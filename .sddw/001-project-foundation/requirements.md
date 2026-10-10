@@ -22,7 +22,7 @@ As a stakeholder, I can visit the Serve With beta website to inspect accepted ch
 - [ ] Clean checkout builds.
 - [ ] PR CI and title validation pass, with no PR-specific deployments.
 - [ ] Push to main deploys `serve-with-staging`.
-- [ ] Beta hostname serves the website over HTTPS.
+- [x] Beta hostname serves the website over HTTPS.
 - [ ] Release Please produces a published stable GitHub release.
 - [ ] Explicit promotion of that release deploys `serve-with` to production.
 - [ ] Production hostname serves the approved release over HTTPS.
