@@ -19,6 +19,23 @@ const digest = async (value: string, pepper: string) => Array.from(new Uint8Arra
 const cookie = (value: string, age: number) => `sw_session=${value}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=${age}`;
 const originOk = (request: Request) => request.headers.get('origin') === new URL(request.url).origin;
 const error = () => json({ error: 'Unable to complete request' }, 400);
+const WINDOW = 10 * 60 * 1000;
+const bucket = (now: number) => Math.floor(now / WINDOW);
+async function allowRate(db: D1Database, pepper: string, dimension: string, identity: string, limit: number, now: number): Promise<boolean> {
+  const key = await digest(dimension + ':' + identity, pepper);
+  const result = await db.prepare(
+    'INSERT INTO auth_rate_limits(key, window, count) VALUES (?, ?, 1) ON CONFLICT(key, window) DO UPDATE SET count=count+1 WHERE count < ?'
+  ).bind(key, bucket(now), limit).run();
+  return result.meta.changes === 1;
+}
+async function withinLimits(request: Request, db: D1Database, pepper: string, email: string, action: string, now: number) {
+  // Cloudflare sets CF-Connecting-IP at the edge. Missing addresses share a conservative fallback bucket.
+  const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
+  // Both gates are charged on each request. This blocks flooding across many addresses.
+  const ipAllowed = await allowRate(db, pepper, action + ':ip', ip, action === 'request' ? 12 : 40, now);
+  const emailAllowed = await allowRate(db, pepper, action + ':email', email, action === 'request' ? 3 : 12, now);
+  return ipAllowed && emailAllowed;
+}
 const bodyOf = async (request: Request): Promise<Record<string, unknown>> => {
   if ((Number(request.headers.get('content-length') || 0) > 2048) || !request.headers.get('content-type')?.startsWith('application/json')) throw new Error('Bad body');
   const body: unknown = await request.json();
@@ -67,8 +84,9 @@ export default {
       if (path === '/api/auth/request') {
         const email = normalize(body.email);
         const generic = json({ message: 'If this account is authorized, a sign-in email will arrive shortly.' });
-        if (!allowed.has(email)) return generic;
         const now = Date.now();
+        const withinRate = await withinLimits(request, db, env.AUTH_PEPPER, email || 'invalid', 'request', now);
+        if (!withinRate || !allowed.has(email)) return generic;
         const count = await db.prepare('SELECT COUNT(*) AS n FROM login_challenges WHERE email=? AND created_at>?').bind(email, now - 3600000).first<{ n: number }>();
         if ((count?.n || 0) >= 5) return generic;
         // Rejection sampling avoids modulo bias in the eight-digit OTP.

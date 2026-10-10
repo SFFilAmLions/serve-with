@@ -2,10 +2,12 @@
 
 - [x] Specify OTP and magic link authentication.
 - [x] Configure two admin emails in YAML and generate server allowlist.
-- [x] Implement initial Cloudflare Worker endpoints and D1 migration.
-- [x] Add email delivery implementation using Resend API.
-- [ ] Provision independent Cloudflare D1 staging/production DBs and bind AUTH_DB.
-- [ ] Configure AUTH_PEPPER, RESEND_API_KEY and AUTH_FROM_EMAIL Worker secrets per environment.
-- [ ] Implement browser-facing sign-in form, magic-link confirmation and protected dashboard.
-- [ ] Add comprehensive integration tests and harden abuse throttling and failed attempt counters.
-- [ ] Verify end-to-end staging; no production promotion without approval.
+- [x] Implement initial Cloudflare Worker endpoints and D1 schema.
+- [x] Add email delivery integration using Resend API.
+- [x] Configure staging D1 and Worker secrets (user confirmed).
+- [x] Add browser-facing sign-in form, magic-link confirmation and server-checked admin dashboard.
+- [x] Add initial IP/email-scoped atomic request and verification throttling.
+- [ ] Apply `migrations/0002_auth_rate_limits.sql` to staging before deploying latest PR code.
+- [ ] Add comprehensive security and integration tests for both login methods and abuse protection.
+- [ ] Verify email delivery, replay/expiry, cookies, logout and staging end-to-end.
+- [ ] Establish production resources only when a production release is approved.
