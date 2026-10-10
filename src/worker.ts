@@ -47,6 +47,13 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
     const path = url.pathname;
+    if (path.startsWith('/api/admin/')) {
+      if (!env.AUTH_DB || !env.AUTH_PEPPER) return json({ error: 'Service unavailable' }, 503);
+      const email = await sessionEmail(request, env);
+      if (!email) return json({ error: 'Authentication required' }, 401);
+      if (request.method === 'GET' && path === '/api/admin/dashboard') return json({ email, message: 'Admin dashboard ready' });
+      return json({ error: 'Not found' }, 404);
+    }
     if (!path.startsWith('/api/auth/')) return env.ASSETS.fetch(request);
     if (!env.AUTH_DB || !env.AUTH_PEPPER || !env.RESEND_API_KEY || !env.AUTH_FROM_EMAIL) return json({ error: 'Sign-in is not configured' }, 503);
     const db = env.AUTH_DB;
@@ -64,11 +71,17 @@ export default {
         const now = Date.now();
         const count = await db.prepare('SELECT COUNT(*) AS n FROM login_challenges WHERE email=? AND created_at>?').bind(email, now - 3600000).first<{ n: number }>();
         if ((count?.n || 0) >= 5) return generic;
-        const code = String(crypto.getRandomValues(new Uint32Array(1))[0] % 100000000).padStart(8, '0');
+        // Rejection sampling avoids modulo bias in the eight-digit OTP.
+        const limit = Math.floor(4294967296 / 100000000) * 100000000;
+        let value: number;
+        do { value = crypto.getRandomValues(new Uint32Array(1))[0]; } while (value >= limit);
+        const code = String(value % 100000000).padStart(8, '0');
         const token = random();
         const codeHash = await digest(email + ':' + code, env.AUTH_PEPPER);
         const tokenHash = await digest(token, env.AUTH_PEPPER);
         const id = crypto.randomUUID();
+        // An issued replacement invalidates earlier outstanding challenges.
+        await db.prepare('UPDATE login_challenges SET consumed_at=? WHERE email=? AND consumed_at IS NULL').bind(now,email).run();
         await db.prepare('INSERT INTO login_challenges(id,email,code_hash,link_hash,expires_at,created_at,attempts) VALUES(?,?,?,?,?,?,0)').bind(id,email,codeHash,tokenHash,now+600000,now).run();
         const link = `${url.origin}/?magic=${encodeURIComponent(token)}`;
         if (!await sendEmail(env,email,code,link)) {
