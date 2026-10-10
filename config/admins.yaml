@@ -1,0 +1,3 @@
+# Administrators are enabled only when explicitly listed here.
+# Replace this example with real approved administrator emails in a reviewed PR.
+admins: []
