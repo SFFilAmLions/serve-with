@@ -25,4 +25,4 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           test -n "$CLOUDFLARE_API_TOKEN" && test -n "$CLOUDFLARE_ACCOUNT_ID" || { echo "::error::Missing Cloudflare secrets"; exit 1; }
-          npx wrangler deploy --name serve-with-staging
+          npx wrangler deploy --env staging
