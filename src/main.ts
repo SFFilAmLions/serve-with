@@ -60,6 +60,9 @@ async function render() {
   try {
     const me = await request('me');
     if (me.authenticated && typeof me.email === 'string') {
+      // The server verifies the session again for every protected API request.
+      const protectedResponse = await fetch('/api/admin/dashboard', { credentials: 'same-origin', cache: 'no-store' });
+      if (!protectedResponse.ok) throw new Error('Session is no longer authorized');
       app!.innerHTML = `<div class="shell"><div class="eyebrow">Serve With · Admin</div><h1>Dashboard</h1><p class="lead">Signed in as ${escaped(me.email)}</p><p class="description">Administrator features are coming soon.</p><button id="logout">Sign out</button></div>`;
       app!.querySelector<HTMLButtonElement>('#logout')!.addEventListener('click',async () => { await request('logout',{}); renderForm(); });
       return;
