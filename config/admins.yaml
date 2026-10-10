@@ -1,3 +1,6 @@
-# Administrators are enabled only when explicitly listed here.
-# Replace this example with real approved administrator emails in a reviewed PR.
-admins: []
+# Explicitly approved administrator email addresses.
+admins:
+  - email: LionAugust@icloud.com
+    enabled: true
+  - email: LSValera58@gmail.com
+    enabled: true
