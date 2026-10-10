@@ -21,11 +21,20 @@ The current application is an informational landing page. Authentication and adm
 ## Deploy with Cloudflare Workers
 
 1. Create a Cloudflare API token with permission to edit Workers, and identify the Cloudflare account ID.
-2. Under GitHub **Settings → Secrets and variables → Actions**, create repository secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`. These are required by the Deploy workflow. If you use protected GitHub Environments, ensure the secrets are accessible in `preview` and `production`.
-3. Feature PRs from this repository deploy preview Workers as `serve-with-pr-N`. Wrangler reports their `workers.dev` URLs in Action logs. The preview Worker names are intentionally separate from production. Fork PRs only run CI.
+2. Under GitHub **Settings → Secrets and variables → Actions**, create repository secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`. These are required by the Deploy workflow. If using protected GitHub Environments, ensure credentials are accessible in `preview` and `production`.
+3. Same-repository feature PRs deploy preview Workers as `serve-with-pr-N`; the `workers.dev` URLs appear in Action logs. Fork PRs only run CI.
 4. Pushes to `main` deploy the production `serve-with` Worker.
-5. In Cloudflare dashboard, configure a custom domain for the `serve-with` Worker: `servewith.sffilamlions.org` (the DNS zone must be managed in Cloudflare).
-6. Verify both a PR preview and production HTTPS URL before accepting the feature. Merge does not automatically prove that DNS is correctly configured.
+5. In Cloudflare dashboard, configure a custom domain for the `serve-with` Worker: `servewith.sffilamlions.org` (zone must be managed in Cloudflare).
+6. Verify preview and production HTTPS URL before accepting the feature.
+
+## Conventional commits and releases
+
+- Use PR titles such as `feat: add events page`, `fix: correct redirect`, `docs: explain setup`. Titles are checked by GitHub Actions.
+- Prefer squash-merging a PR so the resulting commit subject matches its Conventional Commit title.
+- Release Please runs after each push to `main` and updates a pending release PR; merging that release PR creates the GitHub version tag and changelog.
+- Versioning begins at `0.1.0` and uses feature=minor, fix=patch until 1.0. The manifest version is not automatically the currently deployed build.
+- Every ordinary merge to `main` still deploys production; releases and deployments are separate concepts.
+- Staging/version promotion is a future design option, not part of feature 001.
 
 ## Review rules
 
