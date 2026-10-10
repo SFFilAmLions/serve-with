@@ -3,25 +3,29 @@
 Status: proposed for review
 
 ## User story
-As a stakeholder, I can visit a public Serve With page to verify that the project is deployed and review incremental progress.
+As a stakeholder, I can visit the Serve With staging website to inspect accepted changes, and promote a published release to production after approval.
 
 ## In scope
-- Minimal responsive page displaying “Serve With” and project status.
-- TypeScript app with a reproducible build and build checks for pull requests.
-- Cloudflare Worker static asset hosting; preview deployment for PRs and production deployment on main.
-- HTTPS production hostname: servewith.sffilamlions.org.
-- Setup guidance and verified deployment acceptance checklist.
+- Minimal responsive TypeScript landing page.
+- CI on each PR, without creating PR-specific Cloudflare Workers.
+- One shared staging Worker deployed automatically on every push to `main`.
+- One production Worker deployed only when an operator selects a published stable release tag and triggers promotion.
+- Cloudflare custom domains: `staging.servewith.sffilamlions.org` and `servewith.sffilamlions.org`.
+- Conventional Commit PR titles, Release Please and deployment instructions.
 
 ## Out of scope
-- Admin allowlist, sessions, authentication, OTP and magic links (future feature 002).
-- Database, events, volunteer signups, email delivery, elaborate roles, release automation.
+- Authentication, admin YAML, email OTP and magic links (feature 002).
+- Database, event management and signup features.
+- Release candidate staging tags, automatic artifact promotion, per-PR Workers.
 
 ## Acceptance criteria
-- [ ] Fresh checkout builds without manual editing.
-- [ ] PR runs build checks.
-- [ ] PR provides a working preview URL after Cloudflare credentials are configured.
-- [ ] Merge to main deploys production automatically.
-- [ ] https://servewith.sffilamlions.org loads over HTTPS and displays the landing page.
-- [ ] Preview and production deployments have been verified by a human.
+- [ ] Clean checkout builds.
+- [ ] PR CI and title validation pass, with no PR-specific deployments.
+- [ ] Push to main deploys `serve-with-staging`.
+- [ ] Staging hostname serves the website over HTTPS.
+- [ ] Release Please produces a published stable GitHub release.
+- [ ] Explicit promotion of that release deploys `serve-with` to production.
+- [ ] Production hostname serves the approved release over HTTPS.
+- [ ] Operator verifies both environments.
 
-Do not mark feature complete solely because files have been committed.
+Do not mark complete until the staging and production URLs have been tested.

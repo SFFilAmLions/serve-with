@@ -1,19 +1,17 @@
-name: Deploy
+name: Deploy staging
 on:
   push:
     branches: [main]
-  pull_request:
-    types: [opened, synchronize, reopened]
+  workflow_dispatch:
 permissions:
   contents: read
 concurrency:
-  group: worker-${{ github.event.pull_request.number || 'production' }}
+  group: serve-with-staging
   cancel-in-progress: true
 jobs:
-  deploy:
-    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+  deploy-staging:
     runs-on: ubuntu-latest
-    environment: ${{ github.event_name == 'push' && 'production' || 'preview' }}
+    environment: staging
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -21,18 +19,10 @@ jobs:
           node-version: '22'
       - run: npm install
       - run: npm run build
-      - name: Deploy Cloudflare Worker
+      - name: Deploy staging Worker
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
-            echo "::error::Cloudflare secrets are missing; see README."
-            exit 1
-          fi
-          if [ -n "$PR_NUMBER" ]; then
-            npx wrangler deploy --name "serve-with-pr-$PR_NUMBER"
-          else
-            npx wrangler deploy
-          fi
+          test -n "$CLOUDFLARE_API_TOKEN" && test -n "$CLOUDFLARE_ACCOUNT_ID" || { echo "::error::Missing Cloudflare secrets"; exit 1; }
+          npx wrangler deploy --name serve-with-staging

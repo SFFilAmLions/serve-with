@@ -2,40 +2,42 @@
 
 Volunteer coordination for SFFilAmLions, developed in small SDDW iterations.
 
-## Run locally
+## Local development
 
-Use Node.js 22+.
-
+Node.js 22+:
 ```bash
 npm install
 npm run dev
 npm run build
 ```
 
-## Feature 001 — Project Foundation
+See [SDDW feature 001](.sddw/001-project-foundation/requirements.md). Feature 002 will add the YAML admin allowlist, email OTP and magic links.
 
-See [requirements](.sddw/001-project-foundation/requirements.md), [design](.sddw/001-project-foundation/design.md), and [tasks](.sddw/001-project-foundation/tasks.md).
+## Deployment environments
 
-The current application is an informational landing page. Authentication and admin management (YAML allowlist, email OTP **and** magic links) are explicitly planned for a later feature.
+| Event | Result |
+| --- | --- |
+| Pull request | CI + Conventional Commit PR-title check; **no Worker deployment** |
+| Push/merge to `main` | Automatically deploys shared staging Worker `serve-with-staging` |
+| Release Please release PR merged | Creates GitHub versioned release; does **not** automatically deploy production |
+| Manual **Deploy production** workflow with approved, published stable release tag | Checks out tag and deploys Worker `serve-with` |
 
-## Deploy with Cloudflare Workers
+Staging hostname: `staging.servewith.sffilamlions.org`  
+Production hostname: `servewith.sffilamlions.org`
 
-1. Create a Cloudflare API token with permission to edit Workers, and identify the Cloudflare account ID.
-2. Under GitHub **Settings → Secrets and variables → Actions**, create repository secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`. These are required by the Deploy workflow. If using protected GitHub Environments, ensure credentials are accessible in `preview` and `production`.
-3. Same-repository feature PRs deploy preview Workers as `serve-with-pr-N`; the `workers.dev` URLs appear in Action logs. Fork PRs only run CI.
-4. Pushes to `main` deploy the production `serve-with` Worker.
-5. In Cloudflare dashboard, configure a custom domain for the `serve-with` Worker: `servewith.sffilamlions.org` (zone must be managed in Cloudflare).
-6. Verify preview and production HTTPS URL before accepting the feature.
+## Setup
 
-## Conventional commits and releases
+1. Add GitHub repository Actions secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`. Grant token Workers Scripts Write for the selected Cloudflare account.
+2. On first push to `main`, [Deploy staging](../../actions/workflows/deploy.yml) creates `serve-with-staging`. Find its `workers.dev` URL in workflow logs.
+3. In Cloudflare, attach `staging.servewith.sffilamlions.org` to that Worker as a **Custom Domain** and verify HTTPS.
+4. Ensure GitHub Actions has permission to create PRs, so Release Please can maintain its release PR. Squash merge with Conventional Commit PR titles.
+5. Merge an approved Release Please PR; confirm a stable published GitHub Release exists.
+6. In [Deploy production](../../actions/workflows/deploy-production.yml), choose **Run workflow** on `main`, provide the published tag (for example `v0.2.0`) and start deployment. You can optionally require reviewers on the GitHub `production` environment.
+7. Attach `servewith.sffilamlions.org` as a Cloudflare Custom Domain on `serve-with` and verify HTTPS. Keep staging and production environment bindings separate if later introducing stateful services.
+8. The previous `serve-with-pr-1` Worker is not removed by this change; remove it manually after shared staging is verified, if no longer needed.
 
-- Use PR titles such as `feat: add events page`, `fix: correct redirect`, `docs: explain setup`. Titles are checked by GitHub Actions.
-- Prefer squash-merging a PR so the resulting commit subject matches its Conventional Commit title.
-- Release Please runs after each push to `main` and updates a pending release PR; merging that release PR creates the GitHub version tag and changelog.
-- Versioning begins at `0.1.0` and uses feature=minor, fix=patch until 1.0. The manifest version is not automatically the currently deployed build.
-- Every ordinary merge to `main` still deploys production; releases and deployments are separate concepts.
-- Staging/version promotion is a future design option, not part of feature 001.
+## Versioning
 
-## Review rules
+PRs use Conventional Commit titles (`feat:`, `fix:`, `docs:`, etc.) and preferably squash merges. Release Please maintains the version manifest (starting at `0.1.0`), changelog and release PR. Staging tracks the latest `main`; production tracks a deliberately promoted version.
 
-One narrow spec and feature per PR. Review visible changes via preview deployment, then verify production after merge. Avoid adding future product complexity prematurely.
+For now, production rebuilds source at the released tag. Reusing the *exact same built artifact* across environments and candidate tags is future work, not implemented here.
