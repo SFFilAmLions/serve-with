@@ -22,14 +22,18 @@ See [SDDW feature 001](.sddw/001-project-foundation/requirements.md). Feature 00
 | Release Please release PR merged | Creates GitHub versioned release; does **not** automatically deploy production |
 | Manual **Deploy production** workflow with approved, published stable release tag | Checks out tag and deploys Worker `serve-with` |
 
-Staging hostname: `staging.servewith.sffilamlions.org`  
-Production hostname: `servewith.sffilamlions.org`
+| Environment | Public URL | Cloudflare Worker |
+| --- | --- | --- |
+| Beta / staging | [servewith-beta.sffilamlions.org](https://servewith-beta.sffilamlions.org) | `serve-with-staging` |
+| Production (not yet released) | [servewith.sffilamlions.org](https://servewith.sffilamlions.org) | `serve-with` |
+
+While custom domains are being configured, staging is available at [serve-with-staging.sffilamlions.workers.dev](https://serve-with-staging.sffilamlions.workers.dev/). The production URL is reserved for an explicitly approved release.
 
 ## Setup
 
 1. Add GitHub repository Actions secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`. Grant token Workers Scripts Write for the selected Cloudflare account.
 2. On first push to `main`, [Deploy staging](../../actions/workflows/deploy.yml) creates `serve-with-staging`. Find its `workers.dev` URL in workflow logs.
-3. In Cloudflare, attach `staging.servewith.sffilamlions.org` to that Worker as a **Custom Domain** and verify HTTPS.
+3. In Cloudflare, attach `servewith-beta.sffilamlions.org` to that Worker as a **Custom Domain** and verify HTTPS.
 4. Ensure GitHub Actions has permission to create PRs, so Release Please can maintain its release PR. Squash merge with Conventional Commit PR titles.
 5. Merge an approved Release Please PR; confirm a stable published GitHub Release exists.
 6. In [Deploy production](../../actions/workflows/deploy-production.yml), choose **Run workflow** on `main`, provide the published tag (for example `v0.2.0`) and start deployment. You can optionally require reviewers on the GitHub `production` environment.
