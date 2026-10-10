@@ -1,4 +1,5 @@
-import type { D1Database } from '@cloudflare/workers-types';
+interface D1Statement { bind(...values: unknown[]): D1Statement; first<T>(): Promise<T | null>; run(): Promise<{ meta: { changes: number } }> }
+interface D1Database { prepare(query: string): D1Statement }
 import admins from './generated/admins.json';
 
 interface Env {
