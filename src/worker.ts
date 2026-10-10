@@ -85,8 +85,14 @@ export default {
         const now = Date.now();
         const hashed = await digest(path.endsWith('/verify') ? email + ':' + code : token, env.AUTH_PEPPER);
         const field = path.endsWith('/verify') ? 'code_hash' : 'link_hash';
-        const row = await db.prepare(`SELECT id,attempts FROM login_challenges WHERE email=? AND ${field}=? AND consumed_at IS NULL AND expires_at>?`).bind(email,hashed,now).first<{ id: string; attempts: number }>();
-        if (!row || row.attempts >= 5) return error();
+        const latest = await db.prepare('SELECT id,attempts FROM login_challenges WHERE email=? AND consumed_at IS NULL AND expires_at>? ORDER BY created_at DESC LIMIT 1').bind(email,now).first<{id: string; attempts: number}>();
+        if (!latest || latest.attempts >= 5) return error();
+        // Count failed guesses against the latest outstanding challenge, regardless of token validity.
+        const row = await db.prepare(`SELECT id,attempts FROM login_challenges WHERE id=? AND ${field}=? AND consumed_at IS NULL AND expires_at>?`).bind(latest.id,hashed,now).first<{ id: string; attempts: number }>();
+        if (!row) {
+          await db.prepare('UPDATE login_challenges SET attempts=attempts+1 WHERE id=? AND attempts<5 AND consumed_at IS NULL').bind(latest.id).run();
+          return error();
+        }
         const consumed = await db.prepare('UPDATE login_challenges SET consumed_at=? WHERE id=? AND consumed_at IS NULL').bind(now,row.id).run();
         if (consumed.meta.changes !== 1) return error();
         const session = random();
