@@ -8,9 +8,9 @@
 - [x] Document deployment and manual promotion.
 - [ ] Verify new PR checks.
 - [ ] Merge after review to deploy shared staging.
-- [ ] Bind and verify staging custom domain.
+- [ ] Bind and verify beta Workers Custom Domain (`servewith-beta.sffilamlions.org`).
 - [ ] Merge a Release Please release PR to publish a stable version.
 - [ ] Manually deploy approved release to production.
-- [ ] Bind and verify production custom domain.
-- [ ] Clean up legacy PR Worker after staging is verified.
+- [ ] Bind and verify production Workers Custom Domain (`servewith.sffilamlions.org`) after `serve-with` is deployed.
+- [ ] Clean up legacy PR Worker after beta is verified.
 - [ ] Mark feature accepted.
