@@ -52,11 +52,11 @@ References: [requirements.md](requirements.md) (approved); [design.md](design.md
 
 - [x] Implement initial Add Event, Edit, and Delete controls for authenticated admins, including empty states and past events; backend retains authorization enforcement (CI/UI verification pending).
 - [ ] Complete accessible Add/Edit dialog: IANA time-zone autocomplete, form validation, edit prefill, and preserved server errors implemented; keyboard/focus interaction tests pending.
-- [ ] Complete save feedback: duplicate saves blocked and field-level client/server validation implemented; explicit success status and UI interaction tests pending.
+- [ ] Complete save feedback: duplicate saves blocked, field-level errors and success Snackbar implemented; browser-level interaction tests pending.
 - [ ] Guard Cancel, close icon, Escape, and backdrop: if values changed, ask **Discard unsaved changes?**; otherwise close immediately. Ensure keyboard navigation, trapping/restoring focus, and screen-reader labels.
 - [x] Implement a separate Delete confirmation naming the event, refreshing on soft-delete and preserving the event on error (CI/UI verification pending).
 - [x] Handle HTTP 409 version conflicts by preserving unsaved edits, explaining the conflict, and offering a reload action with explicit discard confirmation (automated interaction tests still pending).
-- [ ] Add UI tests for Add/Edit/Delete, past event management, unsaved-change guards, duplicate submission, concurrency conflict preservation, focus restoration, error states, and authorization visibility.
+- [ ] Add comprehensive browser interaction tests for Add/Edit/Delete, past event management, unsaved-change guards, duplicate submission, version conflicts, focus restoration, error states, and authorization visibility. Initial source-contract regression checks added; these are not substitutes for UI interaction tests.
 
 **Review checkpoint:** End-to-end CRUD works for an authenticated staging admin; conflicts do not silently discard work.
 
