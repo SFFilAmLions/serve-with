@@ -4,7 +4,9 @@ import { readFileSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import ts from 'typescript';
 
+globalThis.__testTemporal = (await import('@js-temporal/polyfill')).Temporal;
 const source = readFileSync('src/worker.ts','utf8')
+  .replace("import { Temporal } from '@js-temporal/polyfill';", "const Temporal = globalThis.__testTemporal;")
   .replace("import admins from './generated/admins.json';", "const admins = [{email:'lionaugust@icloud.com',enabled:true}];");
 const compiled = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText;
 const worker = (await import('data:text/javascript;base64,' + Buffer.from(compiled).toString('base64'))).default;
