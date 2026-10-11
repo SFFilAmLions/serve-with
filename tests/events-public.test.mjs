@@ -123,3 +123,35 @@ test('admin event creation and edits validate Temporal, preserve versions, and r
    assert.equal((await h.req('/api/admin/events/'+id,'DELETE',{version:2},cookie)).status,204);
  } finally {h.sqlite.close();}
 });
+
+test('event inputs accept overnight and multiple IANA zones, reject invalid fields and missing IDs',async()=>{
+  const h=harness();
+  try {
+    const now=Date.now(),session='c'.repeat(64);
+    const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode('test:'+session))),b=>b.toString(16).padStart(2,'0')).join('');
+    h.sqlite.prepare('INSERT INTO sessions(token_hash,email,expires_at,created_at) VALUES (?,?,?,?)').run(hash,'lionaugust@icloud.com',now+600000,now);
+    const cookie='__Host-sw_session='+session;
+    const event={title:'Overnight service',location:'Community Center',timezone:'America/New_York',start:'2026-11-14T23:00',end:'2026-11-15T01:00'};
+    const created=await h.req('/api/admin/events','POST',event,cookie);
+    assert.equal(created.status,201);
+    const parsed=(await created.json()).event;
+    assert.equal(parsed.end_at-parsed.start_at,2*60*60*1000);
+    assert.equal(parsed.timezone,'America/New_York');
+    const invalids=[
+      {...event,title:'   '},
+      {...event,location:'x'.repeat(501)},
+      {...event,timezone:'Invalid/Timezone'},
+      {...event,end:event.start},
+      {...event,start:'2026-11-14 23:00'},
+    ];
+    for (const input of invalids) {
+      const response=await h.req('/api/admin/events','POST',input,cookie);
+      assert.equal(response.status,422);
+      assert.ok(Object.keys((await response.json()).fields).length>0);
+    }
+    const missing='123e4567-e89b-42d3-a456-426614174001';
+    assert.equal((await h.req('/api/admin/events/'+missing,'PUT',{...event,version:1},cookie)).status,404);
+    assert.equal((await h.req('/api/admin/events/'+missing,'DELETE',{version:1},cookie)).status,404);
+    assert.equal((await h.req('/api/admin/events/'+parsed.id,'PUT',{...event,version:0},cookie)).status,422);
+  } finally { h.sqlite.close(); }
+});
