@@ -41,6 +41,16 @@ Enable authenticated attendees to sign up for events, withdraw, and review their
 4. Distinguish who made a change if technically feasible, but adding actor/audit columns beyond the agreed minimal model requires separate scope approval.
 5. Existing event Create/Edit/Duplicate/Delete flows remain intact. Optional capacity is an additive event field. An editor must not lower capacity below the number of active signups without an explicit, agreed resolution rule (default: reject the change).
 
+## Administrator user creation and claimable stub accounts
+- On the **administrator event signup page**, provide a searchable selector for an existing attendee **and** a clear **Create user** action. After a new stub is created, return to the event signup flow with that user selected; do not automatically add the person to the event without an explicit signup confirmation.
+- Provide a distinct **administrator-only Create User page** using the existing account-registration form's Material field layout and validation patterns. **First name and last name are required.** Other profile fields, including email and date of birth, are optional at stub creation. No Terms of Use acceptance or Privacy Policy acknowledgment is performed or recorded by the administrator on behalf of the person.
+- Store a stub as an explicitly **unclaimed, unverified identity** with a stable internal user ID and nullable email/DOB as appropriate. Creation must not generate a signed-in session, mark email verified, mark policy acceptance current, or grant administrative privileges. Server-side authorization restricts creating, editing, and using stubs for on-behalf-of signup to authorized administrators.
+- Administrators may sign up a stub user to an event under the same capacity, cutoff, duplicate-active-signup and withdrawal rules as other attendees. Existing history remains associated with the stable user ID after the stub is claimed.
+- **Claiming:** Provide a secure, explicit account-claim flow that verifies control of a contact method or a high-entropy one-time invitation/claim token bound to the stub and expires after limited use. A matching name, guessed email, or knowledge of public roster details must never establish ownership. Once verified, link the authenticated account to the existing stable user ID, prevent duplicate identity/account collisions, and require the real person to complete any missing required details plus personally acknowledge the then-current Terms and Privacy Policy before normal signed-in access.
+- If no email/contact details are provided at stub creation, claiming must still be supported through an admin-mediated secure invitation or one-time claim mechanism; do not expose claim secrets in public URLs, rosters, analytics, or routine logs. Define secure invitation delivery/transfer and recovery in the technical design. **Do not** silently match new registrations to stub records by name.
+- Admin-created stub records must be distinguishable from registered accounts in user selection and rosters, with minimal personal data shown to other active participants. Assess the privacy-policy and age-eligibility implications of administrators entering third-party information without consent, and avoid sending authentication email to an unverified address.
+- Add tests for required names/optional other fields, lack of admin-imputed acceptance, unauthorized creation, duplicate names, secure claiming and replay, account collision handling, preservation of signup history, and inability to claim based on name alone.
+
 ## Database and consistency
 - New `event_signups` table with `id` (UUID), `event_id`, `user_id`, `created_at` (timestamp), and nullable `deleted_at` (timestamp).
 - A row with `deleted_at IS NULL` is active. A row with a non-null `deleted_at` is withdrawn. No status enum.
@@ -109,7 +119,7 @@ This is a cross-cutting UI refinement implemented in the same batch as event sig
 - Signup notifications, email/calendar invitations or reminders.
 - Organization-scoped signup permissions and cross-organization access.
 - Event attendance/check-in or verification of service.
-- Custom signup questions/forms, signup approvals and signup-by-email for users without accounts.
+- Custom signup questions/forms, signup approvals and signup-by-email for users without accounts. Admin-created **stub users** are an explicit exception for on-behalf-of signup, not general anonymous registration.
 - Historical participation recovery/account-deletion flows; reconsider after signup data and retention behavior are validated.
 
 ## Questions for design review
