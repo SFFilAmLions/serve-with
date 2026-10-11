@@ -18,7 +18,7 @@ Retain Vite, React, MUI, Cloudflare Worker, D1, Resend email verification, the c
 | --- | --- | --- |
 | `/` | Public | Upcoming/Past events, Attendee experience |
 | `/login` | Public | Email-first sign-in and inline first-login profile completion |
-| `/profile` | Signed in | Edit own names, view date of birth, read-only verified email, delete own account |
+| `/profile` | Signed in | Edit own names, view date of birth, verified email change, deactivate own account |
 | `/admin` | Complete-profile admin | Administrative workspace |
 | `/admin/events/new` | Complete-profile admin | Create Event dedicated page |
 | `/admin/events/:id/edit` | Complete-profile admin | Edit Event dedicated page (proposed for consistency; pending approval) |
@@ -53,10 +53,13 @@ Configure staging allowlist as a separate reviewed server-side email-only config
 
 ## 5. User pages and authorization
 
-- **Profile:** signed-in user may read/edit own first/last name, view own read-only date of birth and verified email, and initiate own-account deletion with explicit confirmation; prevent empty/invalid names. Never allow edit of email or role here.
+- **Profile:** signed-in user may read/edit own first/last name, view own read-only date of birth and verified email, request a verified new-email change, and initiate own-account deactivation with explicit confirmation; prevent empty/invalid names. Never allow direct unverified editing of email or role here.
 - **Admin Users:** enforce administrator authorization for both directory page and list/search APIs; attendee requests are denied without returning any directory data. List only completed registered accounts; exclude birth dates from directory queries, search results and default payloads (plus an explicitly marked pending state if product review later chooses to expose it); search by name/email; paginate server-side, never dump every account to all clients. No Create User action.
 - **Admin Edit User:** use the same profile form fields as self-edit, but a different server-authorized endpoint allowing edits to the selected existing user's first/last name. Neither user ID nor client-provided role flags confer authority. Verified email and role remain read-only.
-- **Account deletion:** revoke sessions and pending challenges, stop access, remove/anonymize personal data to the defined retention policy; guard concurrent requests. Exact policy for re-registration and retained audit references remains an approval question. Admins cannot delete other accounts as part of this phase.
+- **Verified email change:** a protected change-request and confirm flow sends verification solely to the proposed new address; enforce uniqueness across active/deactivated records and staging eligibility, keep old email until verified, atomically update the existing user, invalidate outstanding challenges/sessions as needed, and recalculate admin permission from the *new* email. Do not transfer access from the old email.
+- **Deactivation (user-facing “Delete account”):** require explicit confirmation, atomically null all profile PII (first name, last name, date of birth and other covered fields), set a deactivated status/time, revoke sessions/challenges, and retain stable user ID and email. Existing signup foreign keys remain linked; don't remove signups. Restrict exposure of deactivated identities in normal directory results.
+- **Reactivation:** successful verification of the retained email looks up and reuses the existing deactivated user ID, clears deactivation state into restricted pending-profile status, then requires fresh names and date of birth inline before full access. Enforce staging eligibility at reactivation. Never restore old profile data or trust prior admin rights.
+- **Privacy constraint:** retained email and signup links still permit identification; refer to this as pseudonymization, not anonymity. Inventory any PII embedded in signups, define exact retained data/retention basis, and consider a separate full-erasure request process before approving migration. Admins cannot delete other accounts in this phase.
 - For all mutating endpoints, check session validity, account completeness, allowlist/eligibility as appropriate, origin, and object-level authorization on the server.
 
 **Date-of-birth privacy:** Limit storage to a calendar date, do not infer age or gate features unless separately specified, never log or publicly index it, and do not expose it in generic user-list responses. Correction is administrator-only after initial entry; owners can view but not edit date of birth. Audit changes without logging raw birth dates; decide encryption feasibility, retention and erasure before implementation.
@@ -76,7 +79,7 @@ A page navigation guard replaces Create Event modal Cancel/X semantics; confirm 
 Tests:
 - Allowed/disallowed staging emails, challenge anti-enumeration and rate limits, case-insensitive uniqueness and email verification, link replay/expiry, code path, no double magic exchange.
 - First-login pending-profile gate; required names; existing admin transition; update own profile versus admin editing others; direct URL/API denial for attendee; role changes only through YAML.
-- Directory pagination/search; session invalidation on self-deletion; no admin creation path.
+- Directory pagination/search; verified email change, PII-clearing deactivation, preserved signup references, same-ID reactivation, session invalidation; no admin creation path.
 - Attendee/admin view switching, app bar account menu, deep linking, accessibility, mobile and light/dark themes.
 - Duplicate Event from upcoming/past events, copied values, distinct new ID, no modification of source, no automatic save, and create-form validation.
 - Date/time alignment, editable End date and timezone, duration and DST cases, unsaved-navigation guards, regression of CRUD/public event listings.
@@ -85,8 +88,8 @@ Implementation requires separate review of task slices, then a PR with green CI 
 
 ## 8. Open product decisions (not silently approved)
 
-1. After self-deletion, can an email still eligible for staging immediately re-register? Suggested: yes as a new account, with fresh verification and no automatic restoration of sessions or elevated roles.
-2. What personal data or audit references must be retained after account deletion? Define before migration/deletion API.
+1. **Resolved:** eligible email can reactivate the same stable user ID after fresh verification, with required profile completion. Linked event signups persist.
+2. **Partly resolved:** retain email, user ID, and event signup references; clear profile PII. Enumerate signup-contained PII and other retention/legal obligations before implementing.
 3. Shall Edit Event also be a dedicated page? Suggested: yes.
 4. Exact picker component and inline duration placement.
 5. Production registration eligibility remains **out of scope** and must be explicitly decided later.
