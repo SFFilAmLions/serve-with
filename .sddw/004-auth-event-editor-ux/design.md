@@ -5,8 +5,8 @@
 Prepare a design only after reviewing [requirements.md](requirements.md).
 
 Design review must cover:
-- Email-first unified login for existing and eligible new users (login page or home-page modal), with eight-digit code or auto-exchanged magic link; single-attempt POST exchange and token scrubbing.
-- First successful verified login creates an eligible account if needed, and routes missing-name profiles to the reusable Edit Profile page before regular access.
+- Dedicated email-first login page for existing and eligible new users, with eight-digit code or auto-exchanged magic link; single-attempt POST exchange and token scrubbing.
+- First successful verified login creates an eligible account if needed, and expands the post-verification login flow inline for missing first/last name before regular access; reuse validation with the later Edit Profile page.
 - Distinct attendee and administrator views; authorized administrator mode switching, route boundaries, app-bar affordances, and mobile behavior.
 - Material AppBar sign-in and account menu, with dialogs and mobile behavior.
 - Dedicated Create Event page (not a modal), shared event form/edit presentation, URL routing and unsaved-navigation guard; prominent date and equal-width clock pickers, expandable end date/time zone, end-date synchronization, DST-aware duration preview.
