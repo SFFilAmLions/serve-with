@@ -88,3 +88,58 @@ test('administrator creates an event, then sees its event-local time and reposit
   await page.getByText('Development build').waitFor();
  }finally{await browser.close()}
 });
+
+test('admin edits and soft-deletes a past event using version preconditions',async()=>{
+ await ready();
+ const browser=await chromium.launch({headless:true});
+ try{
+  const page=await browser.newPage();
+  const event={id:'past-1',title:'Old event',location:'Clubhouse',timezone:'America/Los_Angeles',start_at:Date.parse('2025-05-01T16:00:00Z'),end_at:Date.parse('2025-05-01T18:00:00Z'),version:1};
+  let deleted=false,putCount=0,deleteCount=0;
+  await page.route('**/api/auth/me',r=>r.fulfill({json:{authenticated:true,email:'admin@example.org'}}));
+  await page.route('**/api/admin/dashboard',r=>r.fulfill({json:{ok:true}}));
+  await page.route('**/api/events?view=*',r=>r.fulfill({json:{events:r.request().url().includes('view=past')&&!deleted?[event]:[]}}));
+  await page.route('**/api/admin/events/past-1',async r=>{
+   const data=r.request().postDataJSON();
+   if(r.request().method()==='PUT'){assert.equal(data.version,1);assert.equal(data.title,'Edited event');event.title=data.title;event.version=2;putCount++;await r.fulfill({json:{event}});}
+   else{assert.equal(r.request().method(),'DELETE');assert.equal(data.version,2);deleted=true;deleteCount++;await r.fulfill({status:204,body:''});}
+  });
+  await page.goto(base);
+  await page.getByRole('tab',{name:'Past Events'}).click();
+  await page.getByRole('heading',{name:'Old event'}).waitFor();
+  await page.getByRole('button',{name:'Edit'}).click();
+  await page.getByRole('textbox',{name:'Title'}).fill('Edited event');
+  await page.getByRole('button',{name:'Save'}).click();
+  await page.getByRole('heading',{name:'Edited event'}).waitFor();
+  assert.equal(putCount,1);
+  await page.getByRole('button',{name:'Delete',exact:true}).click();
+  await page.getByRole('dialog',{name:'Delete Edited event?'}).waitFor();
+  await page.getByRole('button',{name:'Delete event'}).click();
+  await page.getByText('No past events yet.').waitFor();
+  assert.equal(deleteCount,1);
+ }finally{await browser.close()}
+});
+
+test('version conflict preserves edits and requires confirmation to reload',async()=>{
+ await ready();
+ const browser=await chromium.launch({headless:true});
+ try{
+  const page=await browser.newPage();
+  const event={id:'conflict-1',title:'Food drive',location:'Main hall',timezone:'America/Los_Angeles',start_at:Date.parse('2026-12-04T17:00:00Z'),end_at:Date.parse('2026-12-04T19:00:00Z'),version:1};
+  await page.route('**/api/auth/me',r=>r.fulfill({json:{authenticated:true,email:'admin@example.org'}}));
+  await page.route('**/api/admin/dashboard',r=>r.fulfill({json:{ok:true}}));
+  await page.route('**/api/events?view=*',r=>r.fulfill({json:{events:[event]}}));
+  await page.route('**/api/admin/events/conflict-1',async r=>{assert.equal(r.request().postDataJSON().version,1);await r.fulfill({status:409,json:{error:'Version conflict'}})});
+  await page.goto(base);
+  await page.getByRole('heading',{name:'Food drive'}).waitFor();
+  await page.getByRole('button',{name:'Edit'}).click();
+  await page.getByRole('textbox',{name:'Title'}).fill('My unsaved edit');
+  await page.getByRole('button',{name:'Save'}).click();
+  await page.getByText('Another administrator changed this event.',{exact:false}).waitFor();
+  assert.equal(await page.getByRole('textbox',{name:'Title'}).inputValue(),'My unsaved edit');
+  await page.getByRole('button',{name:'Reload current event'}).click();
+  await page.getByRole('dialog',{name:'Discard edits and load current event?'}).waitFor();
+  await page.getByRole('button',{name:'Keep editing'}).click();
+  assert.equal(await page.getByRole('textbox',{name:'Title'}).inputValue(),'My unsaved edit');
+ }finally{await browser.close()}
+});
