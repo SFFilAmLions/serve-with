@@ -5,7 +5,7 @@ import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { TimePicker } from '@mui/x-date-pickers/TimePicker';
-import { AppBar, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Alert, Autocomplete, Snackbar, Checkbox, FormControlLabel, Container, CssBaseline, Stack, Tab, Tabs, TextField, ThemeProvider, Typography, useMediaQuery, IconButton, Menu, MenuItem, ListItemButton, Divider, Tooltip, Skeleton } from '@mui/material';
+import { AppBar, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Alert, Autocomplete, Snackbar, Checkbox, FormControlLabel, Container, CssBaseline, Stack, Tab, Tabs, TextField, ThemeProvider, Typography, useMediaQuery, IconButton, Menu, MenuItem, ListItemButton, Divider, Tooltip, Skeleton, Card, CardContent, CardActions, Chip, SvgIcon, Avatar, ToggleButtonGroup, ToggleButton } from '@mui/material';
 import './style.css';
 import policyMetadata from './generated/policy-versions.json';
 import privacyPolicy from '../policies/privacy/approved-draft.md?raw';
@@ -15,6 +15,33 @@ import { type Draft, timeZones, validateDraft, emptyDraft, localInput } from './
 
 type EventRecord = { id:string; title:string; location:string; timezone:string; start_at:number; end_at:number; version:number };
 type View = 'upcoming'|'past';
+function Glyph({type}:{type:'sun'|'moon'|'system'|'person'|'swap'|'logout'|'login'|'pin'|'back'|'save'|'edit'|'copy'|'trash'|'github'}) {
+ const paths:{[key:string]:string}={
+ sun:'M12 3v2m0 14v2M3 12h2m14 0h2M5.6 5.6 7 7m10 10 1.4 1.4M5.6 18.4 7 17m10-10 1.4-1.4M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8',
+ moon:'M20 15.5A8 8 0 0 1 8.5 4a8.2 8.2 0 1 0 11.5 11.5',
+ system:'M3 4h18v13H3zM8 21h8m-4-4v4M12 6v9a4 4 0 0 0 0-9',
+ person:'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8M4 21a8 8 0 0 1 16 0',
+ swap:'M4 7h16m-4-4 4 4-4 4M20 17H4m4-4-4 4 4 4',
+ logout:'M4 4h8v16H4M10 12h11m-4-4 4 4-4 4',
+ login:'M4 4h8v16H4M10 12h11m-4-4 4 4-4 4',
+ pin:'M12 22s7-7 7-13a7 7 0 0 0-14 0c0 6 7 13 7 13Zm0-10a3 3 0 1 0 0-6 3 3 0 0 0 0 6',
+ back:'M20 12H4m7-7-7 7 7 7',
+ save:'M5 12l5 5L20 7',
+ edit:'M4 20h4l11-11-4-4L4 16v4',
+ copy:'M8 4h12v14H8zM4 8v12h12',
+ trash:'M4 7h16M10 4h4M7 7l1 14h8l1-14M10 11v6m4-6v6',
+ github:'M9 19c-4 1-4-2-6-2m13 2v-3a4 4 0 0 0-1-3c3 0 6-1 6-6a5 5 0 0 0-1-3 4 4 0 0 0 0-3s-2 0-4 2a15 15 0 0 0-8 0C6 1 4 1 4 1v3a5 5 0 0 0-1 3c0 5 3 6 6 6a4 4 0 0 0-1 3v3'
+ };
+ return <SvgIcon fontSize="small"><path d={paths[type]} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></SvgIcon>;
+}
+function EventWhen({event}:{event:EventRecord}){
+ const date=(v:number)=>new Intl.DateTimeFormat('en-US',{weekday:'short',month:'short',day:'numeric',year:'numeric',timeZone:event.timezone}).format(v);
+ const time=(v:number)=>new Intl.DateTimeFormat('en-US',{hour:'numeric',minute:'2-digit',timeZone:event.timezone}).format(v);
+ const start=date(event.start_at),end=date(event.end_at);
+ const abbreviated=new Intl.DateTimeFormat('en-US',{timeZone:event.timezone,timeZoneName:'short'}).formatToParts(event.start_at).find(p=>p.type==='timeZoneName')?.value||event.timezone;
+ return <Stack spacing={1}><Typography>{start===end?start:start+' – '+end}</Typography><Typography variant="body2" color="text.secondary">{time(event.start_at)} – {time(event.end_at)}</Typography><Stack direction="row" gap={1} flexWrap="wrap"><Chip icon={<Glyph type="pin"/>} size="small" label={event.location} variant="outlined"/>{event.timezone!==Intl.DateTimeFormat().resolvedOptions().timeZone&&<Tooltip title={event.timezone}><Chip size="small" variant="outlined" label={abbreviated}/></Tooltip>}</Stack></Stack>;
+}
+
 const repositoryUrl = 'https://github.com/SFFilAmLions/serve-with';
 const buildEnvironment = import.meta.env.VITE_DEPLOY_ENV;
 const buildSha = import.meta.env.VITE_COMMIT_SHA || '';
@@ -25,9 +52,7 @@ function BuildFooter() {
  const label = staged ? 'Commit ' + buildSha.slice(0,12) : released ? 'Version ' + releaseTag : 'Development build';
  const href = staged ? repositoryUrl + '/commit/' + buildSha : released ? repositoryUrl + '/releases/tag/' + releaseTag : undefined;
  return <Box component="footer" sx={{my:5,color:'text.secondary',fontSize:12,display:'flex',flexWrap:'wrap',gap:1,alignItems:'center'}}>
-  <a href={repositoryUrl} target="_blank" rel="noopener noreferrer" aria-label="Serve With GitHub repository">GitHub repository</a>
-  <span aria-hidden="true">·</span>
-  {href ? <a href={href} target="_blank" rel="noopener noreferrer">{label}</a> : <span>{label}</span>}
+  <Chip component="a" clickable icon={<Glyph type="github"/>} label="GitHub" href={repositoryUrl} target="_blank" rel="noopener noreferrer" aria-label="Serve With GitHub repository" size="small" variant="outlined"/>{href?<Chip component="a" clickable label={label} href={href} target="_blank" rel="noopener noreferrer" size="small" variant="outlined"/>:<Chip label={label} size="small" variant="outlined"/>}
  </Box>;
 }
 const magic = new URL(location.href).searchParams.get('magic');
@@ -92,9 +117,9 @@ function EventList({admin}:{admin:boolean}){
  const local=(instant:number,timezone:string)=>new Intl.DateTimeFormat('en-US',{weekday:'long',year:'numeric',month:'long',day:'numeric',hour:'numeric',minute:'2-digit',timeZone:timezone,timeZoneName:'short'}).format(new Date(instant));
  return <Box component="section" aria-label="Events" sx={{my:5}}>
   {admin&&<Box sx={{display:'flex',justifyContent:'flex-end',mb:2}}><Button variant="contained" onClick={e=>{editorTrigger.current=e.currentTarget;go('/admin/events/new')}}>Add Event</Button></Box>}
-  <Tabs value={view} onChange={(_,v:View)=>setView(v)} aria-label="Event timeline"><Tab label="Upcoming Events" value="upcoming"/><Tab label="Past Events" value="past"/></Tabs>
+  <ToggleButtonGroup exclusive color="primary" size="small" value={view} onChange={(_,v:View|null)=>{if(v)setView(v)}} aria-label="Event timeline" sx={{gap:1,'& .MuiToggleButton-root':{borderRadius:'24px !important',px:2,border:'1px solid',borderColor:'divider'}}}><ToggleButton value="upcoming">Upcoming</ToggleButton><ToggleButton value="past">Past</ToggleButton></ToggleButtonGroup>
   {loading?<Box sx={{p:4}} role="status"><CircularProgress aria-label="Loading events"/></Box>:error?<Stack sx={{p:3}} spacing={2}><Typography role="alert">{error}</Typography><Button onClick={()=>reload(n=>n+1)}>Retry</Button></Stack>:events.length===0?<Box sx={{p:4}}><Typography variant="h6">{view==='upcoming'?'No upcoming events':'No past events yet.'}</Typography>{view==='upcoming'&&<Typography>Check back soon for new opportunities to serve.</Typography>}</Box>:
-  <Stack spacing={0} sx={{pt:3}}>{events.map(e=><Box key={e.id} sx={{py:2,borderBottom:1,borderColor:"divider"}}><Button onClick={()=>go("/events/"+e.id)}>{e.title}</Button><Typography sx={{mt:1}}>{local(e.start_at,e.timezone)} – {local(e.end_at,e.timezone)}</Typography><Typography color="text.secondary">{e.timezone}</Typography><Typography sx={{mt:1}}>Location: {e.location}</Typography>{admin&&<Stack direction="row" spacing={1} sx={{mt:2}}><Button onClick={event=>{editorTrigger.current=event.currentTarget;go('/admin/events/'+e.id+'/edit')}}>Edit</Button><Button onClick={()=>go("/admin/events/new",{duplicate:e})}>Duplicate</Button><Button color="error" onClick={event=>{deleteTrigger.current=event.currentTarget;setToDelete(e);setDeleteError('')}}>Delete</Button></Stack>}</Box>)}</Stack>}
+  <Box sx={{display:'grid',gridTemplateColumns:{xs:'1fr',md:'repeat(2,minmax(0,1fr))'},gap:2,pt:3}}>{events.map(e=><Card variant="outlined" key={e.id} sx={{display:'flex',flexDirection:'column'}}><CardContent sx={{flexGrow:1}}><Typography variant="h6" component="h3"><Button sx={{p:0,textAlign:'left',fontSize:'inherit'}} onClick={()=>go('/events/'+e.id)}>{e.title}</Button></Typography><EventWhen event={e}/></CardContent><CardActions sx={{justifyContent:'flex-end',px:2,pb:2}}>{admin?<><Button size="small" startIcon={<Glyph type="edit"/>} onClick={()=>go('/admin/events/'+e.id+'/edit')}>Edit</Button><IconButton size="small" aria-label={'Duplicate '+e.title} onClick={()=>go('/admin/events/new',{duplicate:e})}><Glyph type="copy"/></IconButton><IconButton size="small" color="error" aria-label={'Delete '+e.title} onClick={event=>{deleteTrigger.current=event.currentTarget;setToDelete(e);setDeleteError('')}}><Glyph type="trash"/></IconButton></>:<Button size="small" onClick={()=>go('/events/'+e.id)}>Details</Button>}</CardActions></Card>)}</Box>
  {editor.open&&<Editor key={editor.event?.id||'new'} event={editor.event} onClose={closeEditor} onSaved={()=>{setNotice(editor.event?'Event updated':'Event created');closeEditor();reload(n=>n+1)}} onReload={()=>{closeEditor();reload(n=>n+1)}}/>}
  <Snackbar open={!!notice} autoHideDuration={4500} onClose={()=>setNotice('')} anchorOrigin={{vertical:'bottom',horizontal:'center'}}><Alert severity="success" onClose={()=>setNotice('')}>{notice}</Alert></Snackbar>
  <Dialog open={!!toDelete} onClose={()=>{if(!deleting)closeDelete()}} aria-labelledby="delete-event-title" aria-describedby="delete-event-description"><DialogTitle id="delete-event-title">Delete {toDelete?.title}?</DialogTitle><DialogContent id="delete-event-description">{deleteError&&<Alert severity="error">{deleteError}</Alert>}This removes the event from public listings.</DialogContent><DialogActions><Button disabled={deleting} onClick={closeDelete}>Cancel</Button><Button color="error" loading={deleting} onClick={()=>void remove()}>Delete event</Button></DialogActions></Dialog>
@@ -124,7 +149,7 @@ export function App(){
  const [admin,setAdmin]=useState(false);
  const dark=useMediaQuery('(prefers-color-scheme: dark)');
  const theme=React.useMemo(()=>createClubTheme(dark?'dark':'light'),[dark]);
- return <ThemeProvider theme={theme}><CssBaseline/><AppBar position="static" color="default" elevation={0}><Container><Box sx={{py:1.5,display:"flex",alignItems:"center",gap:1.5}}><Box component="img" src="/club-logo.png" alt="San Francisco Fil-Am Lions Club logo" sx={{width:48,height:48,objectFit:"contain"}}/><Typography variant="h6">Serve With SF Fil-Am Lions</Typography></Box></Container></AppBar><Container maxWidth="md" component="main"><Typography variant="h3" component="h1" sx={{mt:5}}>Serve With SF Fil-Am Lions</Typography><Typography color="text.secondary">Making it easier to serve together.</Typography><EventList admin={admin}/><SignIn onAuthChange={setAdmin}/><Box sx={{mt:3,display:'flex',gap:2}}><a href="/terms">Terms of Use</a><a href="/privacy">Privacy Policy</a></Box><BuildFooter/></Container></ThemeProvider>
+ return <ThemeProvider theme={theme}><CssBaseline/><AppBar position="static" color="default" elevation={0}><Container><Box sx={{py:1.5,display:"flex",alignItems:"center",gap:1.5}}><Box component="img" src="/club-logo.png" alt="San Francisco Fil-Am Lions Club logo" sx={{width:48,height:48,objectFit:"contain"}}/><Typography variant="h6">Serve With Lions</Typography></Box></Container></AppBar><Container maxWidth="md" component="main"><Typography variant="h3" component="h1" sx={{mt:5}}>Serve With SF Fil-Am Lions</Typography><Typography color="text.secondary">Making it easier to serve together.</Typography><EventList admin={admin}/><SignIn onAuthChange={setAdmin}/><Box sx={{mt:3,display:'flex',gap:2}}><a href="/terms">Terms of Use</a><a href="/privacy">Privacy Policy</a></Box><BuildFooter/></Container></ThemeProvider>
 }
 
 type Me = {requiredVersions?:{terms:string;privacy:string}|null;authenticated:boolean;email?:string;userId?:string;firstName?:string|null;lastName?:string|null;profileComplete?:boolean;agreementCurrent?:boolean;administratorEligible?:boolean;privileged?:boolean};
@@ -167,9 +192,9 @@ function UserView({id,edit}:{id:string;edit:boolean}){
  {message&&<Alert severity="error">{message}</Alert>}</Stack>;
 }
 function UsersDirectory(){
- const [people,setPeople]=useState<any[]>([]),[query,setQuery]=useState(()=>sessionStorage.getItem('sw-users-q')||''),[sort,setSort]=useState<'first'|'last'>(()=>sessionStorage.getItem('sw-users-sort')==='first'?'first':'last'),[direction,setDirection]=useState<'asc'|'desc'>(()=>sessionStorage.getItem('sw-users-direction')==='desc'?'desc':'asc'),[letter,setLetter]=useState(()=>sessionStorage.getItem('sw-users-letter')||''),[offset,setOffset]=useState(0),[more,setMore]=useState(false),[error,setError]=useState('');
- const load=async(next=0)=>{try{const params=new URLSearchParams({q:query,sort,direction,letter,offset:String(next)});const data=await requestJson('/api/admin/users?'+params);setPeople(old=>next?[...old,...data.users]:data.users);setMore(data.hasMore);setOffset(data.nextOffset);setError('')}catch(e){setError(String(e))}};
- useEffect(()=>{sessionStorage.setItem('sw-users-q',query);sessionStorage.setItem('sw-users-sort',sort);sessionStorage.setItem('sw-users-direction',direction);sessionStorage.setItem('sw-users-letter',letter);void load(0)},[query,sort,direction,letter]);
+ const [people,setPeople]=useState<any[]>([]),[query,setQuery]=useState(()=>sessionStorage.getItem('sw-users-q')||''),[sort,setSort]=useState<'first'|'last'>(()=>sessionStorage.getItem('sw-users-sort')==='first'?'first':'last'),[direction,setDirection]=useState<'asc'|'desc'>(()=>sessionStorage.getItem('sw-users-direction')==='desc'?'desc':'asc'),[offset,setOffset]=useState(0),[more,setMore]=useState(false),[error,setError]=useState('');
+ const load=async(next=0)=>{try{const params=new URLSearchParams({q:query,sort,direction,offset:String(next)});const data=await requestJson('/api/admin/users?'+params);setPeople(old=>next?[...old,...data.users]:data.users);setMore(data.hasMore);setOffset(data.nextOffset);setError('')}catch(e){setError(String(e))}};
+ useEffect(()=>{sessionStorage.setItem('sw-users-q',query);sessionStorage.setItem('sw-users-sort',sort);sessionStorage.setItem('sw-users-direction',direction);void load(0)},[query,sort,direction]);
  const sortBy=(v:'first'|'last')=>{if(sort===v)setDirection(d=>d==='asc'?'desc':'asc');else{setSort(v);setDirection('asc')}};
  const gridColumns={xs:'minmax(0,1fr)',sm:'minmax(0,1fr) minmax(0,1fr)',lg:'minmax(0,1fr) minmax(0,1fr) minmax(0,2fr)'};
  return <Stack sx={{my:4}} spacing={2}><Typography variant="h4">Users</Typography><TextField label="Search name or email" value={query} onChange={e=>setQuery(e.target.value)}/><Box sx={{display:{xs:'none',sm:'grid'},gridTemplateColumns:gridColumns,gap:1}}>
@@ -183,7 +208,7 @@ function UsersDirectory(){
  <Typography sx={{display:{xs:'block',sm:'none'}}}>{[p.first_name,p.last_name].filter(Boolean).join(' ')||p.email}</Typography>
  <Typography color="text.secondary" sx={{display:{xs:'none',lg:'block'},overflow:'hidden',textOverflow:'ellipsis'}}>{p.email}</Typography>
  </ListItemButton><Divider/></React.Fragment>)}{!people.length&&<Typography sx={{p:2}}>No matching users. Try a different name or email.</Typography>}{more&&<Button onClick={()=>void load(offset)}>Load more</Button>}</Box>
- <Stack aria-label="Alphabetical directory navigation" sx={{position:'sticky',top:16,alignSelf:'flex-start',maxHeight:'70vh',overflowY:'auto',width:42}}>{'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map(x=><Button key={x} sx={{minWidth:36,minHeight:26,p:0}} aria-label={'Jump to '+x} onClick={()=>setLetter(x)} variant={letter===x?'contained':'text'}>{x}</Button>)}<Button size="small" onClick={()=>setLetter('')}>All</Button></Stack></Box>{error&&<Alert severity="error">{error}</Alert>}</Stack>;
+ </Box>{error&&<Alert severity="error">{error}</Alert>}</Stack>;
 }
 
 function EventDetail({id,admin}:{id:string;admin:boolean}){
@@ -211,7 +236,7 @@ function EventPageEditor({id}:{id?:string}){
  const save=async()=>{const errors=validateDraft(draft);if(Object.keys(errors).length){setMessage(Object.values(errors).join('; '));return}setBusy(true);setMessage('');try{const r=await submitJson(id?'/api/admin/events/'+id:'/api/admin/events',{...draft,...(id?{version}:{})},id?'PUT':'POST');go('/events/'+r.event.id)}catch(e){setMessage(e instanceof Error?e.message:'Save failed; draft retained')}finally{setBusy(false)}};
  const duration=draft.start&&draft.end?dayjs(draft.end).diff(dayjs(draft.start),'minute'):0;
  return <LocalizationProvider dateAdapter={AdapterDayjs}><Stack spacing={2} sx={{my:4,maxWidth:750}}>
- <Stack direction="row" alignItems="center" spacing={1}><Tooltip title="Close"><IconButton aria-label="Close editor" onClick={close}>✕</IconButton></Tooltip><Typography variant="h4" sx={{flex:1}}>{id?'Edit event':'Create event'}</Typography><Tooltip title="Save"><span><IconButton aria-label="Save event" disabled={busy} onClick={()=>void save()}>✓</IconButton></span></Tooltip></Stack>
+ <Stack direction="row" alignItems="center" spacing={1}><Tooltip title="Close"><IconButton aria-label="Close editor" onClick={close}>✕</IconButton></Tooltip><Typography variant="h4" sx={{flex:1}}>{id?'Edit event':'Create event'}</Typography></Stack>
  {duplication&&!id&&<Alert severity="info">Duplicating {duplication.title}; saving creates a different event.</Alert>}
  {message&&<Alert severity="error">{message}</Alert>}
  <TextField required label="Event title" value={draft.title} onChange={e=>update('title',e.target.value)}/>
@@ -221,7 +246,7 @@ function EventPageEditor({id}:{id?:string}){
  {duration>0&&<Typography>Duration: {Math.floor(duration/60)}h {duration%60}m</Typography>}
  <Button onClick={()=>setMore(v=>!v)} aria-expanded={more}>More options</Button>
  {more&&<><DatePicker label="End date" value={date('end')} onChange={v=>setDate('end',v)} slotProps={{textField:{fullWidth:true}}}/><Autocomplete options={timeZones} value={draft.timezone} onChange={(_,v)=>update('timezone',v||'America/Los_Angeles')} renderInput={p=><TextField {...p} label="Time zone"/>}/></>}
- <Button variant="contained" disabled={busy} onClick={()=>void save()}>Save event</Button>
+ <Stack direction="row" spacing={1} justifyContent="flex-end"><Button size="small" onClick={close}>Cancel</Button><Button size="small" variant="contained" startIcon={<Glyph type="save"/>} disabled={busy} onClick={()=>void save()}>Save event</Button></Stack>
  <Dialog open={confirmClose} onClose={()=>setConfirmClose(false)}><DialogTitle>Discard unsaved changes?</DialogTitle><DialogActions><Button onClick={()=>setConfirmClose(false)}>Keep editing</Button><Button color="error" onClick={()=>go(id?'/events/'+id:'/admin/events')}>Discard changes</Button></DialogActions></Dialog>
  </Stack></LocalizationProvider>;
 }
