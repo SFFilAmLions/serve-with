@@ -167,3 +167,41 @@ test('keyboard Escape protects dirty editor and returns focus to Add Event',asyn
   assert.equal(await add.evaluate(el=>el===document.activeElement),true);
  }finally{await browser.close()}
 });
+
+test('public listing can retry after a server failure without authentication',async()=>{
+ await ready();
+ const browser=await chromium.launch({headless:true});
+ try{
+  const page=await browser.newPage();
+  let attempts=0;
+  await page.route('**/api/auth/me',r=>r.fulfill({status:503,json:{error:'Service unavailable'}}));
+  await page.route('**/api/events?view=*',r=>r.fulfill(attempts++===0?{status:503,json:{error:'Temporarily unavailable'}}:{json:{events:[]}}));
+  await page.goto(base);
+  await page.getByRole('alert').getByText('Unable to load events').waitFor();
+  await page.getByRole('button',{name:'Retry'}).click();
+  await page.getByText('No upcoming events',{exact:true}).waitFor();
+  assert.equal(attempts,2);
+ }finally{await browser.close()}
+});
+
+test('failed delete keeps event visible and confirmation open for retry',async()=>{
+ await ready();
+ const browser=await chromium.launch({headless:true});
+ try{
+  const page=await browser.newPage();
+  const event={id:'delete-fail',title:'Keep this event',location:'Community center',timezone:'America/Los_Angeles',start_at:Date.parse('2026-12-04T17:00:00Z'),end_at:Date.parse('2026-12-04T19:00:00Z'),version:1};
+  let attempts=0;
+  await page.route('**/api/auth/me',r=>r.fulfill({json:{authenticated:true,email:'admin@example.org'}}));
+  await page.route('**/api/admin/dashboard',r=>r.fulfill({json:{ok:true}}));
+  await page.route('**/api/events?view=*',r=>r.fulfill({json:{events:[event]}}));
+  await page.route('**/api/admin/events/delete-fail',r=>{attempts++;return r.fulfill({status:500,json:{error:'Internal error'}})});
+  await page.goto(base);
+  await page.getByRole('heading',{name:event.title}).waitFor();
+  await page.getByRole('button',{name:'Delete',exact:true}).click();
+  await page.getByRole('button',{name:'Delete event'}).click();
+  await page.getByRole('alert').getByText('Unable to delete event').waitFor();
+  assert.equal(await page.getByRole('heading',{name:event.title}).count(),1);
+  assert.equal(await page.getByRole('dialog',{name:'Delete Keep this event?'}).count(),1);
+  assert.equal(attempts,1);
+ }finally{await browser.close()}
+});
