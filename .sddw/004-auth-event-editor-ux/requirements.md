@@ -47,13 +47,14 @@ Origin: successful SDDW 003 staging use and user feedback. Consolidates [#10](ht
 
 - A signed-in account holder can request an email change. The new email must be unique among active real-email accounts, eligible for the current environment (including the staging email whitelist), and verified with a one-time code or magic link **sent to the new address** before the account email is changed. Until verification succeeds, keep the original email unchanged. Invalidate outstanding change attempts and rotate/revoke sessions as appropriate on success. Administrator rights must be recalculated from the new email under `config/admins.yaml`, never blindly transferred.
 
-### Simple account activation requirement (SDDW 004 core)
+### Terms acceptance and account activation (SDDW 004 core)
 
-- On initial registration/profile completion, display **one unchecked, required checkbox**: “I agree to the Terms of Use and Privacy Policy”, linking to the current documents. Never precheck it.
-- Persist a user-level boolean `is_active`: `false` until the user has verified their email, provided all mandatory profile fields, and explicitly accepted the checkbox; set it to `true` after completion. Keep the version(s) and timestamp of the agreement as separate evidence.
-- An inactive user may authenticate only into a restricted flow for completing missing details and accepting the agreement, not access attendee participation or admin operations. An existing account whose `is_active` is `false` can accept the checkbox again to reactivate without reentering already-complete personal details.
-- Deactivation in this simplified phase means setting `is_active=false`, preserving profile fields and prior agreement records; invalidate existing privileged sessions. An administrator's role remains independently configured in `config/admins.yaml`.
-- The boolean represents **service-account activation**, not legal consent to all processing. Any optional consent purposes require separate controls. Full deletion and recovery-key functionality are **deferred from the simplified release**, pending a separate scope decision; preserve those ideas as future design notes.
+- On first verified registration/profile completion, require one **unchecked** checkbox agreeing to linked Terms of Use and acknowledging the Privacy Policy. Do not precheck it.
+- Store an account creation timestamp (`created_at`) separately from `terms_accepted_at` (nullable timestamp of the **most recent** affirmative acceptance). Also store the accepted Terms/Privacy document version identifiers or equivalent immutable revision references.
+- A user has access to regular attendee/admin functions only with verified email, all required profile fields, and an acceptance covering the **currently required document version(s)**. Null acceptance or an older acceptance means the user must accept again before proceeding. The check is enforced server-side, not by the UI alone.
+- When the Terms of Use or Privacy Policy changes in a way that requires renewed acknowledgment, publish/update the required version and present the unchecked checkbox at next authenticated access. On affirmative acceptance, update `terms_accepted_at` and the version reference(s); keep prior acceptance records for audit. Do **not** reset or overwrite the original `created_at`.
+- In this simplified scope, deactivation invalidates the current acceptance (for example, setting `terms_accepted_at=NULL` and clearing the current accepted version), while retaining names, email, DOB, historical signups and earlier audit records. After verified login the user can reaccept current terms without reentering valid profile information.
+- Terms acceptance is an account-access condition, not blanket legal consent to unrelated personal-data processing. Optional consent requires separate controls. Full account deletion and recovery are deferred to a later phase.
 
 ### Account deletion and optional recovery — future scope (not part of simplified core)
 
