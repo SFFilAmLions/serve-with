@@ -35,7 +35,7 @@ After verification, existing complete/current users finish sign-in immediately. 
 2. Resolve a verified email to a stable user ID or idempotently initialize an incomplete profile. Existing configured admins complete the same flow.
 3. D1 user record: stable ID, unique normalized email, first/last name, DOB as calendar date, email-verification timestamp, immutable `created_at`, `updated_at`, nullable `terms_accepted_at`, and accepted Terms/Privacy version references.
 4. Append-only acceptance history stores user ID, accepted versions and timestamp. Compare accepted versions against server-configured required versions. Missing/outdated acceptance is an access gate, not account deactivation or a lifecycle transition. Do not create `is_active`, deactivation APIs or recovery keys.
-5. Show one unchecked Terms/Privacy acknowledgment when needed, including reacceptance after version changes, without reentering valid personal details. Publication and version-management procedure must precede onboarding.
+5. Show one unchecked Terms/Privacy acknowledgment when needed, including reacceptance after version changes, without reentering valid personal details. Publication/version-management follows [policy-publication.md](policy-publication.md): immutable versioned sources, public current/archive routes, independently configured required versions, append-only acceptance evidence, and explicit reacceptance whenever either required version changes. Substantive policy text and first versions still require organizational approval before onboarding.
 
 ## Account experience
 
