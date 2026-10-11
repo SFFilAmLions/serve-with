@@ -13,7 +13,11 @@ Enable authenticated attendees to sign up for events, withdraw, and review their
 - **Audit representation:** Signup history lives in the signup records themselves, using creation and soft-deletion timestamps. Every re-signup creates a **new row**. No separate audit table for this workflow.
 
 ## Attendee experience
-1. Public event details remain readable anonymously; signing up requires a verified, eligible authenticated account with the required profile and policy acceptance.
+1. Public event details remain readable anonymously. **Show the primary Sign up button to both signed-in and signed-out visitors** while signup is open. Signup requires a verified, eligible authenticated account with completed profile and current policy acceptance.
+   - When signed out, clicking **Sign up** starts the existing login/account-creation flow, retains the specific target event as a safe return destination, and automatically attempts that event's signup **once** after successful login, any required profile completion and agreement acceptance. The visitor must not have to navigate back to the event or click Sign up again.
+   - The pending signup intent must survive the magic-link email round trip and page reload, without storing auth credentials or putting sensitive data in the URL. It must not allow an untrusted/open redirect or unauthorized signup for another account. Clear the intent after successful signup, explicit abandonment, or a terminal eligibility/event error; prevent repeated submissions on remount or refresh.
+   - On return, show a clear success confirmation or the actual failure (event now full, event started, deleted event, authorization issue, network error) without implying that pressing the button reserved a spot. Recheck server-side cutoff, capacity and one-active-signup rules **at the moment of signup**. The browser cannot guarantee a space while login/account creation occurs.
+   - For already-signed-up visitors, show the current enrollment state and withdrawal action rather than a second Sign up. For an event that's started or is full, show an explanatory unavailable/filled state rather than a misleading actionable sign-up control; signed-out users still see the same availability information.
 2. An eligible attendee sees an explicit **Sign up** action before the event start, unless already signed up or the event is full.
 3. Signing up creates a distinct signup row and displays immediate, accessible confirmation. Avoid duplicate actions while a request is pending.
 4. Before the event starts, an active attendee can **Withdraw** with a clear confirmation. Withdrawal sets `deleted_at` and removes the user from the active roster and active capacity count.
@@ -61,6 +65,7 @@ Enable authenticated attendees to sign up for events, withdraw, and review their
 - Participant roster shows active names only to an active signup holder; anonymous visitors, nonparticipants and withdrawn users are denied. Verify access is revoked after withdrawal and no email/DOB/history fields are returned.
 - Deleted event, missing event, user re-signup, repeated withdrawal, and deleted signup race behavior.
 - Browser tests for signup button states, admin user selection, mobile layout, keyboard use, error feedback and My signups history.
+- Anonymous event Sign up button launches login/new-account onboarding, survives the magic-link round trip, automatically submits exactly once after profile and policy gates, and reports success/full/started/errors without extra user interaction. Verify intent cleanup, refresh/replay protection and no open redirects.
 - Staging acceptance with real D1 before any production release.
 
 
