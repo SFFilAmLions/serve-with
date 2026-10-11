@@ -69,3 +69,8 @@ Staging and production use separate Worker/D1 resources; never apply staging mig
 - [SDDW 004 — Requirements](.sddw/004-auth-event-editor-ux/requirements.md)
 - [SDDW 004 — Proposed Design](.sddw/004-auth-event-editor-ux/design.md)
 - [SDDW 004 — Tasks](.sddw/004-auth-event-editor-ux/tasks.md)
+
+
+## License
+
+Serve With is open-source software licensed under the [MIT License](LICENSE).
