@@ -11,9 +11,11 @@
 
 ## Decisions and prerequisites
 
-- [ ] Approve requirements and design; verify MUI X Date and Time Pickers dependency/license.
+- [x] Verify picker license/package selection: MIT Community `@mui/x-date-pickers` + `dayjs`; dependency installation/compatibility tests remain for implementation.
+- [ ] Approve requirements and design.
 - [ ] Publish Terms/Privacy, define required version identifiers and reacceptance procedure.
-- [ ] Review D1 migration and existing administrator transition; confirm staging allowlist behavior.
+- [x] Review existing D1 schema/auth/admin transition and propose additive migration/allowlist architecture (see [prerequisite-review.md](prerequisite-review.md)).
+- [ ] Approve concrete D1 migration/audit retention; verify deployed staging schema and configure staging allowlist.
 
 ## Implementation slices (not yet authorized)
 
