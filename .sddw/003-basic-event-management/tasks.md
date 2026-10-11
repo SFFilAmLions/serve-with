@@ -1,6 +1,6 @@
 # Tasks — SDDW 003 Basic Event Management
 
-**Status: Approved pre-staging verification work underway in PR #6. Last fully successful CI baseline: `7aedfcab`, [run #38118018777](https://github.com/SFFilAmLions/serve-with/actions/runs/38118018777). New security, contrast and duplicate-submit tests still require CI confirmation. No merge, migration or deployment authorized.**
+**Status: Approved pre-staging verification work underway in PR #6. Last fully successful CI baseline: `7aedfcab`, [run #38118018777](https://github.com/SFFilAmLions/serve-with/actions/runs/38118018777). New security, contrast, duplicate-submit, CI-concurrency, and Temporal version-pin changes still require CI confirmation. No merge, migration or deployment authorized.**
 
 References: [requirements.md](requirements.md) (approved); [design.md](design.md) (approved by user on 2026-10-10). Target is **Serve With SF Fil-Am Lions**. Retain the existing Vite / Cloudflare Workers / D1 architecture, with React + MUI and a Material 3-inspired theme.
 
@@ -9,7 +9,7 @@ References: [requirements.md](requirements.md) (approved); [design.md](design.md
 - [x] Review and approve this task breakdown before any code changes, migrations, dependency installation, or deployments.
 - [x] Check current `main` and outstanding PRs before implementation; working in PR #6 alongside its existing magic-link fix.
 - [x] Verify official club logo provenance and permission: the club's published branding guidelines at https://www.sffilamlions.org/about/social identify `SF Fil-Am Lions Logo.png`, Ubuntu/Ubuntu Condensed/Alata, and `#F1C232`; user explicitly authorized reuse of the club logo. Added the matching 167,619-byte club Drive PNG as `public/club-logo.png` (small image tracked in Git normally, not LFS). Font loading uses Google Fonts with system fallbacks; font-license and contrast review still require separate validation.
-- [ ] Verify Temporal polyfill on a real Cloudflare Worker and inspect bundle size. Node integration tests already cover DST gaps/overlaps and event write validation; `e816c66` adds multiple IANA zones. The `@js-temporal/polyfill` version remains semver-ranged (`^0.5.1`); pin/test compatibility before staging.
+- [ ] Verify Temporal polyfill on a real Cloudflare Worker and inspect bundle size. Node integration tests already cover DST gaps/overlaps and event write validation; `e816c66` adds multiple IANA zones. Pinned `@js-temporal/polyfill` to `0.5.1` in `c748c9e`; CI and actual Cloudflare Worker runtime compatibility still require verification.
 - [ ] Validate WCAG contrast and focus/interaction states. Added mobile light/dark heading foreground/background contrast >= 4.5 and horizontal-overflow browser test (`a6e8d30`); still need measured full component/focus-state contrast and screenshot/screen-reader inspection.
 
 ## Slice 1 — Event schema and public read API
@@ -79,3 +79,5 @@ No event detail pages/permanent links, volunteer signups, organizations, permiss
 - **Successful CI baseline:** `7aedfcab` / GitHub Actions run `38118018777` (Node tests, TypeScript + Vite build and Playwright Chromium tests).
 - **Pending CI:** commits `a6e8d30`, `e816c66`, `02e7058` extend duplicate-submit, mobile contrast, CSRF and Temporal coverage. Do not promote checks to complete until their CI run passes.
 - **Deployment boundary:** PR #6 is still open; no production or staging merge/deploy, no D1 migration applied. Cloudflare runtime, real email delivery, live event CRUD, full WCAG review and release footer remain staging acceptance items.
+
+- **CI workflow hardening:** `bb0529b` adds concurrency cancellation to avoid multiple obsolete PR CI runs; `774e597` caps the pending-save browser fixture duration to avoid indefinite request hangs. These changes are not yet certified by the latest CI.
