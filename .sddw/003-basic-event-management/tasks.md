@@ -1,6 +1,6 @@
 # Tasks — SDDW 003 Basic Event Management
 
-**Status: Slices 1–2 implemented in PR #6; API coverage is expanding. React frontend and staging acceptance remain pending.**
+**Status: Event APIs, React public/admin UI and core browser tests implemented in PR #6. Expanded failure-path testing and CI hardening ongoing; branding/theme review and staging deployment are not authorized in this batch.**
 
 References: [requirements.md](requirements.md) (approved); [design.md](design.md) (approved by user on 2026-10-10). Target is **Serve With SF Fil-Am Lions**. Retain the existing Vite / Cloudflare Workers / D1 architecture, with React + MUI and a Material 3-inspired theme.
 
@@ -52,17 +52,17 @@ References: [requirements.md](requirements.md) (approved); [design.md](design.md
 
 - [x] Implement initial Add Event, Edit, and Delete controls for authenticated admins, including empty states and past events; backend retains authorization enforcement (CI/UI verification pending).
 - [ ] Complete accessible Add/Edit dialog: IANA time-zone autocomplete, form validation, edit prefill, and preserved server errors implemented; keyboard/focus interaction tests pending.
-- [ ] Complete save feedback: duplicate saves blocked, field-level errors and success Snackbar implemented; browser-level interaction tests pending.
+- [ ] Complete save feedback: duplicate saves blocked, field-level errors and success Snackbar implemented; browser-level interaction tests pending. Corrected stale-event reload so it does not incorrectly announce a successful edit (`102edc8`; CI pending).
 - [ ] Guard Cancel, close icon, Escape, and backdrop: unsaved-change confirmation implemented and keyboard focus restoration, accessible dialog descriptions, and nested confirmation close guards added; actual browser keyboard/focus and screen-reader checks still pending.
 - [x] Implement a separate Delete confirmation naming the event, refreshing on soft-delete and preserving the event on error (CI/UI verification pending).
 - [x] Handle HTTP 409 version conflicts by preserving unsaved edits, explaining the conflict, and offering a reload action with explicit discard confirmation (automated interaction tests still pending).
-- [ ] Add comprehensive browser interaction tests for Add/Edit/Delete, past event management, unsaved-change guards, duplicate submission, version conflicts, focus restoration, error states, and authorization visibility. Initial source-contract and executable form tests exist; Chromium/Playwright flows now cover anonymous tab browsing, admin editor, discard confirmation, and mocked Add Event submission with repository/footer verification (CI verification pending). CI passed at `8dc57b4` for initial Edit/Delete and version-conflict flows; broaden coverage for keyboard/focus and failure states before completion.
+- [ ] Add comprehensive browser interaction tests for Add/Edit/Delete, past event management, unsaved-change guards, duplicate submission, version conflicts, focus restoration, error states, and authorization visibility. Initial source-contract and executable form tests exist; Chromium/Playwright flows now cover anonymous tab browsing, admin editor, discard confirmation, and mocked Add Event submission with repository/footer verification (CI verification pending). CI passed at `8dc57b4` for Edit/Delete and version-conflict flows and at `04a9217` for Escape/discard guarding. New anonymous retry and failed-delete tests added in `065f1d5` (CI pending); broaden failure states before completion.
 
 **Review checkpoint:** End-to-end CRUD works for an authenticated staging admin; conflicts do not silently discard work.
 
 ## Slice 5 — Staging acceptance and production gate
 
-- [ ] Run TypeScript checks, relevant security tests, React interaction tests, and build/size checks; confirm existing authentication and CI are still green.
+- [ ] Run TypeScript checks, relevant security tests, React interaction tests, and build/size checks; confirm existing authentication and CI are still green. Latest fully verified baseline: GitHub CI `38117468190` at `04a9217`; newer commits pending verification.
 - [ ] After code and task approval, deploy **staging only** through the existing GitHub workflow and apply the migration to `serve-with-staging-db`. Validate data and migrations before changes.
 - [ ] Verify live `https://servewith-beta.sffilamlions.org/` on desktop/mobile: anonymous Upcoming/Past, timezone boundaries, admin CRUD, in-progress classification, deletion, conflicting edits, empty state, official brand, light/dark system switching, OTP/magic-link regression, and correct environment-specific repo/version-or-commit footer.
 - [ ] Document any deviations and update this checklist with evidence/checks; obtain explicit sign-off on staging.
