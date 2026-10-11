@@ -323,6 +323,7 @@ export default {
       headers.set('X-Content-Type-Options', 'nosniff');
       return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
     }
+    if (request.method === 'GET' && path === '/api/auth/turnstile-config') return json({siteKey:env.TURNSTILE_SITE_KEY||null});
     if (!env.AUTH_DB || !env.AUTH_PEPPER) return json({ error: 'Sign-in is not configured' }, 503);
     const db = env.AUTH_DB;
     if (request.method === 'GET' && path === '/api/auth/me') {
