@@ -61,7 +61,7 @@ Verify auth token replay/expiry, eligibility non-enumeration, current agreement/
 
 Do not design or implement email changes, account deactivation controls, deletion, anonymized signup history or recovery keys in this SDDW. Preserve future considerations only in [deferred-account-lifecycle.md](deferred-account-lifecycle.md).
 
-**Before coding:** verify the selected MUI X picker package/license fits the project, and finalize the Terms/Privacy publication/versioning procedure.
+**Before coding:** the picker package/license review is complete: use the MIT Community `@mui/x-date-pickers` package with Day.js, with install/build compatibility verified during implementation. Finalize the Terms/Privacy publication/versioning procedure before onboarding. See [prerequisite-review.md](prerequisite-review.md) and [migration-plan.md](migration-plan.md).
 
 
 ## Responsive action convention
@@ -84,3 +84,23 @@ Keep global app bars, workspace tabs and other stable navigation mounted while c
 Field validation is inline and programmatically associated with its field. Save/network failures preserve form contents and use an appropriate inline message or Material snackbar; important dynamic status is announced accessibly. Prevent duplicate submissions while saving without causing layout shifts.
 
 All icon-only controls have accessible names, visible focus treatment and adequate Material touch targets. All workflows are keyboard operable. Restore focus sensibly after dialogs; provide keyboard/screen-reader equivalents for the visual A–Z rail; respect reduced-motion preferences; and maintain sufficient contrast in all appearance modes. Do not use administrator color as the sole workspace signal. Protected-resource authorization failures must not disclose private user data. If a session expires during an editor workflow, preserve the draft where safely feasible through reauthentication.
+
+
+## API shape for implementation review
+
+Keep public reads separate from privileged mutation APIs.
+
+- `GET /api/events?view=upcoming|past` — existing public list.
+- `GET /api/events/:id` — public canonical event detail; return 404 for missing/deleted event.
+- `GET /api/auth/me` — authenticated state plus the minimum current-user/profile/gate/workspace capability information needed by the client; never return DOB in generic directory payloads.
+- `POST /api/auth/request`, `POST /api/auth/verify`, `POST /api/auth/magic`, `POST /api/auth/logout` — retain non-enumerating/rate-limited behavior while adding registration eligibility and automatic magic exchange.
+- Profile/agreement completion endpoints must require a verified limited session and enforce field/version rules server-side.
+- `GET /api/users/:id` and `PUT /api/users/:id` — owner/admin authorization; server decides editable fields, with admin-only DOB correction audit.
+- `GET /api/admin/users` — admin-only server-backed search/sort/incremental letter navigation; list projection excludes DOB.
+- Existing `/api/admin/events` mutation APIs remain admin-only and gain route-compatible detail/editor support as needed.
+
+Do not trust client workspace state, hidden controls, route ownership, or supplied role fields for authorization.
+
+## Migration/deployment sequencing
+
+The existing workflows already apply D1 migrations remotely before Worker deployment and bind staging/production to separate databases. Once implementation is authorized, add a versioned `0004_users_and_agreements.sql`; never edit historical migrations. The proposed shape and transition are documented in [migration-plan.md](migration-plan.md). Before merging executable SQL, inspect the deployed staging migration state and test migration against a representative database. Production remains gated by the release workflow and separate approval.
