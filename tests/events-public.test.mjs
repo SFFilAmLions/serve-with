@@ -11,7 +11,7 @@ globalThis.__testEligibility = (await import('data:text/javascript;base64,' + Bu
 ).toString('base64'))).isStagingRegistrationEligible;
 
 const source = readFileSync('src/worker.ts','utf8')
-  .replace("import packageJson from '../package.json';", "const packageJson = {version:'0.1.0'};")
+  .replace("import policyMetadata from './generated/policy-versions.json';", "const policyMetadata = JSON.parse(readFileSync('src/generated/policy-versions.json','utf8'));")
   .replace("import { Temporal } from '@js-temporal/polyfill';", "const Temporal = globalThis.__testTemporal;")
   .replace("import { isStagingRegistrationEligible } from './registration-eligibility';", "const isStagingRegistrationEligible = globalThis.__testEligibility;")
   .replace("import admins from './generated/admins.json';", "const admins = [{email:'lionaugust@icloud.com',enabled:true}];");
@@ -23,7 +23,7 @@ function harness() {
   sqlite.exec(readFileSync('migrations/0001_auth.sql','utf8'));
   sqlite.exec(readFileSync('migrations/0003_events.sql','utf8'));
   sqlite.exec(readFileSync('migrations/0004_users_and_agreements.sql','utf8'));
-  const versionTerms='0.1.0', versionPrivacy='0.1.0';
+  const versionTerms=JSON.parse(readFileSync('src/generated/policy-versions.json','utf8')).terms.version, versionPrivacy=JSON.parse(readFileSync('src/generated/policy-versions.json','utf8')).terms.version;
   // Event regressions retain an already-completed authorized administrator session.
   sqlite.prepare('INSERT INTO users(id,email,first_name,last_name,date_of_birth,email_verified_at,created_at,updated_at,terms_accepted_at,accepted_terms_version,accepted_privacy_version) VALUES(?,?,?,?,?,?,?,?,?,?,?)')
     .run('11111111-1111-4111-8111-111111111111','lionaugust@icloud.com','Admin','Example','1990-01-01',1,1,1,1,versionTerms,versionPrivacy);
@@ -203,7 +203,7 @@ test('admin writes enforce CSRF origin even with a valid authenticated session',
   const event={title:'Service',location:'San Francisco',timezone:'America/Los_Angeles',start:'2026-11-14T09:00',end:'2026-11-14T11:00'};
   const response=await worker.fetch(new Request('https://servewith-beta.sffilamlions.org/api/admin/events',{
    method:'POST',headers:{origin:'https://malicious.example','content-type':'application/json',cookie:'__Host-sw_session='+session},body:JSON.stringify(event)
-  }),{AUTH_DB:h.adapter,AUTH_PEPPER:'test',REQUIRED_TERMS_VERSION:'0.1.0',REQUIRED_PRIVACY_VERSION:'0.1.0',ASSETS:{fetch:async()=>new Response('asset')}});
+  }),{AUTH_DB:h.adapter,AUTH_PEPPER:'test',REQUIRED_TERMS_VERSION:JSON.parse(readFileSync('src/generated/policy-versions.json','utf8')).terms.version,REQUIRED_PRIVACY_VERSION:JSON.parse(readFileSync('src/generated/policy-versions.json','utf8')).terms.version,ASSETS:{fetch:async()=>new Response('asset')}});
   assert.equal(response.status,400);
   assert.equal(h.sqlite.prepare('SELECT COUNT(*) AS n FROM events').get().n,0);
  }finally{h.sqlite.close()}
