@@ -23,7 +23,7 @@ Retain Vite, React, MUI, Cloudflare Worker, D1, Resend email verification, the c
 | `/admin/events/new` | Complete-profile admin | Create Event dedicated page |
 | `/admin/events/:id/edit` | Complete-profile admin | Edit Event dedicated page (proposed for consistency; pending approval) |
 | `/admin/users` | Complete-profile admin | Registered-user directory, search/filter |
-| `/admin/users/:id/edit` | Complete-profile admin | Edit existing user's first/last name; date-of-birth visibility/correction must be separately approveds only |
+| `/admin/users/:id/edit` | Complete-profile admin | Edit existing user's first/last name; authorized administrators may view and correct date of birth for the selected user, with server-side permission checks and audited changess only |
 
 Use an accessible routing solution that supports deep links, browser back/forward and refresh through the existing Worker static-asset fallback. Restore intended destination only if still authorized after login/profile completion; otherwise return to attendee home. No Create User route.
 
@@ -53,13 +53,13 @@ Configure staging allowlist as a separate reviewed server-side email-only config
 
 ## 5. User pages and authorization
 
-- **Profile:** signed-in user may read/edit own first/last name, view own date of birth and verified email, and initiate own-account deletion with explicit confirmation; prevent empty/invalid names. Never allow edit of email or role here.
+- **Profile:** signed-in user may read/edit own first/last name, view own read-only date of birth and verified email, and initiate own-account deletion with explicit confirmation; prevent empty/invalid names. Never allow edit of email or role here.
 - **Admin Users:** list only completed registered accounts; exclude birth dates from directory queries, search results and default payloads (plus an explicitly marked pending state if product review later chooses to expose it); search by name/email; paginate server-side, never dump every account to all clients. No Create User action.
 - **Admin Edit User:** use the same profile form fields as self-edit, but a different server-authorized endpoint allowing edits to the selected existing user's first/last name. Neither user ID nor client-provided role flags confer authority. Verified email and role remain read-only.
 - **Account deletion:** revoke sessions and pending challenges, stop access, remove/anonymize personal data to the defined retention policy; guard concurrent requests. Exact policy for re-registration and retained audit references remains an approval question. Admins cannot delete other accounts as part of this phase.
 - For all mutating endpoints, check session validity, account completeness, allowlist/eligibility as appropriate, origin, and object-level authorization on the server.
 
-**Date-of-birth privacy:** Limit storage to a calendar date, do not infer age or gate features unless separately specified, never log or publicly index it, and do not expose it in generic user-list responses. Decide access/correction, encryption feasibility, retention and erasure before implementation.
+**Date-of-birth privacy:** Limit storage to a calendar date, do not infer age or gate features unless separately specified, never log or publicly index it, and do not expose it in generic user-list responses. Correction is administrator-only after initial entry; owners can view but not edit date of birth. Audit changes without logging raw birth dates; decide encryption feasibility, retention and erasure before implementation.
 
 ## 6. Event form and responsive editor
 
