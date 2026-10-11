@@ -5,12 +5,13 @@ import { DatabaseSync } from 'node:sqlite';
 import ts from 'typescript';
 
 const source = readFileSync('src/worker.ts','utf8')
-  .replace("import admins from './generated/admins.json';", "const admins = [];");
+  .replace("import admins from './generated/admins.json';", "const admins = [{email:'lionaugust@icloud.com',enabled:true}];");
 const compiled = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText;
 const worker = (await import('data:text/javascript;base64,' + Buffer.from(compiled).toString('base64'))).default;
 
 function harness() {
   const sqlite = new DatabaseSync(':memory:');
+  sqlite.exec(readFileSync('migrations/0001_auth.sql','utf8'));
   sqlite.exec(readFileSync('migrations/0003_events.sql','utf8'));
   const adapter = { prepare(sql) { const statement = sqlite.prepare(sql); return {
     bind(...args) { return {
@@ -19,8 +20,11 @@ function harness() {
       run: async () => ({ meta: { changes: Number(statement.run(...args).changes) } })
     }; }
   }; } };
-  const req = (path, method='GET') => worker.fetch(new Request('https://servewith-beta.sffilamlions.org' + path,{method}),{
-    AUTH_DB:adapter,ASSETS:{fetch:async()=>new Response('asset')}
+  const req = (path, method='GET', body, cookie) => worker.fetch(new Request('https://servewith-beta.sffilamlions.org' + path,{
+    method, headers:{ origin:'https://servewith-beta.sffilamlions.org', 'content-type':'application/json', ...(cookie ? {cookie}:{}) },
+    ...(body ? {body:JSON.stringify(body)}:{})
+  }),{
+    AUTH_DB:adapter, AUTH_PEPPER:'test', ASSETS:{fetch:async()=>new Response('asset')}
   });
   const insert = (id,start,end,deleted=null) => sqlite.prepare(
     'INSERT INTO events (id,title,location,timezone,start_at,end_at,created_at,updated_at,deleted_at) VALUES (?,?,?,?,?,?,?,?,?)'
@@ -64,5 +68,28 @@ test('database constraints reject invalid and inverted events',()=>{
     assert.throws(()=>h.sqlite.prepare(
       'INSERT INTO events (id,title,location,timezone,start_at,end_at,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?)'
     ).run('bad-title','   ','somewhere','UTC',100,200,1,1),/CHECK constraint/);
+  }finally{h.sqlite.close();}
+});
+
+test('soft delete requires authentication, checks version and retains record',async()=>{
+  const h=harness();
+  try{
+    const id='123e4567-e89b-42d3-a456-426614174000';
+    const now=Date.now();
+    h.insert(id,now+1000,now+5000);
+    assert.equal((await h.req('/api/admin/events/'+id,'DELETE',{version:1})).status,401);
+    const session='a'.repeat(64);
+    const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode('test:'+session))),b=>b.toString(16).padStart(2,'0')).join('');
+    h.sqlite.prepare('INSERT INTO sessions(token_hash,email,expires_at,created_at) VALUES (?,?,?,?)')
+      .run(hash,'lionaugust@icloud.com',now+100000,now);
+    const cookie='__Host-sw_session='+session;
+    const url='/api/admin/events/'+id;
+    assert.equal((await h.req(url,'DELETE',{version:5},cookie)).status,409);
+    assert.equal((await h.req(url,'DELETE',{version:1},cookie)).status,204);
+    const event=h.sqlite.prepare('SELECT deleted_at,version FROM events WHERE id=?').get(id);
+    assert.equal(event.version,2);
+    assert.ok(event.deleted_at);
+    assert.equal((await h.req(url,'DELETE',{version:1},cookie)).status,404);
+    assert.deepEqual((await (await h.req('/api/events')).json()).events,[]);
   }finally{h.sqlite.close();}
 });
