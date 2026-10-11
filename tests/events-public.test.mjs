@@ -181,3 +181,32 @@ test('past events remain editable, DST overlaps are rejected, and bad requests p
     assert.equal((await h.req('/api/admin/events/'+event.id,'DELETE',{version:3},cookie)).status,404);
   } finally { h.sqlite.close(); }
 });
+
+test('admin writes enforce CSRF origin even with a valid authenticated session',async()=>{
+ const h=harness();
+ try{
+  const session='e'.repeat(64),now=Date.now();
+  const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode('test:'+session))),b=>b.toString(16).padStart(2,'0')).join('');
+  h.sqlite.prepare('INSERT INTO sessions(token_hash,email,expires_at,created_at) VALUES (?,?,?,?)').run(hash,'lionaugust@icloud.com',now+600000,now);
+  const event={title:'Service',location:'San Francisco',timezone:'America/Los_Angeles',start:'2026-11-14T09:00',end:'2026-11-14T11:00'};
+  const response=await worker.fetch(new Request('https://servewith-beta.sffilamlions.org/api/admin/events',{
+   method:'POST',headers:{origin:'https://malicious.example','content-type':'application/json',cookie:'__Host-sw_session='+session},body:JSON.stringify(event)
+  }),{AUTH_DB:{prepare:h.sqlite.prepare.bind(h.sqlite)},AUTH_PEPPER:'test',ASSETS:{fetch:async()=>new Response('asset')}});
+  assert.equal(response.status,400);
+  assert.equal(h.sqlite.prepare('SELECT COUNT(*) AS n FROM events').get().n,0);
+ }finally{h.sqlite.close()}
+});
+
+test('Temporal rejects gaps and ambiguous overlaps in distinct time zones',async()=>{
+ const Temporal=globalThis.__testTemporal;
+ for(const [zone,gap,overlap] of [
+  ['America/Los_Angeles','2026-03-08T02:30','2026-11-01T01:30'],
+  ['America/New_York','2026-03-08T02:30','2026-11-01T01:30']
+ ]){
+  for(const timestamp of [gap,overlap]){
+   assert.throws(()=>Temporal.PlainDateTime.from(timestamp).toZonedDateTime(zone,{disambiguation:'reject'}));
+  }
+  const summer=Temporal.PlainDateTime.from('2026-07-04T09:00').toZonedDateTime(zone,{disambiguation:'reject'});
+  assert.equal(summer.timeZoneId,zone);
+ }
+});
