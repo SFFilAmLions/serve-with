@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { AppBar, Box, Button, Card, CardContent, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Alert, Autocomplete, Snackbar, Container, CssBaseline, Stack, Tab, Tabs, TextField, ThemeProvider, Typography, useMediaQuery, IconButton, Menu, MenuItem, List, ListItemButton, ListItemText, Divider, Tooltip, Skeleton } from '@mui/material';
+import { AppBar, Box, Button, Card, CardContent, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Alert, Autocomplete, Snackbar, Container, CssBaseline, Stack, Tab, Tabs, TextField, ThemeProvider, Typography, useMediaQuery, IconButton, Menu, MenuItem, ListItemButton, ListItemText, Divider, Tooltip, Skeleton } from '@mui/material';
 import './style.css';
 import { createClubTheme } from './theme';
 import { type Draft, timeZones, validateDraft, emptyDraft, localInput } from './event-form';
@@ -112,7 +112,7 @@ function SignIn({onAuthChange}:{onAuthChange:(value:boolean)=>void}){
  {message&&<Typography sx={{mt:2}} role="status">{message}</Typography>}
  </Box>
 }
-function App(){
+export function App(){
  const [admin,setAdmin]=useState(false);
  const dark=useMediaQuery('(prefers-color-scheme: dark)');
  const theme=React.useMemo(()=>createClubTheme(dark?'dark':'light'),[dark]);
@@ -133,7 +133,7 @@ const formatTime=(value:number,zone:string)=>new Intl.DateTimeFormat('en-US',{we
 function AuthScreen({me,refresh}:{me:Me;refresh:()=>Promise<void>}){
  const [email,setEmail]=useState(''),[code,setCode]=useState(''),[stage,setStage]=useState<'email'|'code'>('email'),[busy,setBusy]=useState(false);
  const [message,setMessage]=useState(''),[first,setFirst]=useState(''),[last,setLast]=useState(''),[dob,setDob]=useState('');
- const [accepted,setAccepted]=useState(false);
+
  const token=React.useMemo(()=>new URL(location.href).searchParams.get('magic'),[]);
  const exchanging=useRef(false);
  const work=async(fn:()=>Promise<void>)=>{setBusy(true);setMessage('');try{await fn()}catch(err){setMessage(err instanceof Error?err.message:'Unable to complete request')}finally{setBusy(false)}};
@@ -148,7 +148,7 @@ function AuthScreen({me,refresh}:{me:Me;refresh:()=>Promise<void>}){
  {message&&<Alert role="status" severity="info">{message}</Alert>}
  </Stack>;
 }
-function UserView({id,edit,me}:{id:string;edit:boolean;me:Me}){
+function UserView({id,edit}:{id:string;edit:boolean}){
  const [user,setUser]=useState<any>(null),[message,setMessage]=useState(''),[first,setFirst]=useState(''),[last,setLast]=useState(''),[dob,setDob]=useState(''),[dirty,setDirty]=useState(false);
  useEffect(()=>{void requestJson('/api/users/'+encodeURIComponent(id)).then(r=>{setUser(r);setFirst(r.user.first_name||'');setLast(r.user.last_name||'');setDob(r.user.date_of_birth||'')}).catch(e=>setMessage(e.message))},[id]);
  if(message&&!user)return <Alert severity="error">{message}</Alert>;
@@ -182,9 +182,9 @@ function RoutedApp(){
  const admin=path.startsWith('/admin'),canAdmin=Boolean(me.privileged&&me.administratorEligible);
  const userRoute=path.match(/^\/users\/([0-9a-f-]{36})(\/edit)?$/);
  const eventRoute=path.match(/^\/events\/([0-9a-f-]{36})$/);
- const editRoute=path.match(/^\/admin\/events\/([0-9a-f-]{36})\/edit$/);
+
  return <ThemeProvider theme={theme}><CssBaseline/><AppBar position="static" color={admin?'primary':'default'} elevation={0}><Container maxWidth="lg"><Stack direction="row" alignItems="center" spacing={2} sx={{py:1}}><Box component="img" src="/club-logo.png" alt="SF Fil-Am Lions logo" sx={{width:42,height:42}}/><Button color="inherit" onClick={()=>go('/')}>Serve With</Button>{admin&&<Typography>Administrator</Typography>}<Box sx={{flexGrow:1}}/><Button color="inherit" onClick={e=>setAnchor(e.currentTarget)} aria-label="Account and appearance menu">{me.authenticated?(me.firstName||me.email||'Account'):'Sign in / Appearance'}</Button><Menu anchorEl={anchor} open={!!anchor} onClose={()=>setAnchor(null)}>{me.authenticated&&<MenuItem onClick={()=>{setAnchor(null);go('/users/'+me.userId)}}>My Profile</MenuItem>}{canAdmin&&<MenuItem onClick={()=>{setAnchor(null);go(admin?'/':'/admin/events')}}>{admin?'Attendee workspace':'Administrator workspace'}</MenuItem>}{(['light','dark','system'] as const).map(mode=><MenuItem key={mode} selected={appearance===mode} onClick={()=>{setAppearance(mode);localStorage.setItem('servewith-appearance',mode);setAnchor(null)}}>{mode[0].toUpperCase()+mode.slice(1)} appearance</MenuItem>)}{me.authenticated?<MenuItem onClick={()=>{setAnchor(null);void api('logout',{}).then(refresh).then(()=>go('/'))}}>Sign out</MenuItem>:<MenuItem onClick={()=>{setAnchor(null);go('/login')}}>Sign in</MenuItem>}</Menu></Stack>{admin&&canAdmin&&<Tabs value={path.startsWith('/admin/users')?'users':'events'} onChange={(_,v)=>go(v==='users'?'/admin/users':'/admin/events')} textColor="inherit" indicatorColor="secondary"><Tab label="Events" value="events"/><Tab label="Users" value="users"/></Tabs>}</Container></AppBar>
- <Container maxWidth="lg" component="main">{path==='/login'?<AuthScreen me={me} refresh={refresh}/>:userRoute?<UserView key={path} id={userRoute[1]} edit={!!userRoute[2]} me={me}/>:eventRoute?<EventDetail id={eventRoute[1]} admin={canAdmin}/>:path==='/admin/users'&&canAdmin?<UsersDirectory/>:path.startsWith('/admin')&&!canAdmin?<Alert severity="warning" sx={{mt:3}}>Complete your profile and current agreement to access administrator tools. <Button onClick={()=>go('/login')}>Account setup</Button></Alert>:<><Typography variant="h4" sx={{mt:4}}>{admin?'Manage events':'Serve With SF Fil-Am Lions'}</Typography><EventList admin={canAdmin&&admin}/></>}<BuildFooter/></Container></ThemeProvider>;
+ <Container maxWidth="lg" component="main">{path==='/login'?<AuthScreen me={me} refresh={refresh}/>:userRoute?<UserView key={path} id={userRoute[1]} edit={!!userRoute[2]}/>:eventRoute?<EventDetail id={eventRoute[1]} admin={canAdmin}/>:path==='/admin/users'&&canAdmin?<UsersDirectory/>:path.startsWith('/admin')&&!canAdmin?<Alert severity="warning" sx={{mt:3}}>Complete your profile and current agreement to access administrator tools. <Button onClick={()=>go('/login')}>Account setup</Button></Alert>:<><Typography variant="h4" sx={{mt:4}}>{admin?'Manage events':'Serve With SF Fil-Am Lions'}</Typography><EventList admin={canAdmin&&admin}/></>}<BuildFooter/></Container></ThemeProvider>;
 }
 
 createRoot(document.getElementById('app')!).render(<RoutedApp/>);
