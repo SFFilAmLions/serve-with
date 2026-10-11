@@ -11,15 +11,15 @@
 
 ## Decisions and prerequisites
 
-- [ ] Approve requirements and design; select accessible date/time picker.
+- [ ] Approve requirements and design; verify MUI X Date and Time Pickers dependency/license.
 - [ ] Publish Terms/Privacy, define required version identifiers and reacceptance procedure.
 - [ ] Review D1 migration and existing administrator transition; confirm staging allowlist behavior.
 
 ## Implementation slices (not yet authorized)
 
 - [ ] **A — Login and registration:** D1 profile/acceptance history, staging allowlist, existing-admin transition, email-first code/magic login, automatic one-time link exchange, inline profile completion and version-aware acknowledgment.
-- [ ] **B — Account navigation and management:** top-right account menu, Attendee/Admin switch, owner profile, administrator-only Users search and Edit User, audited DOB correction, server-side access gates.
-- [ ] **C — Event UX:** dedicated Create/Edit pages, shared time/date controls and duration, collapsed end date/zone, duplicate-to-new-ID flow, existing CRUD and concurrency protections.
+- [ ] **B — Account navigation and management:** top-right account menu with Attendee/Administrator switch; Administrator Events/Users tabs; canonical `/users/:id` and `/users/:id/edit` pages with no `/profile` or admin-specific user editor; administrator-only Users search, audited DOB correction and server-side access gates.
+- [ ] **C — Event UX:** `/admin/events` management list; dedicated Create/Edit pages; MUI X date/time controls and duration; collapsed end date/zone; duplicate via navigation state to `/admin/events/new` with source notice and new-ID save; list-level confirmed Delete; existing CRUD/concurrency protections.
 - [ ] **D — Verification:** automated auth/replay/eligibility/terms/profile tests; attendee-denied Users APIs; audit, responsive accessibility, duplicate and DST regression; green CI.
 
 ## Release gates
