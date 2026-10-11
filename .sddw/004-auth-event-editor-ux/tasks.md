@@ -6,7 +6,8 @@
 - [x] Record user decisions: existing administrators complete profile at next sign-in; staging whitelist is email-only; first and last names are editable.
 - [x] Confirm `config/admins.yaml` remains email-only for administrator authorization; first/last names, date of birth, and verified email belong to D1 profiles.
 - [ ] Review/approve remaining registration and deletion requirements; design a no-lockout administrator profile-completion transition.
-- [ ] Decide date-of-birth correction permissions, directory visibility, privacy, retention and migration; validate a calendar date without inferring age limits.
+- [x] Approve administrator-only corrections to submitted date of birth; owner can view but not edit it.
+- [ ] Design audited admin date-of-birth correction, directory exclusion, privacy, retention and migration; validate a calendar date without inferring age limits.
 - [ ] Design account schema, migrations, verification, self-deletion/session revocation, staging allowlist policy and tests, and how existing admins transition.
 - [ ] Review/approve the separate Attendee and Administrator view requirements and design accessible switching and route authorization.
 - [ ] Design authentication and account-menu interactions in [design.md](design.md); review and approve.
