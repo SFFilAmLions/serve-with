@@ -29,6 +29,8 @@ Origin: successful SDDW 003 staging use and user feedback. Consolidates [#10](ht
 - Start-date changes carry forward to end date **only until the user explicitly overrides end date**. Never overwrite an intentionally chosen end date.
 - For editing existing multiday events or nondefault time zones, expand More options automatically; when collapsed, display a concise summary for important nondefault values.
 - Duration must reflect actual elapsed time in the event's IANA time zone, including overnight/multiday and daylight-saving changes; invalid or ambiguous local times show a validation state, not a misleading duration.
+- Provide an administrator-only **Duplicate Event** action on existing events (including past events). It opens the dedicated **Create Event** page with the selected event's editable fields prefilled (title, location, start/end date and time, and time zone). Users may modify any prefilled field before saving.
+- Duplicating must **create a new event with a new ID**, not alter the source event, copy its version/deletion metadata, or save automatically. Clearly label the page as creating a new event and require explicit Save. The existing create endpoint and validation rules apply, including past dates and DST handling.
 - Retain editing of all persisted fields, form prepopulation, API request format, server validation, optimistic version conflict handling, error draft preservation, and soft deletion.
 
 ## 4. User registration, profiles, and account deletion
@@ -79,7 +81,7 @@ Origin: successful SDDW 003 staging use and user feedback. Consolidates [#10](ht
 
 ## 7. Acceptance and boundaries
 
-- Automated tests: automatic single-attempt magic-link sign-in/token scrubbing, code/login/logout regressions, registration/profile/deletion and staging eligibility checks, own-profile edit versus administrator editing of other users, protected user directory, dedicated event-create page, admin Edit User and first-login profile completion, account-menu/mobile, attendee/admin view switching and keyboard behavior, page-navigation/discard behavior, start/end synchronization and overrides, distinct date and clock input UX, live duration and DST edge cases, Edit prefill, no public-list regression.
+- Automated tests: automatic single-attempt magic-link sign-in/token scrubbing, code/login/logout regressions, registration/profile/deletion and staging eligibility checks, own-profile edit versus administrator editing of other users, protected user directory, dedicated event-create page and event duplication, admin Edit User and first-login profile completion, account-menu/mobile, attendee/admin view switching and keyboard behavior, page-navigation/discard behavior, start/end synchronization and overrides, distinct date and clock input UX, live duration and DST edge cases, Edit prefill, no public-list regression.
 - Verify changes on staging through normal `main` workflow after approval, fixing staging defects iteratively. **No production deployment without separate explicit authorization.**
 - Out of scope: new authentication providers, new event schema, event RSVP/signups, recurrence, organization permissions expansion, or production release.
 
