@@ -24,3 +24,11 @@ test('public event states remain independent of auth and footer keeps source lin
  assert.ok(source.includes(term),term);
  }
 });
+
+test('event dialogs restore focus to their action triggers',()=>{
+ assert.match(source,/editorTrigger=useRef/);
+ assert.match(source,/deleteTrigger=useRef/);
+ assert.match(source,/requestAnimationFrame\(\(\)=>target\.current\?\.focus\(\)\)/);
+ assert.match(source,/onClose=\{closeEditor\}/);
+ assert.match(source,/onClick=\{closeDelete\}/);
+});
