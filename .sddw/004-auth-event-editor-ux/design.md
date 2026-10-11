@@ -43,6 +43,10 @@ A signed-in administrator defaults to Attendee view, with an explicit, compact m
 
 **Security:** Preserve one-time challenges, expiry, rate limits, secure HttpOnly session cookie, CSRF/origin checks, authentication failure behavior and generic anti-enumeration messaging. Avoid adding token/code/name content to logs or URLs; magic token is consumed via POST only. Add safe error/retry paths for provider failures. Keep existing session migration compatibility.
 
+### Simplified activation gate
+
+Use a user-level `is_active` boolean, initially false. On first verified sign-in, collect missing names/DOB and an unchecked required agreement to the Terms of Use and Privacy Policy, then set active true. Store agreement version/timestamp separately, without rewriting prior acceptance records. For a deactivated account, preserve PII, require verified re-login and renewed affirmative checkbox acceptance to set active true; guard attendee and admin APIs using active/profile state and revoke existing privileged sessions on deactivation. This Boolean is account eligibility, not blanket legal consent. Treat recovery-key deletion design below as future work, not part of streamlined release.
+
 ## 4. Data storage and migration approach
 
 Introduce an additive `users` table in a new numbered D1 migration, with stable ID, normalized unique email, first_name, last_name, date_of_birth (ISO YYYY-MM-DD calendar date, not a timestamp), email verification timestamp, created/updated timestamps, and account-deleted state or equivalent. Design CHECK constraints so a pending-profile record can temporarily lack names, while **all fully active accounts have valid names, date of birth, and verified email**. Retain existing sessions and login challenges through a backward-compatible transition; link sessions to users safely after verification. Index normalized email and directory search fields.
