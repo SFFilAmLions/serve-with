@@ -7,7 +7,7 @@ import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { TimePicker } from '@mui/x-date-pickers/TimePicker';
 import { AppBar, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Alert, Autocomplete, Snackbar, Checkbox, FormControlLabel, Container, CssBaseline, Stack, Tab, Tabs, TextField, ThemeProvider, Typography, useMediaQuery, IconButton, Menu, MenuItem, ListItemButton, Divider, Tooltip, Skeleton } from '@mui/material';
 import './style.css';
-import packageJson from '../package.json';
+import policyMetadata from './generated/policy-versions.json';
 import privacyPolicy from '../policies/privacy/approved-draft.md?raw';
 import termsPolicy from '../policies/terms/approved-draft.md?raw';
 import { createClubTheme } from './theme';
@@ -227,14 +227,14 @@ function EventPageEditor({id}:{id?:string}){
 }
 
 
-const policyVersion = packageJson.version;
+const policyVersion = policyMetadata;
 function PolicyPage({kind}:{kind:'terms'|'privacy'}) {
  const source=kind==='terms'?termsPolicy:privacyPolicy;
  const title=kind==='terms'?'Terms of Use':'Privacy Policy';
  const renderInline=(line:string)=>line.split(/(\*\*[^*]+\*\*)/g).map((part,i)=>part.startsWith('**')&&part.endsWith('**')?<strong key={i}>{part.slice(2,-2)}</strong>:part);
  return <Box component="article" sx={{my:4,maxWidth:850}}>
   <Typography variant="h4" component="h1" gutterBottom>{title}</Typography>
-  <Typography color="text.secondary" sx={{mb:3}}>Version {policyVersion} · Effective October 11, 2026</Typography>
+  <Typography color="text.secondary" sx={{mb:3}}>Last modified {new Date(policyVersion[kind].modifiedAt).toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'})} · Revision {policyVersion[kind].commit.slice(0,12)} · Effective October 11, 2026</Typography>
   {source.split('\n').map((line,i)=>{
     if(!line.trim()||line.startsWith('# '))return null;
     if(line.startsWith('### '))return <Typography key={i} variant="h6" component="h2" sx={{mt:3,mb:1}}>{renderInline(line.slice(4))}</Typography>;
@@ -258,7 +258,7 @@ function AgreementCompletion({me,refresh}:{me:Me;refresh:()=>Promise<void>}) {
  };
  return <Stack spacing={2} sx={{mt:3,maxWidth:650}}>
   <Typography variant="h6">Review and accept current policies</Typography>
-  <Typography>Read the <a href="/terms" target="_blank" rel="noopener noreferrer">Terms of Use</a> and <a href="/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a> (version {versions?.terms||policyVersion}).</Typography>
+  <Typography>Read the <a href="/terms" target="_blank" rel="noopener noreferrer">Terms of Use</a> and <a href="/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a> (version {versions?.terms||policyVersion.terms.version}).</Typography>
   <FormControlLabel control={<Checkbox checked={checked} onChange={e=>setChecked(e.target.checked)}/>} label="I have read and agree to the Terms of Use and acknowledge the Privacy Policy."/>
   {!versions&&<Alert severity="warning">Required policy versions are unavailable. Acceptance is disabled.</Alert>}
   {error&&<Alert severity="error" role="alert">{error}</Alert>}
