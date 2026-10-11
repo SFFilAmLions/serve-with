@@ -44,7 +44,7 @@ References: [requirements.md](requirements.md) (approved); [design.md](design.md
 - [x] Implement friendly public empty states, loading indicators, retries, and failure feedback independently of login (UI verification pending).
 - [ ] Preserve OTP sign-in and logout, explicit POST magic-link confirmation and token removal from browser history; integrate pending magic-link fix when appropriately merged instead of independently changing its behavior here.
 - [x] Implement club-handbook-style footer and explicit build metadata for staging/production (CI and browser acceptance pending): repository link in all views; staged deployed commit hash linking to commit; production approved release version linking to GitHub release; local-development fallback, explicitly supplied by build workflows.
-- [ ] Add frontend tests for public browsing, loading/error/empty states, timestamp formatting, responsive layout, system-driven light/dark theme, and auth regression.
+- [ ] Complete frontend tests for public browsing, loading/error/empty states, responsive layout, system-driven light/dark theme, and auth regression. Extracted event editor validation/time formatting into `src/event-form.ts` with executable unit tests for inputs, overnight events, and multiple zones; CI pending.
 
 **Review checkpoint:** Anonymous visitors can browse events on the landing page without signing in.
 
