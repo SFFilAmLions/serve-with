@@ -1,53 +1,82 @@
 # Serve With — Privacy Policy
 
-**Status:** Approved wording, not published
-**Effective date:** To be assigned at publication
-**Operator:** San Francisco Fil-Am Lions Club
+**Status:** Final Draft — Pending Approval  
+**Effective Date:** To be assigned upon approval  
+**Operated by:** San Francisco Fil-Am Lions Club
 
-## 1. Information We Collect
+### 1. Information We Collect
 
-When you register for Serve With, we collect your first and last name, email address, date of birth, and records of acceptance of the Terms of Use and Privacy Policy. We process information needed for authentication, secure sessions and protection against misuse, including technical security data such as IP-derived rate-limit identifiers.
+When you register for Serve With, we collect:
 
-If event registration or volunteer participation features are introduced, we may collect associated participation information. We will update this policy as appropriate before collecting additional categories of personal information.
+- Your first and last name.
+- Your email address.
+- Your date of birth.
+- Records of your acceptance of our Terms of Use and Privacy Policy.
 
-## 2. How We Use Your Information
+We also process information needed to authenticate accounts, protect the website, and maintain secure sessions.
 
-We use this information to manage and verify accounts; coordinate club events and volunteer opportunities; determine age eligibility for activities; communicate about accounts and activities; maintain security and reliability; and keep necessary administrative records.
+When event registration or volunteer participation features are available, we may collect information about your participation in those activities. We will update this policy as appropriate before introducing additional categories of personal information.
 
-Date of birth is used for account records and age-eligibility checks.
+### 2. How We Use Your Information
 
-## 3. Who Can Access or Receive Your Information
+We use your information to:
 
-Your full Serve With profile is accessible only to you and authorized Serve With administrators.
+- Create, verify, and manage your account.
+- Organize club events and volunteer opportunities.
+- Determine age eligibility for activities with age restrictions.
+- Communicate with you about accounts, events, and volunteer activities.
+- Protect the website against unauthorized access and misuse.
+- Maintain necessary administrative and participation records.
 
-We may share limited information, such as your name, contact information or participation details, with organizers of a specific volunteer activity, including organizers outside the club, when reasonably necessary to coordinate that activity. This does not give organizers general access to your full profile.
+We use your date of birth for account records and age-eligibility checks.
 
-Service providers process data necessary for hosting, database storage and account email delivery, including Cloudflare and Resend. We do not sell your personal information.
+### 3. Who Can Access or Receive Your Information
 
-## 4. Minimum Age
+Your full Serve With account profile is accessible only to you and authorized Serve With administrators.
 
-Registration is available only to people **13 years of age or older**. Some activities may impose higher minimum ages or additional conditions. We use date of birth to determine eligibility.
+For a particular volunteer activity, we may share limited information, such as your name, contact information, or participation details, with its organizers when reasonably necessary to coordinate that activity. This does not provide outside organizers with general access to your full account profile.
 
-Serve With is not intended for children under 13. If we learn that an account belongs to a child under 13, we will review and take appropriate action, including removal of personal information as required by law.
+We also use service providers for website hosting, data storage, and account-related email delivery. These providers may process information necessary to perform those services.
 
-## 5. Data Security
+We do not sell your personal information.
 
-We use reasonable technical and organizational safeguards, including authenticated access and restricted administrator permissions. No online service can guarantee absolute security.
+### 4. Minimum Age
 
-## 6. Retention and Deletion
+Serve With registration is available only to individuals **13 years of age or older**.
 
-We retain personal information as reasonably necessary to operate Serve With, coordinate activities, maintain appropriate records and satisfy applicable obligations.
+Some activities may have higher minimum ages or additional participation requirements. We may use your date of birth to determine eligibility.
 
-You may request deletion at **secretary@sffilamlions.org**. An authorized administrator will manually review the request. Following approval, we will delete personal profile information where practical, retaining only information reasonably necessary for legitimate administrative, security, recordkeeping or legal purposes. We will communicate the outcome, including necessary retention, and honor applicable legal obligations and privacy rights.
+Serve With is not intended for children under 13. If we learn that an account belongs to a child under 13, we will review and take appropriate action, including removal of personal information as required by applicable law.
 
-## 7. Access and Corrections
+### 5. Data Security
 
-You may review your profile and edit supported fields. For other corrections, including date of birth, or privacy requests, contact **secretary@sffilamlions.org**.
+We use reasonable technical and organizational safeguards to protect personal information, including authenticated access and restricted administrative permissions.
 
-## 8. Changes
+No online service can guarantee absolute security.
 
-We may revise this policy as Serve With evolves. New versions will identify an effective date, and when required we will request acceptance before continued use of account features.
+### 6. Data Retention and Deletion
 
-## 9. Contact
+We retain personal information for as long as reasonably necessary to operate Serve With, coordinate activities, maintain necessary records, and satisfy applicable obligations.
 
-San Francisco Fil-Am Lions Club — **secretary@sffilamlions.org**.
+You may request deletion of your account or personal information by contacting **secretary@sffilamlions.org**.
+
+An authorized administrator will review the request. When deletion is approved, we will remove personal profile information where practical and retain only records reasonably necessary for legitimate administrative, security, recordkeeping, or legal purposes.
+
+We will communicate the outcome of the request, including any information that must be retained. We will honor applicable privacy rights and legal obligations.
+
+### 7. Access and Corrections
+
+You may review your profile and update supported account information through Serve With.
+
+For corrections to information you cannot edit yourself, including your date of birth, or to make a privacy-related request, contact **secretary@sffilamlions.org**.
+
+### 8. Changes to This Policy
+
+We may revise this policy as Serve With develops.
+
+Each new version will include an effective date. When required, we will request your acknowledgment of the updated policy before allowing continued use of account features.
+
+### 9. Contact
+
+**San Francisco Fil-Am Lions Club**  
+Email: secretary@sffilamlions.org
