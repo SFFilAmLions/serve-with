@@ -1,142 +1,45 @@
-# SDDW 004 — Authentication and Event Editor UX Refinements: Requirements
+# SDDW 004 — Registration, Account & Event UX: Requirements
 
-**Status: Scope defined by user; requirements ready for final review. Technical design and implementation not yet approved.**
+**Status: Simplified scope ready for user review. No implementation, merge, migration or deployment approval.**
 
-Origin: successful SDDW 003 staging use and user feedback. Consolidates [#10](https://github.com/SFFilAmLions/serve-with/issues/10), [#11](https://github.com/SFFilAmLions/serve-with/issues/11), and [#12](https://github.com/SFFilAmLions/serve-with/issues/12). This specification is the source of truth; issues remain pointers.
+Consolidates issues [#10](https://github.com/SFFilAmLions/serve-with/issues/10), [#11](https://github.com/SFFilAmLions/serve-with/issues/11), [#12](https://github.com/SFFilAmLions/serve-with/issues/12) and subsequent user requirements. Future account-lifecycle concepts are preserved separately in [deferred-account-lifecycle.md](deferred-account-lifecycle.md), **not part of SDDW 004**.
 
-## 1. One-click magic-link authentication
+## 1. Login and registration
 
-- Opening a valid emailed magic link **automatically signs the user in**, without a second confirmation button or email re-entry.
-- Exchange the single-use token through the existing secure POST API, not a state-changing GET. Remove the token from the browser address and history before the request; avoid token leaks via referrers or logging.
-- Show understandable signing-in progress and clear expired/invalid/already-used errors. Never exchange a token twice because of rerenders or retries.
-- Preserve administrator allowlist, token expiration and replay protection, secure session cookies, eight-digit code authentication, and logout.
+- Use one dedicated **email-first login page**. After entering email, let users authenticate by existing eight-digit code or magic link. Clicking a valid magic link **automatically signs in** via one-time POST exchange, without another confirmation button; scrub tokens from URL/history and protect against replay, expiry and duplicate exchange.
+- Following verified email ownership, ask new accounts and incomplete existing accounts for required **first name, last name, and date of birth** inline on the login page. No separate Create User page. Return complete users directly to the normal attendee experience.
+- Require a single **initially unchecked acknowledgment checkbox** linked to the Terms of Use and Privacy Policy during registration/profile completion. Record immutable account `created_at` independently of nullable `terms_accepted_at`, accepted document version references, and prior acceptance audit history.
+- Access requires verified email, completed mandatory profile, and an agreement covering **currently required** document version(s). Require the checkbox again if the required terms/privacy version changes; a timestamp alone does not establish validity. Incomplete or outdated accounts can access only sign-in/profile-completion/reacceptance/logout, not attendee participation or admin mutations. This is not blanket consent to optional processing.
+- In this scope, **deactivation** means invalidating current agreement/acceptance and restricting access while retaining the profile. Verified re-login plus fresh acknowledgment reactivates it. No separate `is_active` boolean. Full deletion and key-based recovery are deferred.
+- On staging only, gate account creation/activation/challenges by a **server-side email-only staging allowlist**, distinct from administrator permissions. Avoid account/allowlist enumeration; include existing admins in eligibility. Production registration policy is deferred and must not silently default to open.
+- Preserve existing administrator configuration `config/admins.yaml` as **email/enabled only**. Administrator names, verified email and DOB are in D1. Existing administrators must supply missing profile details and acknowledge terms at next sign-in without losing their configured role.
 
-## 2. Conventional Material app-bar account controls
+## 2. Account navigation and user management
 
-- Place account access in the **top right of the existing branded AppBar**, not at the bottom of the page.
-- Signed out: provide a compact **Sign in** action navigating to a dedicated, accessible login page, without hiding public events.
-- Signed in: provide an account/avatar menu exposing the user's email and **Sign out**; the menu must work with keyboard and small/mobile viewports.
-- Public event browsing must remain accessible regardless of login or auth-service errors. Admin mutation controls appear only with confirmed authorization, backed by existing server authorization.
-- Remove the old bottom-of-page auth/account panel while retaining the GitHub repository and deployment-identification footer.
+- Put Sign in / account menu (identity and Sign out) at the **top right of the MUI app bar**, removing the former bottom auth panel. Public upcoming/past events remain browsable without login.
+- Default signed-in experience is **Attendee**; authorized admins can switch into a distinct **Administrator** workspace. Hiding admin UI is insufficient: protect every admin route and API server-side.
+- **Edit Profile:** owner can edit first/last name and view verified email and date of birth. Email remains read-only in SDDW 004. After initial entry, DOB can be corrected **only by an administrator**, with a restricted API and audit trail.
+- **Users directory:** administrator-only page with basic name/email search, no DOB in list or default API payload. Attendees must never see the list, nor access it via guessed routes or list/search APIs.
+- **Edit User:** authorized administrators can edit an existing account's names and correct DOB. No admin Create User page. Profile and directory endpoints must enforce ownership/role authorization; no self-service role editing or cross-user deletion.
 
-## 3. Streamlined Add/Edit Event dialog
+## 3. Event management usability
 
-- **Revised decision:** Event creation must use a **dedicated Create Event page**, not a modal dialog. Provide a normal page header, navigation/back affordance, and prominent Save action. Reuse the same event field component for editing; the final Edit Event presentation (dedicated page recommended for consistency) is specified during design.
-- Navigation away from an event form with unsaved changes must prompt before discarding edits, including browser back/navigation where supported. The earlier modal-specific X/Cancel requirement no longer applies to the Create Event page.
-- Display a **prominent, full-width Start date**, followed by **equal-sized Start time and End time controls next to each other**; use easy-to-operate clock/time pickers with keyboard/manual input support.
-- Show a live **Duration** preview aligned under the time row or near End time without making either time control narrower.
-- Keep **End date** and **Time zone** collapsed under a discoverable **More options** section by default. Default end date to the chosen start date and zone to `America/Los_Angeles`.
-- Start-date changes carry forward to end date **only until the user explicitly overrides end date**. Never overwrite an intentionally chosen end date.
-- For editing existing multiday events or nondefault time zones, expand More options automatically; when collapsed, display a concise summary for important nondefault values.
-- Duration must reflect actual elapsed time in the event's IANA time zone, including overnight/multiday and daylight-saving changes; invalid or ambiguous local times show a validation state, not a misleading duration.
-- Provide an administrator-only **Duplicate Event** action on existing events (including past events). It opens the dedicated **Create Event** page with the selected event's editable fields prefilled (title, location, start/end date and time, and time zone). Users may modify any prefilled field before saving.
-- Duplicating must **create a new event with a new ID**, not alter the source event, copy its version/deletion metadata, or save automatically. Clearly label the page as creating a new event and require explicit Save. The existing create endpoint and validation rules apply, including past dates and DST handling.
-- Retain editing of all persisted fields, form prepopulation, API request format, server validation, optimistic version conflict handling, error draft preservation, and soft deletion.
+- Use a dedicated **Create Event page**, with matching dedicated **Edit Event page** proposed for consistency; shared field components, validation and unsaved-navigation safeguards.
+- Prominent full-width **Start date**; equal-width side-by-side **Start time** and **End time** clock-capable controls; live **Duration** alongside/under time controls without resizing either.
+- Collapse **End date** and **Time zone** under More options. End date initially follows start date until explicitly overridden. Default zone is `America/Los_Angeles`; preserve overnight/multiday and timezone/DST validation behavior, with errors rather than misleading duration.
+- **Duplicate Event** action for administrators, including past events, opens Create Event prefilled with only editable source fields. It does **not** save until explicit Save, creates a **new ID**, never changes the original and does not copy server metadata.
+- Preserve existing event CRUD authorization, optimistic concurrency/error behavior and publicly readable listings.
 
-## 4. User registration, profiles, and account deletion
+## 4. Documentation, quality and rollout
 
-- **One dedicated email-first login page, with inline registration.** A person starts by entering their email, then verifies ownership using an eight-digit security code or automatic magic-link exchange. Only after email verification, if no complete profile exists, expand the login flow to collect required first name, last name, and date of birth inline. Existing users with complete profiles proceed directly. No separate Create User page. Every active user, including every administrator, must have a **nonblank first name, nonblank last name, valid date of birth, and unique verified email address**. Apply appropriate validation and normalization server-side; public event browsing remains anonymous.
-- Authenticated users can view and edit their first and last names, view their read-only date of birth (correctable only by an authorized administrator), request a verified email change, and either deactivate or delete their own account. First/last name and date of birth remain required while active.
-- Do not grant administrator privileges through registration or profile changes. **Decision: existing administrators complete their first and last names and date of birth through the same inline required profile-completion step during their next sign-in.** Until completed, permit only the limited profile-completion and sign-out experience, not administrative operations; preserve the administrator role assignment after completion. Never invent names. Reconcile the authoritative administrator list and persisted user profiles without locking out existing admins during the transition.
-- **Approved authority split:** keep `config/admins.yaml` as the email-based administrator authorization list (email and enabled status), not a storage location for first/last names. Store each administrator's required, editable first name and last name and mandatory date of birth, alongside their verified email, **only in their D1 user profile**. Administrator access is based on the configured email plus a completed, verified user profile. Do not synchronize editable names into YAML.
-- Separate **account eligibility**, **registered account status**, and **administrator authorization**. An eligible person is not an admin merely because they can register, and an administrator email is not a substitute for a complete user profile.
+- Keep root `README.md` accurate: separate **implemented** SDDW 003 from proposed SDDW 004, and link staging **https://servewith-beta.sffilamlions.org/** and production **https://servewith.sffilamlions.org/**.
+- Add tests for authorization (especially attendee denial of Users APIs), staging eligibility, authentication edge cases, missing profile/updated terms gates, admin DOB correction, account-menu/mobile UX, event duplicate/new ID, time/DST and editing regression.
+- Review implementation tasks and migrations before coding. Submit reviewed PR(s), run CI, merge only with approval, validate on staging. Production release remains separately gated.
 
-### Verified email changes
+## Explicitly deferred
 
-### Verified email changes
+**Not SDDW 004:** self-service email changes, user deletion, anonymized historical signups, optional emailed recovery keys, ownership re-claim, attendee event signups, production registration policy. See [deferred-account-lifecycle.md](deferred-account-lifecycle.md).
 
-- A signed-in account holder can request an email change. The new email must be unique among active real-email accounts, eligible for the current environment (including the staging email whitelist), and verified with a one-time code or magic link **sent to the new address** before the account email is changed. Until verification succeeds, keep the original email unchanged. Invalidate outstanding change attempts and rotate/revoke sessions as appropriate on success. Administrator rights must be recalculated from the new email under `config/admins.yaml`, never blindly transferred.
+## Remaining design decision
 
-### Terms acceptance and account activation (SDDW 004 core)
-
-- On first verified registration/profile completion, require one **unchecked** checkbox agreeing to linked Terms of Use and acknowledging the Privacy Policy. Do not precheck it.
-- Store an account creation timestamp (`created_at`) separately from `terms_accepted_at` (nullable timestamp of the **most recent** affirmative acceptance). Also store the accepted Terms/Privacy document version identifiers or equivalent immutable revision references.
-- A user has access to regular attendee/admin functions only with verified email, all required profile fields, and an acceptance covering the **currently required document version(s)**. Null acceptance or an older acceptance means the user must accept again before proceeding. The check is enforced server-side, not by the UI alone.
-- When the Terms of Use or Privacy Policy changes in a way that requires renewed acknowledgment, publish/update the required version and present the unchecked checkbox at next authenticated access. On affirmative acceptance, update `terms_accepted_at` and the version reference(s); keep prior acceptance records for audit. Do **not** reset or overwrite the original `created_at`.
-- In this simplified scope, deactivation invalidates the current acceptance (for example, setting `terms_accepted_at=NULL` and clearing the current accepted version), while retaining names, email, DOB, historical signups and earlier audit records. After verified login the user can reaccept current terms without reentering valid profile information.
-- Terms acceptance is an account-access condition, not blanket legal consent to unrelated personal-data processing. Optional consent requires separate controls. Full account deletion and recovery are deferred to a later phase.
-
-### Account deletion and optional recovery — future scope (not part of simplified core)
-
-**Future deletion design only; do not implement from this section in the streamlined SDDW 004 release.** Deactivation and deletion have different data effects. Deactivation preserves the full profile and blocks participation pending renewed agreement. Deletion clears PII and may retain historical participation with optional key-based recovery.
-
-- **Initial agreement:** Require an unchecked Terms of Use and Privacy Policy acceptance checkbox on the initial profile form, with links to both documents. Save the accepted versions and acceptance timestamp. Distinguish agreement to terms from separate optional processing consent, where applicable.
-- **Deactivate account:** preserve the verified email, first/last names, date of birth, stable user ID, and historical signups. Mark the account inactive and clear its **current participation agreement** flag. Preserve historical records of earlier agreement; do not erase or falsify them. Restrict sessions and participation until the returning user verifies the same email and affirmatively accepts the current terms/privacy notice again. No redundant reentry of names/date of birth unless missing. Reevaluate staging eligibility and administrator status.
-- **Delete account:** clear the same profile PII **and remove the original email association**; revoke all access and remove the account from normal directories. Preserve only suitably stripped historical event signup records, with a random internal identifier independent of former name/email.
-- On the Delete confirmation screen, offer **optional email delivery of a recovery key**, clearly explaining the consequence. If selected, generate a high-entropy random single-use **bearer recovery key**, email it to the original verified address before removing that address, and retain only a cryptographically protected verifier linked to the historical record. Do not retain plaintext, original email, or a deterministic mapping from email to key.
-- If the user **declines** recovery, never generate, deliver, or retain a claimable recovery key or identity-to-history mapping. Old signup history cannot be recovered through the service. Re-registering the previous email creates a fresh account unlinked to history; administrators must not be able to reconstruct ownership using deleted profile fields.
-- If the user possesses a valid recovery key, possession intentionally grants the ability to **claim** the linked historical account, including if another person obtained the key. Require verification of a new eligible email and a fresh required profile, and atomically invalidate the recovery key on use. Reevaluate administrator permission under the newly verified email. No deleted PII, old session or prior role assignment is restored.
-- Random placeholders (for example, unpredictable addresses under the reserved `example.com` domain) may be used where an email-shaped value is unavoidable, but they are **not** the recovery key and must never receive authentication mail. Prefer separate internal IDs and null real email instead of placeholder email whenever possible.
-- Active accounts must always have complete required profiles and agreement. Deactivated accounts retain profile PII but are inactive; only deleted/historical records intentionally lack identity fields, never silently treated as active. User-facing lists should show a neutral **Deactivated user** or **Deleted user** label rather than placeholder values, and never expose recovery tokens.
-- **Privacy qualification:** recoverable histories and deactivated email-linked histories are pseudonymous/identifiable, and even nonrecoverable participation histories are not automatically anonymous if event combinations, signup notes, backups or outside sources can reveal a person. Inventory and handle signup-level PII, logs, exports, mail-provider copies and backup retention before claiming full erasure or legal anonymity.
-- Acceptance: test both deletion choices and ordinary deactivation; PII scrub and access revocation; same-email deactivation recovery with mandatory profile reentry; no-key history irrecoverability; optional email delivery failure; hash-only recovery key storage; key replay/theft implications; duplicate/allowlist checks; preservation of nonidentifying signup history.
-
-### Staging-only registration allowlist
-
-- **Decision: the staging whitelist contains email addresses only, not names.** In the **staging environment only**, permit account creation **only when the email matches an explicitly approved staging user allowlist**. Whitelist eligibility must be checked on the server before creating or activating an account and before sending registration credentials; never rely solely on UI validation.
-- Visitors may enter any email on the login screen, but an unlisted email must **not** result in a staging account, session, or usable login challenge. Use safe, non-enumerating public error/acknowledgment messaging to avoid exposing the whitelist.
-- Staging administrators must be covered explicitly by the same staging account-eligibility policy; administrator authorization remains a separate check.
-- Existing staging users/admins need a reviewed migration/activation policy so mandatory profile fields and eligibility are enforced without silently losing access. Treat profile completion or approved seed-data migration as a deliberate step.
-- Maintain the staging allowlist through a reviewed, environment-specific configuration/source of truth, not an open-registration switch or a client-side list. Never accidentally apply the staging restriction to production.
-- **Production registration eligibility is not specified by this requirement** and must be defined in design review before enabling production registration; no assumption of open production signup.
-
-### Acceptance criteria
-
-- Tests cover required admin first-sign-in profile completion, continued admin access after completion, edited names, eligible/ineligible staging registration, normalized/case-insensitive email matching, verification, duplicate email handling, required name and date-of-birth validation, self-deletion/session revocation, denial of self-assigned admin privileges, and handling of existing admins.
-- Verify ordinary users can sign in but cannot call administrator mutation APIs. Verify public events remain readable while signed out.
-- No deployment or user-account migration until requirements, design, and implementation tasks have been approved.
-
-## 5. Profile editor and administrator user directory
-
-- Give **every authenticated user a dedicated Edit Profile page**, reachable through the top app-bar account menu. **After successful email verification, expand the login page to request any missing first/last names or date of birth**, and require completion before ordinary attendee or administrator features become available. Reuse the profile fields/validation for the standalone Edit Profile page used for later edits; there is no independent Create User page. Users may view and update **their own first and last names** and view their own date of birth, with required-field validation. Their verified email is displayed but **not editable** in SDDW 004.
-- **Attendees must not be able to view or access the Users directory**, whether through navigation, a direct URL, or the users-list/search APIs. Only authorized administrators can access the directory. Provide an **administrator-only Users page** listing registered user accounts, with useful identifying columns (first name, last name, email) and basic search/filtering. This is an account directory, not an event-attendance list. Do not provide a Create User action; eligible new users create their own accounts via the login/verification flow.
-- From the Users directory, administrators may open an **Edit User page** for an existing account, prefilled with its profile information. Reuse the profile-edit form fields and validation, but enforce administrator-only cross-user editing on the server. Administrators may edit first and last names, not verified email or administrator privileges. **Date of birth must not appear in the default directory or ordinary account list API**; date of birth may be viewed and corrected only within the administrator's authorized Edit User workflow, with explicit validation and audit tracking; it remains excluded from the default directory. There is **no administrator Create User page** in this phase.
-- Self-service login and required profile completion handle first-time account creation; the admin Edit User page does not register accounts or bypass staging eligibility.
-- Never treat the ability to edit a profile as permission to grant administrator status or modify the verified email.
-- Enforce administrator authorization server-side on all users-list, search, and cross-user read endpoints; attendees must receive an authorization denial even when guessing a URL, ID, or API path. Enforce ownership or administrator authorization server-side on every profile read/write. A normal user cannot view the full user directory, enumerate other users, or edit another user by manipulating a URL or API request.
-- Administrator account/profile management must preserve existing eligibility, verification, permissions, and account-deletion safeguards. Administration of roles and cross-user deletion are **not authorized by this requirement**. Self-service **verified email changes are in scope**. Administrator creation of ordinary user accounts is not in scope; first-time account creation occurs through verified email login.
-- Page navigation must support direct links, browser back/forward, responsive layout, keyboard focus, save feedback, and unsaved-change protection.
-
-## 6. Separate Attendee and Administrator experiences
-
-- Provide **distinct Attendee and Administrator views**, not one public event page with scattered admin editing controls. Attendee is the normal/default experience for signed-in people.
-- **Attendee view:** Browse Upcoming and Past events, use personal account/profile controls, and access attendee-facing capabilities as those are introduced. Do not invent registration-for-events, RSVP, signup, or attendance features as part of SDDW 004; those remain future work.
-- **Administrator view:** A clearly identified management workspace for permitted staff, with Add/Edit/Delete Event controls and any future administrative functions. Keep editing controls out of the attendee experience.
-- An authenticated administrator can **switch between Attendee and Administrator views** without signing out or changing identity. A standard attendee must not be offered an administrator switch or gain access to admin routes.
-- The app bar must make the current view obvious. Provide a discoverable, mobile-friendly view switch for eligible admins, and place the account menu (identity/profile/logout) separately from mode switching.
-- Authorization remains **server-enforced** for all administrative APIs and routes; changing a client-side view must never grant privileges.
-- Preserve anonymous public event browsing, with an appropriate attendee/public entry view when signed out.
-- When returning from admin to attendee, retain the attendee's normal browsing experience; define back/navigation and optional view persistence in design. Never leak admin-only information into the attendee view.
-- Browser tests must cover attendee-only accounts, administrators switching both directions, direct navigation to protected administrator views, logout and expired-session behavior, keyboard/mobile switching, and no accidental admin controls in attendee view.
-
-## 7. Project documentation
-
-- Update the root `README.md` as part of SDDW 004 to reflect features actually implemented versus planned, and to prominently link both environment URLs: staging `https://servewith-beta.sffilamlions.org/` and production `https://servewith.sffilamlions.org/`.
-- Describe the current deployment workflow and production release gate accurately. Keep the README up to date as SDDW 004 is implemented, reviewed, and eventually shipped; do not present planned features as already live.
-
-## 8. Acceptance and boundaries
-
-- Automated tests: automatic single-attempt magic-link sign-in/token scrubbing, code/login/logout regressions, registration/profile/deletion and staging eligibility checks, own-profile edit versus administrator editing of other users, protected user directory, dedicated event-create page and event duplication, admin Edit User and first-login profile completion, account-menu/mobile, attendee/admin view switching and keyboard behavior, page-navigation/discard behavior, start/end synchronization and overrides, distinct date and clock input UX, live duration and DST edge cases, Edit prefill, no public-list regression.
-- Verify changes on staging through normal `main` workflow after approval, fixing staging defects iteratively. **No production deployment without separate explicit authorization.**
-- Out of scope: new authentication providers, new event schema, event RSVP/signups, recurrence, organization permissions expansion, or production release.
-
-## 9. Confirmed requirements decisions
-
-- **Existing administrators:** Mandatory first/last name completion at next sign-in (not invented or pre-seeded). Until complete, restrict to completion/sign-out while preserving their existing role assignment.
-- **Staging registration allowlist:** Email addresses only; registrants supply their own mandatory names.
-- **Profile editing:** Users may change their first/last names after registration; both fields must remain valid and nonblank. Date of birth is mandatory and read-only to the account owner after initial submission; only an authorized administrator may correct it. Changing email is allowed only through a separate ownership-verification process; direct edits to the email field are not allowed.
-- **Administrator identity source:** `config/admins.yaml` remains an email-only authorization source; required names and verified email reside in D1 profiles, including administrators. No names in YAML.
-
-## 10. Items to settle in design review
-
-- Specific MUI date/time picker dependency, license constraints, and mobile clock UX.
-- Whether the duration should be shown directly beneath the equal-width time inputs or in an End time label area; the equal sizing and prominent date are required either way.
-- Exact loading/error presentation for automatic magic-link exchange.
-- Decide whether Edit Event should also be a dedicated page (recommended for consistency) and the exact URL patterns for Create Event, Users, Edit User, and Edit Profile.
-- Define email/code/magic-link login state, inline post-verification name expansion, first-login account activation timing, duplicate prevention, and eligibility checks before challenge issuance and activation. Do not disclose whether an email is registered before verification.
-- Attendee/Admin view navigation model (route or mode switch), initial/default view and UI placement; do not imply attendee event signup is already implemented.
-- Date-of-birth input format (calendar date, not timestamp), reasonable validity bounds, administrator correction audit, data minimization and retention; do not show dates of birth in the user list by default. Correction permissions are approved: administrators only.
-- User table migration; complete PII scrubbing scope beyond the required profile fields, retained-email/privacy/retention rationale, and potential separate full-erasure process; staging email-only allowlist reconciliation. Administrator configuration/profile source-of-truth split is approved.
-- Production registration eligibility policy (explicitly deferred; no production registration is authorized).
-
-**Next gate:** Final requirements/design review and resolution of remaining account-deletion/retention and editor decisions, then implementation task approval. Scope is closed to additional features unless explicitly reopened.
+Choose the specific date/time picker implementation and confirm the consistent Edit Event dedicated page; preserve required UX and accessible keyboard/mobile behavior. Document publication and required acceptance version changes need an operating procedure before onboarding real attendees.
