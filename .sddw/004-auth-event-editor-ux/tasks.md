@@ -9,6 +9,8 @@
 - [ ] Design account schema, migrations, verification, self-deletion/session revocation, staging allowlist policy and tests, and how existing admins transition.
 - [ ] Review/approve the separate Attendee and Administrator view requirements and design accessible switching and route authorization.
 - [ ] Design authentication and account-menu interactions in [design.md](design.md); review and approve.
+- [ ] Specify Create Event as a dedicated page and choose a consistent Edit Event page design, navigation, dirty-form safeguards, and tests.
+- [ ] Design authenticated Edit Profile and admin-only Users/Edit User pages, including authorization, search, data exposure, and regression tests.
 - [ ] Design date/time picker choice, progressive disclosure, duration algorithm, and accessibility; review and approve.
 - [ ] Break approved design into small implementation/test slices.
 - [ ] Implement on a separate branch or PR, run automated tests, and merge to `main` only after review.
