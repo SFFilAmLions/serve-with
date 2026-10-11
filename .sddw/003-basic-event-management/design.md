@@ -101,7 +101,11 @@ All JSON responses set `Cache-Control: no-store` initially to prevent stale publ
 - `src/lib/api.ts` typed fetch client; `src/lib/event-time.ts` display formatting.
 - `src/worker.ts` routes and authorization; extract handlers into small modules if needed.
 - `migrations/0003_events.sql`; extend existing Worker integration tests and add frontend interaction tests.
-- Keep build-SHA footer visibility from the existing deployment workflow.
+- Display a compact, persistent source/build footer consistent with the club-handbook convention. Include a clearly labeled **GitHub repository** link to `https://github.com/SFFilAmLions/serve-with` on both public and authenticated views. The link must be keyboard accessible, have a descriptive accessible name, and open the repository rather than a generic organization page.
+- **Staging** (`servewith-beta.sffilamlions.org`, deployment environment `staging`): display `Commit <short SHA>`, derived from the **actual checked-out Git commit** embedded during the staging build. Link the commit identifier to `https://github.com/SFFilAmLions/serve-with/commit/<full SHA>`. Do not show the package version in place of the deployed commit.
+- **Production** (`servewith.sffilamlions.org`): display `Version vX.Y.Z`, derived from the **explicitly approved, published stable release tag** selected by the production deployment workflow, not a hard-coded package version or a staging SHA. Link it to the matching GitHub release page (`/releases/tag/vX.Y.Z`).
+- Determine the display mode from explicit build-time deployment metadata, not hostname heuristics. The staging and production workflows must inject the appropriate value at build time; local preview can show `Development build`. Never expose credentials or runtime secrets.
+- Preserve this footer across anonymous event views, sign-in, and authenticated admin views. Verify both build pipelines inject the expected metadata and that footer links and labels are correct in tests.
 
 ## 8. Verification and release constraints
 
