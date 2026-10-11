@@ -15,6 +15,7 @@ function harness() {
   const sqlite = new DatabaseSync(':memory:');
   sqlite.exec(readFileSync('migrations/0001_auth.sql','utf8'));
   sqlite.exec(readFileSync('migrations/0003_events.sql','utf8'));
+  sqlite.exec(readFileSync('migrations/0004_users_and_agreements.sql','utf8'));
   const adapter = { prepare(sql) { const statement = sqlite.prepare(sql); return {
     bind(...args) { return {
       all: async () => ({ results: statement.all(...args) }),
