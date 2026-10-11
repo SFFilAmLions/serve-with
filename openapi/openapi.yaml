@@ -391,3 +391,127 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+
+  /api/auth/me:
+    get:
+      tags: [Authentication]
+      operationId: getCurrentSession
+      summary: Inspect current login and profile readiness
+      security: []
+      responses:
+        '200':
+          description: Current session state
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: object
+                    required: [authenticated, email]
+                    properties:
+                      authenticated:
+                        type: boolean
+                        const: false
+                      email:
+                        type: 'null'
+                  - type: object
+                    required: [authenticated, email, userId, firstName, lastName, emailVerified, profileComplete, agreementCurrent, administratorEligible, privileged, requiredVersions]
+                    properties:
+                      authenticated:
+                        type: boolean
+                        const: true
+                      email:
+                        type: string
+                        format: email
+                      userId:
+                        type: string
+                        format: uuid
+                      firstName:
+                        type: [string, 'null']
+                      lastName:
+                        type: [string, 'null']
+                      emailVerified:
+                        type: boolean
+                      profileComplete:
+                        type: boolean
+                      agreementCurrent:
+                        type: boolean
+                      administratorEligible:
+                        type: boolean
+                      privileged:
+                        type: boolean
+                      requiredVersions:
+                        type: object
+                        required: [terms, privacy]
+                        properties:
+                          terms:
+                            type: string
+                          privacy:
+                            type: string
+        '503':
+          description: Sign-in not configured
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/auth/request:
+    post:
+      tags: [Authentication]
+      operationId: requestSignIn
+      summary: Request a one-time sign-in email
+      description: |
+        Requires a same-origin request; enforces Turnstile and rate limits.
+        Returns a generic success message to avoid revealing whether an
+        address is eligible.
+      security: []
+      parameters:
+        - in: header
+          name: Origin
+          required: true
+          schema:
+            type: string
+            format: uri
+          description: Must match request origin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+                turnstileToken:
+                  type: string
+                  description: Required when Turnstile is configured
+              additionalProperties: true
+      responses:
+        '200':
+          description: Generic response irrespective of account eligibility
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message:
+                    type: string
+        '400':
+          description: Invalid request or origin
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Turnstile verification required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Authentication or email service unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
