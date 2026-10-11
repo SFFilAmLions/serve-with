@@ -1,6 +1,6 @@
 # Tasks — SDDW 003 Basic Event Management
 
-**Status: Event APIs, React public/admin UI and core browser tests implemented in PR #6. Branding/theme development is now authorized and underway; staging deployment and merging remain unapproved.**
+**Status: All remaining development/verification packages authorized; PR #6 remains unmerged. Staging and production deployment remain explicitly prohibited pending separate approval.**
 
 References: [requirements.md](requirements.md) (approved); [design.md](design.md) (approved by user on 2026-10-10). Target is **Serve With SF Fil-Am Lions**. Retain the existing Vite / Cloudflare Workers / D1 architecture, with React + MUI and a Material 3-inspired theme.
 
@@ -42,7 +42,7 @@ References: [requirements.md](requirements.md) (approved); [design.md](design.md
 - [x] Set visible header and browser title/description to **Serve With SF Fil-Am Lions**; keep URLs unchanged (CI/UI verification pending).
 - [x] Implement initial responsive Upcoming/Past tabs with event cards showing event-local start/end instants, time zone, and location (CI/UI verification pending).
 - [x] Implement friendly public empty states, loading indicators, retries, and failure feedback independently of login (UI verification pending).
-- [ ] Preserve OTP sign-in and logout, explicit POST magic-link confirmation and token removal from browser history; integrate pending magic-link fix when appropriately merged instead of independently changing its behavior here.
+- [ ] Verify OTP sign-in/logout and explicit magic POST/token URL cleanup. Added Chromium mocked auth regression tests in `7de9087` (CI pending); end-to-end real provider staging validation remains deferred.
 - [x] Implement club-handbook-style footer and explicit build metadata for staging/production (CI and browser acceptance pending): repository link in all views; staged deployed commit hash linking to commit; production approved release version linking to GitHub release; local-development fallback, explicitly supplied by build workflows.
 - [ ] Complete frontend tests for public browsing, loading/error/empty states, responsive layout, system-driven light/dark theme, and auth regression. Extracted event editor validation/time formatting into `src/event-form.ts` with passing unit tests; initial Chromium UI tests added to CI, pending verification.
 
@@ -52,7 +52,7 @@ References: [requirements.md](requirements.md) (approved); [design.md](design.md
 
 - [x] Implement initial Add Event, Edit, and Delete controls for authenticated admins, including empty states and past events; backend retains authorization enforcement (CI/UI verification pending).
 - [ ] Complete accessible Add/Edit dialog: IANA time-zone autocomplete, form validation, edit prefill, and preserved server errors implemented; keyboard/focus interaction tests pending.
-- [ ] Complete save feedback: duplicate saves blocked, field-level errors and success Snackbar implemented; browser-level interaction tests pending. Corrected stale-event reload so it does not incorrectly announce a successful edit (`102edc8`; CI pending).
+- [ ] Complete save feedback: duplicate saves blocked, field-level errors and success Snackbar implemented; `d3f919f` adds a 422 field-error draft-retention Chromium test (CI pending), duplicate-save coverage still pending. Corrected stale-event reload so it does not incorrectly announce a successful edit (`102edc8`; CI pending).
 - [ ] Guard Cancel, close icon, Escape, and backdrop: unsaved-change confirmation implemented and keyboard focus restoration, accessible dialog descriptions, and nested confirmation close guards added; actual browser keyboard/focus and screen-reader checks still pending.
 - [x] Implement a separate Delete confirmation naming the event, refreshing on soft-delete and preserving the event on error (CI/UI verification pending).
 - [x] Handle HTTP 409 version conflicts by preserving unsaved edits, explaining the conflict, and offering a reload action with explicit discard confirmation (automated interaction tests still pending).
@@ -62,7 +62,7 @@ References: [requirements.md](requirements.md) (approved); [design.md](design.md
 
 ## Slice 5 — Staging acceptance and production gate
 
-- [ ] Run TypeScript checks, relevant security tests, React interaction tests, and build/size checks; confirm existing authentication and CI are still green. Latest fully verified baseline: GitHub CI `38117468190` at `04a9217`; newer commits pending verification.
+- [ ] Finish TypeScript/security/browser/build-size verification. GitHub CI passed at `b65d0308` (run `38117888410`), including club-logo, color-scheme, and API/browser regressions. The new auth and 422 tests are awaiting CI; Cloudflare staging runtime and bundle compatibility checks remain pending, with deployments not authorized.
 - [ ] After code and task approval, deploy **staging only** through the existing GitHub workflow and apply the migration to `serve-with-staging-db`. Validate data and migrations before changes.
 - [ ] Verify live `https://servewith-beta.sffilamlions.org/` on desktop/mobile: anonymous Upcoming/Past, timezone boundaries, admin CRUD, in-progress classification, deletion, conflicting edits, empty state, official brand, light/dark system switching, OTP/magic-link regression, and correct environment-specific repo/version-or-commit footer.
 - [ ] Document any deviations and update this checklist with evidence/checks; obtain explicit sign-off on staging.
