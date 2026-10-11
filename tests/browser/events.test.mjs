@@ -32,7 +32,7 @@ test('anonymous event lists are public, account controls live in the app bar',as
   assert.equal(await page.getByRole('button',{name:'Add Event'}).count(),0);
   await page.getByRole('tab',{name:'Past Events'}).click();
   await page.getByText('No past events yet.').waitFor();
-  await page.getByRole('button',{name:'Sign in / Appearance'}).click();
+  await page.getByRole('button',{name:'Account and appearance menu'}).click();
   await page.getByRole('menuitem',{name:'Sign in',exact:true}).click();
   assert.match(page.url(),/\/login$/);
   await page.getByRole('heading',{name:'Sign in'}).waitFor();
@@ -93,15 +93,15 @@ test('administrator workspace has Events and Users tabs and separate appearance 
  const {browser,page}=await context(admin);
  try{
   await page.goto(base);
-  await page.getByRole('button',{name:'Admin',exact:true}).click();
+  await page.getByRole('button',{name:'Account and appearance menu'}).click();
   await page.getByRole('menuitem',{name:'Administrator workspace'}).click();
   await page.getByText('Administrator',{exact:true}).first().waitFor();
   await page.getByRole('tab',{name:'Events'}).waitFor();
   await page.getByRole('tab',{name:'Users'}).waitFor();
-  await page.getByRole('button',{name:'Admin',exact:true}).click();
+  await page.getByRole('button',{name:'Account and appearance menu'}).click();
   await page.getByRole('menuitem',{name:'Dark appearance'}).click();
   assert.equal(await page.evaluate(()=>localStorage.getItem('servewith-appearance')),'dark');
-  await page.getByRole('button',{name:'Admin',exact:true}).click();
+  await page.getByRole('button',{name:'Account and appearance menu'}).click();
   await page.getByRole('menuitem',{name:'Attendee workspace'}).click();
   assert.equal(new URL(page.url()).pathname,'/');
  }finally{await browser.close()}
