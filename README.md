@@ -21,12 +21,14 @@ Staging Worker: `serve-with-staging`. Production Worker: `serve-with`. Both envi
 
 **SDDW 004 — Registration, account management, and UX refinements:** **Scope defined; draft requirements and proposed design under review, not implemented or deployed.** See [SDDW 004 requirements](.sddw/004-auth-event-editor-ux/requirements.md), [proposed design](.sddw/004-auth-event-editor-ux/design.md), [tasks](.sddw/004-auth-event-editor-ux/tasks.md), and [draft PR #13](https://github.com/SFFilAmLions/serve-with/pull/13). Planned scope includes:
 
-- Dedicated email-first login page, auto-completing magic-link sign-in, and first-login registration/profile completion.
+- Dedicated email-first login page, auto-completing magic-link sign-in, first-login registration/profile completion, and a required Terms/Privacy checkbox with timestamp and version-based reacceptance.
 - Required first/last name, verified email and date of birth; date-of-birth corrections restricted to administrators.
-- Staging-only email whitelist; separate Attendee and Administrator experiences; secure self-service profile changes and account deletion.
+- Staging-only email whitelist; separate Attendee and Administrator experiences; own-profile name editing and version-aware Terms of Use / Privacy Policy acknowledgment. Account deletion and recovery are deferred.
 - Administrator-only Users directory and Edit User page. **No standalone Create User page.**
 - Dedicated Create Event page, Duplicate Event shortcut, simplified date/time pickers and live duration preview.
 - Conventional app-bar user/account menu; user-role and profile-data access enforced on the server.
+
+Deferred email changes, account deletion/recovery keys and historical signup restoration are documented in [future account lifecycle notes](.sddw/004-auth-event-editor-ux/deferred-account-lifecycle.md), not part of SDDW 004.
 
 **Do not mistake features proposed in SDDW 004 for functionality already live on staging.** Production functionality is not asserted by this README.
 
