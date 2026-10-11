@@ -6,7 +6,7 @@ Consolidates [#10](https://github.com/SFFilAmLions/serve-with/issues/10), [#11](
 
 ## Core flow 1 — Sign in and complete registration
 
-- Provide one email-first login page supporting the existing eight-digit code and magic link. A valid magic link signs the user in automatically through a one-time POST exchange, without an extra confirmation click. Prevent replay/expiry/duplicate exchange and remove tokens from URL/history.
+- Provide one continuous email-first `/login` Material flow rather than separate Sign In/Register pages. First request Email with a **Continue** action; then show a non-enumerating **Check your email** state with the submitted address, eight-digit code input, **Continue**, **Resend code**, and **Use a different email**. A valid magic link signs the user in automatically through a one-time POST exchange and advances to the required next state without an extra confirmation click. Prevent replay/expiry/duplicate exchange and remove tokens from URL/history.
 - After email verification, prompt new or incomplete users inline for first name, last name and date of birth. Do not create a separate Create User page.
 - Present one initially unchecked acknowledgment linked to the current Terms of Use and Privacy Policy. Persist immutable account `created_at` separately from nullable `terms_accepted_at`, accepted document versions and historical acceptance events.
 - Require verified email, complete mandatory profile and acceptance of current required document versions before attendee or administrator mutations. If versions change, require reacceptance without reentering valid profile data. An acknowledgment is not optional-processing consent.
