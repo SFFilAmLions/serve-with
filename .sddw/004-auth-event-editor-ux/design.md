@@ -12,10 +12,12 @@ Retain React/Vite/MUI, Cloudflare Worker, D1, Resend and current events APIs. Re
 | --- | --- | --- |
 | `/` | Public | Upcoming/past events and attendee landing |
 | `/login` | Public / limited verified session | Code or magic-link login, inline profile and agreement completion |
-| `/profile` | Verified owner | Edit names; view read-only email and DOB |
-| `/admin` | Eligible administrator | Separate admin workspace |
+| `/events/:id` | Public | Canonical event detail route; detail-page expansion may be deferred |
+| `/users/:id` | Owner or eligible administrator | Canonical user profile; public visibility is a future enhancement |
+| `/users/:id/edit` | Owner or eligible administrator | Canonical editor; fields vary by permission |
+| `/admin` | Eligible administrator | Redirect to `/admin/events` |
+| `/admin/events` | Eligible administrator | Event management; default Administrator tab |
 | `/admin/users` | Eligible administrator | Paginated name/email directory |
-| `/admin/users/:id/edit` | Eligible administrator | Edit names, audited DOB correction |
 | `/admin/events/new` | Eligible administrator | Create or duplicate-prefilled event |
 | `/admin/events/:id/edit` | Eligible administrator | Edit existing event |
 
@@ -31,11 +33,15 @@ All privileged APIs independently verify authenticated session, verified email, 
 
 ## Account experience
 
-Top-right MUI app-bar account controls replace bottom auth. Default to Attendee mode; admins can switch workspaces. Owner profile edits names only; DOB/email display read-only. Admin-only paginated directory excludes DOB from list responses. Admin edit permits names and audited DOB correction; omit raw DOB from logs. Never infer authorization from hidden UI controls.
+Top-right MUI app-bar account controls replace bottom auth. Default to Attendee mode. For eligible admins, the account/user menu contains the Attendee/Administrator workspace switch; Administrator mode exposes exactly two primary tabs, **Events** (`/admin/events`) and **Users** (`/admin/users`), with Events as the default. The switch navigates to workspace URLs rather than maintaining an independent workspace flag.
+
+There is no `/profile` route and no admin-specific user-detail/edit route. **My Profile** links directly to `/users/{currentUserId}`. Selecting a person in `/admin/users` navigates to `/users/:id`; editing uses `/users/:id/edit`. Owner editing permits names only while email/DOB are read-only; administrators additionally may correct DOB with actor/time audit. The Users directory excludes DOB from list responses and remains admin-only. User profile visibility to the general public is deferred, but the canonical non-admin URL is intentionally future-compatible with public profiles. Never infer authorization from hidden UI controls.
 
 ## Event experience
 
-Dedicated Create and Edit pages share field controls and validation. Start date is prominent; Start/End time are equal-width clock-capable accessible controls with nearby live Duration. End date/time zone are collapsed; end date follows start until override. Use IANA `America/Los_Angeles` by default, with DST and multiday validation. Duplicate opens Create with editable fields only, strips source ID/version/timestamps, and persists a new event only on explicit Save. Preserve optimistic concurrency, draft/error retention, unsaved-navigation safeguards and public listing behavior.
+`/admin/events` retains Upcoming/Past event management with a prominent **Create event** action and per-event Edit, Duplicate and Delete actions. Deletion stays on the management list with confirmation rather than becoming an ordinary Edit-form action.
+
+Dedicated Create and Edit pages share field controls and validation. Use MUI X Date and Time Pickers (subject to dependency/license verification) instead of browser `datetime-local`: prominent full-width Start date; equal-width Start/End time controls; nearby live Duration. End date/time zone are collapsed under More options; end date follows start until override. Use IANA `America/Los_Angeles` by default, with DST and multiday validation. Duplicate navigates to `/admin/events/new` using client navigation state to prefill editable fields, visibly identifies the source event, strips source ID/version/timestamps, and persists a new event only on explicit Save. Preserve optimistic concurrency, draft/error retention, unsaved-navigation safeguards and public listing behavior.
 
 ## Test and rollout plan
 
@@ -45,4 +51,4 @@ Verify auth token replay/expiry, eligibility non-enumeration, current agreement/
 
 Do not design or implement email changes, account deactivation controls, deletion, anonymized signup history or recovery keys in this SDDW. Preserve future considerations only in [deferred-account-lifecycle.md](deferred-account-lifecycle.md).
 
-**Before coding:** choose picker library and finalize Terms/Privacy publication/versioning procedure.
+**Before coding:** verify the selected MUI X picker package/license fits the project, and finalize the Terms/Privacy publication/versioning procedure.
