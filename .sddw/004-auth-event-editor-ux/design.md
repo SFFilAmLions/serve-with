@@ -8,7 +8,7 @@ Source: [requirements.md](requirements.md). References: issues #10, #11, and #12
 Retain Vite, React, MUI, Cloudflare Worker, D1, Resend email verification, the current events API and migration history. This phase adds a registered-user model and a route-based app shell. Separate **account eligibility**, **email ownership**, **profile completeness**, and **administrator permission** in all server checks.
 
 - `config/admins.yaml`: existing email/enabled entries remain the sole role-assignment authority. Do not put names in YAML.
-- D1 `users`: verified, unique normalized email; required first/last names when profile is complete. User identity is not derived from YAML.
+- D1 `users`: verified, unique normalized email; required first/last name and date of births and birth date when profile is complete. User identity is not derived from YAML.
 - Staging eligibility: a distinct email-only allowlist, **not** the admin list. Only staging applies it. Production registration policy is explicitly undecided and not enabled by this design.
 - Both attendee and admin API calls require a valid session and completed profile where authentication is necessary. Admin APIs additionally check the authoritative admin list. Public events remain unauthenticated.
 
@@ -17,13 +17,13 @@ Retain Vite, React, MUI, Cloudflare Worker, D1, Resend email verification, the c
 | Route | Access | Responsibility |
 | --- | --- | --- |
 | `/` | Public | Upcoming/Past events, Attendee experience |
-| `/login` | Public | Email-first sign-in and inline first-login name completion |
-| `/profile` | Signed in | Edit own names, read-only verified email, delete own account |
+| `/login` | Public | Email-first sign-in and inline first-login profile completion |
+| `/profile` | Signed in | Edit own names, view date of birth, read-only verified email, delete own account |
 | `/admin` | Complete-profile admin | Administrative workspace |
 | `/admin/events/new` | Complete-profile admin | Create Event dedicated page |
 | `/admin/events/:id/edit` | Complete-profile admin | Edit Event dedicated page (proposed for consistency; pending approval) |
 | `/admin/users` | Complete-profile admin | Registered-user directory, search/filter |
-| `/admin/users/:id/edit` | Complete-profile admin | Edit existing user's first/last names only |
+| `/admin/users/:id/edit` | Complete-profile admin | Edit existing user's first/last name; date-of-birth visibility/correction must be separately approveds only |
 
 Use an accessible routing solution that supports deep links, browser back/forward and refresh through the existing Worker static-asset fallback. Restore intended destination only if still authorized after login/profile completion; otherwise return to attendee home. No Create User route.
 
@@ -36,7 +36,7 @@ A signed-in administrator defaults to Attendee view, with an explicit, compact m
 3. For eligible emails, use the existing provider to send an eight-digit one-time code **and** magic link. The user can enter the code or open the magic link.
 4. The magic link performs its existing one-time POST exchange automatically, without a confirmation button. Strip token from location/history before exchange; guard against duplicate requests from rerenders, StrictMode and navigation. Code and magic flows share a successful-verification result.
 5. After verified email ownership, look up account by normalized email, or create a minimal **pending-profile** user record atomically if eligible. Such an identity is not a complete active account: only limited session, profile completion and sign-out are allowed. Avoid duplicate records during simultaneous/replayed completions.
-6. If either required name is missing, expand the login page inline to show first/last name fields. Save them server-side, transition account to complete, then proceed to the intended authorized view. Existing administrators without names use exactly this flow and retain their YAML-defined role once complete.
+6. If either required name or date of birth is missing, expand the login page inline to show first/last name and date-of-birth fields. Save them server-side, transition account to complete, then proceed to the intended authorized view. Existing administrators without names use exactly this flow and retain their YAML-defined role once complete.
 7. Complete-profile users proceed directly to Attendee view (or their allowed previously intended route). All users may later change first/last names at `/profile`; email is read-only.
 
 **Authentication-state contract:** anonymous → verification pending → verified but profile incomplete → verified profile complete. Never interpret an incomplete profile as full admin authorization.
@@ -45,7 +45,7 @@ A signed-in administrator defaults to Attendee view, with an explicit, compact m
 
 ## 4. Data storage and migration approach
 
-Introduce an additive `users` table in a new numbered D1 migration, with stable ID, normalized unique email, first_name, last_name, email verification timestamp, created/updated timestamps, and account-deleted state or equivalent. Design CHECK constraints so a pending-profile record can temporarily lack names, while **all fully active accounts have valid names and verified email**. Retain existing sessions and login challenges through a backward-compatible transition; link sessions to users safely after verification. Index normalized email and directory search fields.
+Introduce an additive `users` table in a new numbered D1 migration, with stable ID, normalized unique email, first_name, last_name, date_of_birth (ISO YYYY-MM-DD calendar date, not a timestamp), email verification timestamp, created/updated timestamps, and account-deleted state or equivalent. Design CHECK constraints so a pending-profile record can temporarily lack names, while **all fully active accounts have valid names, date of birth, and verified email**. Retain existing sessions and login challenges through a backward-compatible transition; link sessions to users safely after verification. Index normalized email and directory search fields.
 
 Do not prepopulate or guess administrator names. Previously authorized admin email accounts receive a secure first-login profile-completion path, without changing the role assignment list. Audit and reconcile legacy sessions so they cannot bypass the completion gate.
 
@@ -53,11 +53,13 @@ Configure staging allowlist as a separate reviewed server-side email-only config
 
 ## 5. User pages and authorization
 
-- **Profile:** signed-in user may read/edit own first/last name, view verified email, and initiate own-account deletion with explicit confirmation; prevent empty/invalid names. Never allow edit of email or role here.
-- **Admin Users:** list only completed registered accounts (plus an explicitly marked pending state if product review later chooses to expose it); search by name/email; paginate server-side, never dump every account to all clients. No Create User action.
+- **Profile:** signed-in user may read/edit own first/last name, view own date of birth and verified email, and initiate own-account deletion with explicit confirmation; prevent empty/invalid names. Never allow edit of email or role here.
+- **Admin Users:** list only completed registered accounts; exclude birth dates from directory queries, search results and default payloads (plus an explicitly marked pending state if product review later chooses to expose it); search by name/email; paginate server-side, never dump every account to all clients. No Create User action.
 - **Admin Edit User:** use the same profile form fields as self-edit, but a different server-authorized endpoint allowing edits to the selected existing user's first/last name. Neither user ID nor client-provided role flags confer authority. Verified email and role remain read-only.
 - **Account deletion:** revoke sessions and pending challenges, stop access, remove/anonymize personal data to the defined retention policy; guard concurrent requests. Exact policy for re-registration and retained audit references remains an approval question. Admins cannot delete other accounts as part of this phase.
 - For all mutating endpoints, check session validity, account completeness, allowlist/eligibility as appropriate, origin, and object-level authorization on the server.
+
+**Date-of-birth privacy:** Limit storage to a calendar date, do not infer age or gate features unless separately specified, never log or publicly index it, and do not expose it in generic user-list responses. Decide access/correction, encryption feasibility, retention and erasure before implementation.
 
 ## 6. Event form and responsive editor
 
