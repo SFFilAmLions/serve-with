@@ -1,6 +1,6 @@
 # SDDW 003 — Basic Event Management: Technical Design
 
-Status: **Proposed for review only — implementation not authorized.** Branding decision 1 approved; remaining design decisions pending.
+Status: **Proposed for review only — implementation not authorized.** Branding decision 1 and time-zone decision 2 approved; decisions 3–4 pending.
 Requirements: [requirements.md](requirements.md). This design adopts **React + Material UI (MUI)** with a **Material Design 3-inspired custom theme**; it does not claim native/full Material 3 compliance.
 
 ## 1. Architectural overview
@@ -74,7 +74,7 @@ The form submits local start/end date and time strings and an IANA zone; the Wor
 - **Zero** (DST gap) or **multiple** (DST overlap) matches produce field-specific 422 validation errors, instructing the admin to choose a different unambiguous local time; do not silently choose an offset.
 - Ensure `end_at > start_at` after conversion. Overnight/multiday intervals are permitted.
 - Read/edit round-trips reconstruct local fields using the retained zone. Test Pacific DST transitions, at least one non-Pacific zone, and cross-midnight events.
-- Choose and lock the timezone-resolution library only after verifying Cloudflare Workers compatibility and bundle size in the implementation task plan.
+- **Approved decision 2:** Use the Temporal API with a polyfill where native Temporal is unavailable. Convert local date/time plus IANA time zone with explicit `disambiguation: 'reject'` semantics so DST gaps and overlaps are rejected. Verify Cloudflare Workers runtime compatibility, the chosen polyfill's maintenance status, and bundle size during task planning before implementation.
 
 ## 6. API proposal
 
@@ -111,7 +111,7 @@ Only after design approval: break work into small tasks and a separate implement
 ## 9. Open design review items
 
 1. Verify approved club logo and brand-font asset sourcing and whether to load fonts remotely or bundle suitably licensed copies.
-2. Choose timezone-aware runtime library compatible with Cloudflare Workers that rejects DST gaps/folds.
+2. **Resolved:** Temporal with a polyfill, explicit rejection of DST gaps/folds; Cloudflare Workers compatibility and bundle size remain implementation verification criteria.
 3. Decide whether optimistic concurrency is essential in the first CRUD implementation; document explicit behavior.
 4. Review final MUI theme colors for accessibility on light/dark surfaces. Default to a light interface; defer dark-mode toggle unless required.
 
