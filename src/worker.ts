@@ -290,7 +290,15 @@ export default {
       return json({ error: 'Not found' }, 404);
     }
     if (!path.startsWith('/api/auth/')) {
-      const response = await env.ASSETS.fetch(request);
+      // Render the SPA for canonical deep links; retain ordinary asset handling.
+      const spaRoute = request.method === 'GET' && (
+        path === '/login' || path === '/admin' || path === '/admin/events' || path === '/admin/users' ||
+        path === '/admin/events/new' || /^\\/admin\\/events\\/[0-9a-f-]{36}\\/edit$/.test(path) ||
+        /^\\/users\\/[0-9a-f-]{36}(?:\\/edit)?$/.test(path) ||
+        /^\\/events\\/[0-9a-f-]{36}$/.test(path)
+      );
+      const assetRequest = spaRoute ? new Request(new URL('/',request.url),request) : request;
+      const response = await env.ASSETS.fetch(assetRequest);
       const headers = new Headers(response.headers);
       headers.set('Referrer-Policy', 'no-referrer');
       headers.set('X-Content-Type-Options', 'nosniff');
