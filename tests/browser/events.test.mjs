@@ -292,7 +292,7 @@ test('editor retains draft values and shows server field errors on 422',async()=
  }finally{await browser.close()}
 });
 
-test('save disables duplicate submission while the network request is pending',async()=>{
+test('save disables duplicate submission while the network request is pending',{timeout:20000},async()=>{
  await ready();
  const browser=await chromium.launch({headless:true});
  try {
@@ -301,7 +301,7 @@ test('save disables duplicate submission while the network request is pending',a
   await page.route('**/api/auth/me',r=>r.fulfill({json:{authenticated:true,email:'admin@example.org'}}));
   await page.route('**/api/admin/dashboard',r=>r.fulfill({json:{ok:true}}));
   await page.route('**/api/events?view=*',r=>r.fulfill({json:{events:[]}}));
-  await page.route('**/api/admin/events',async r=>{posts++;await pending;await r.fulfill({status:201,json:{event:{}}})});
+  await page.route('**/api/admin/events',async r=>{posts++;await Promise.race([pending,new Promise(resolve=>setTimeout(resolve,4000))]);await r.fulfill({status:201,json:{event:{}}})});
   await page.goto(base);
   await page.getByText('No upcoming events',{exact:true}).waitFor();
   await page.getByRole('button',{name:'Add Event'}).click();
@@ -311,7 +311,7 @@ test('save disables duplicate submission while the network request is pending',a
   await page.getByLabel('End date and time').fill('2026-11-15T11:00');
   await page.getByRole('button',{name:'Save'}).click();
   await page.getByRole('button',{name:'Save'}).waitFor({state:'visible'});
-  await page.waitForFunction(()=>document.querySelector('button[disabled]')!==null);
+  await page.waitForFunction(()=>document.querySelector('button[disabled]')!==null,null,{timeout:3000});
   assert.equal(await page.getByRole('button',{name:'Save'}).isDisabled(),true);
   assert.equal(posts,1);
   release();
