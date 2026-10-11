@@ -30,3 +30,11 @@
 - Unit/integration tests for date formatting, timezone parity, DST, duplicate/update/delete behavior and privilege gates.
 - Keyboard/screen reader, contrast, responsive and touch-target accessibility testing.
 - Keep PR draft; do not merge, deploy or modify remote staging configuration.
+
+## Login email-request abuse prevention (new)
+- Prefer **Cloudflare Turnstile (free managed widget)** before sending an email code or magic link. Server must verify the response token with Cloudflare Siteverify before generating or sending an email. Never trust a client-only CAPTCHA or publish the secret key.
+- Protect both first email requests and **Resend code**. Keep existing IP/email rate limits, non-enumerating responses and challenge expiration; a CAPTCHA supplements, not replaces, limits.
+- Bind verification to expected hostname/action where applicable; reject missing, expired and invalid tokens; fail closed if verification is unavailable. Prevent replay; Turnstile tokens are short-lived and single-use.
+- Use separate public site key and server-side secret, provisioned by the operator after deployment approval. No hardcoded credentials or deployment/config changes in this PR. Document dev/test configuration and mock verification in tests.
+- Add browser accessible loading/validation/retry/error states; confirm CSP/script hosting and privacy notice implications.
+- Alternative if Turnstile is infeasible: Cloudflare WAF/rate-limiting and bot defenses on the route, but preserve server-side email quotas. Do not rely on client-only hiding of the request form.
