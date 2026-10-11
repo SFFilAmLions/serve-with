@@ -1,4 +1,4 @@
-interface D1Statement { bind(...values: unknown[]): D1Statement; first<T>(): Promise<T | null>; run(): Promise<{ meta: { changes: number } }> }
+interface D1Statement { bind(...values: unknown[]): D1Statement; first<T>(): Promise<T | null>; all<T>(): Promise<{ results: T[] }>; run(): Promise<{ meta: { changes: number } }> }
 interface D1Database { prepare(query: string): D1Statement }
 import admins from './generated/admins.json';
 
@@ -76,6 +76,21 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
     const path = url.pathname;
+    if (path === '/api/events') {
+      if (request.method !== 'GET') return json({ error: 'Method not allowed' }, 405);
+      if (!env.AUTH_DB) return json({ error: 'Service unavailable' }, 503);
+      const view = url.searchParams.get('view') || 'upcoming';
+      if (view !== 'upcoming' && view !== 'past') return json({ error: 'Invalid event view' }, 400);
+      const now = Date.now();
+      const comparison = view === 'upcoming' ? '>' : '<=';
+      const direction = view === 'upcoming' ? 'ASC' : 'DESC';
+      const events = await env.AUTH_DB.prepare(
+        `SELECT id,title,location,timezone,start_at,end_at,version FROM events
+         WHERE deleted_at IS NULL AND end_at ${comparison} ?
+         ORDER BY start_at ${direction}, id ${direction}`
+      ).bind(now).all<{ id: string; title: string; location: string; timezone: string; start_at: number; end_at: number; version: number }>();
+      return json({ view, events: events.results });
+    }
     if (path.startsWith('/api/admin/')) {
       if (!env.AUTH_DB || !env.AUTH_PEPPER) return json({ error: 'Service unavailable' }, 503);
       const email = await sessionEmail(request, env);

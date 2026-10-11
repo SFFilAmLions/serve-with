@@ -1,24 +1,24 @@
 # Tasks — SDDW 003 Basic Event Management
 
-**Status: Draft for review. None of the implementation tasks below is authorized or started.**
+**Status: Implementation authorized on PR #6. Slice 1 committed for CI review; remaining tasks pending.**
 
 References: [requirements.md](requirements.md) (approved); [design.md](design.md) (approved by user on 2026-10-10). Target is **Serve With SF Fil-Am Lions**. Retain the existing Vite / Cloudflare Workers / D1 architecture, with React + MUI and a Material 3-inspired theme.
 
 ## Gate 0 — Review and readiness
 
-- [ ] Review and approve this task breakdown before any code changes, migrations, dependency installation, or deployments.
-- [ ] Check current `main` and outstanding PRs before implementation, especially the independent SDDW 002 magic-link PR; preserve working OTP sign-in, auth security controls, and build SHA display.
+- [x] Review and approve this task breakdown before any code changes, migrations, dependency installation, or deployments.
+- [x] Check current `main` and outstanding PRs before implementation; working in PR #6 alongside its existing magic-link fix.
 - [ ] Verify official club logo provenance/permission, Ubuntu and Alata web-font licenses/distribution, and official `#F1C232` brand color; record accessible fallback if an asset cannot be verified.
 - [ ] Verify maintained Temporal polyfill compatibility with Cloudflare Workers, strict `disambiguation: 'reject'` behavior, and build/bundle impact; pin an appropriate dependency.
 - [ ] Validate the planned light/dark MUI color tokens for WCAG contrast, including focus states and interaction states.
 
 ## Slice 1 — Event schema and public read API
 
-- [ ] Add versioned additive D1 migration (expected `0003_events.sql`, after checking existing migrations): UUID ID, title, location, IANA time zone, UTC start/end instants, created/updated/deleted timestamps, and integer event `version` initialized to 1.
-- [ ] Add DB constraints for trimmed nonblank title/location, positive version, and `end_at > start_at`; add and verify useful list-query indexes.
-- [ ] Implement anonymous `GET /api/events?view=upcoming|past` with only non-deleted event fields and version; default to upcoming, reject unsupported view values, return no private admin data.
-- [ ] Classify upcoming by `end_at > now` (including in progress), past by `end_at <= now`; sort by `start_at, id` ascending for upcoming and descending for past; use a fixed test clock.
-- [ ] Add Worker/D1 integration tests for empty state payloads, stable ordering, exact end-time boundary, in-progress events, and exclusion of soft-deleted records.
+- [x] Add versioned additive D1 migration (expected `0003_events.sql`, after checking existing migrations): UUID ID, title, location, IANA time zone, UTC start/end instants, created/updated/deleted timestamps, and integer event `version` initialized to 1.
+- [x] Add DB constraints for trimmed nonblank title/location, positive version, and `end_at > start_at`; add initial list-query indexes (query-plan tuning pending).
+- [x] Implement anonymous `GET /api/events?view=upcoming|past` with only non-deleted event fields and version; default to upcoming, reject unsupported view values, return no private admin data.
+- [x] Classify upcoming by `end_at > now` (including in progress), past by `end_at <= now`; sort by `start_at, id` ascending for upcoming and descending for past; use a fixed test clock.
+- [x] Add Worker/D1 integration tests for empty state payloads, stable ordering, exact end-time boundary, in-progress events, and exclusion of soft-deleted records (CI pending).
 
 **Review checkpoint:** Public events can be read anonymously; no administrative mutation route or frontend change is needed to verify this slice.
 
