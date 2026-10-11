@@ -28,6 +28,12 @@ Enable authenticated attendees to sign up for events, withdraw, and review their
    - **Public capacity summary:** Anonymous and signed-in visitors can see the number of active signups (**spots taken**) and, when a capacity limit exists, **spots available** (`max(0, capacity - active signups)`) on the public event list and event detail. Never expose attendee identities via this summary. For unlimited events, show the active signup count and **Unlimited capacity** rather than a misleading remaining-spots number. Keep counts current after signup/withdrawal, with server-calculated values; a visible count is informational and never a reservation or guarantee of availability.
 8. **Participant roster:** An authenticated attendee with an **active signup** for an event may view the names of other attendees with active signups for that same event. The list must not expose email addresses, dates of birth, withdrawn signup records, or historical timestamps. A user who withdraws loses this access immediately. Anonymous visitors and authenticated nonparticipants cannot view the attendee roster. The server must enforce the access check on every request.
 
+## Standard event page vs administrator event page
+- **Standard event page:** The canonical public event page and its Sign up / Sign up as {first name} action behave identically for all visitors, including administrators. Administrator status must not add an on-behalf-of selector or privileged actions to this page.
+- **Administrator event page:** Provide a distinct administrator-facing event management page with the additional roster, signup history, searchable attendee selection, and on-behalf-of signup/withdrawal controls. These controls remain server-authorized.
+- **Non-administrator navigation:** Any non-admin who opens an admin event page URL must be redirected to the corresponding standard event page rather than shown the admin interface. This redirect is a user experience rule, not a replacement for API authorization; the server must still deny unauthorized admin requests.
+- Retain the existing standard event route. Define the admin event detail route in the technical design, avoiding conflicts with existing admin editor routes.
+
 ## Administrator experience
 1. Authorized administrators can see the current roster and count for each event, and examine historical withdrawn records, with timestamps.
 2. They can add an existing attendee by selecting/searching a user, or withdraw an active attendee on that user's behalf. They cannot create an unverified account through the roster.
@@ -64,7 +70,8 @@ Enable authenticated attendees to sign up for events, withdraw, and review their
 - Attendee history shows only the owner; admin roster/history excludes private DOB and respects privilege checks.
 - Participant roster shows active names only to an active signup holder; anonymous visitors, nonparticipants and withdrawn users are denied. Verify access is revoked after withdrawal and no email/DOB/history fields are returned.
 - Deleted event, missing event, user re-signup, repeated withdrawal, and deleted signup race behavior.
-- Browser tests for signup button states, including anonymous `Sign up` vs authenticated `Sign up as {first name}`, admin user selection, mobile layout, keyboard use, error feedback and My signups history.
+- Browser tests for signup button states, including anonymous `Sign up` vs authenticated `Sign up as {first name}`, admin user selection on the **admin event page only**, mobile layout, keyboard use, error feedback and My signups history.
+- Verify identical standard event page functionality for admins and attendees; verify non-admin admin-event-page URLs redirect to corresponding standard event pages and admin API access remains forbidden.
 - Anonymous event Sign up button launches login/new-account onboarding, survives the magic-link round trip, automatically submits exactly once after profile and policy gates, and reports success/full/started/errors without extra user interaction. Verify intent cleanup, refresh/replay protection and no open redirects.
 - Staging acceptance with real D1 before any production release.
 
