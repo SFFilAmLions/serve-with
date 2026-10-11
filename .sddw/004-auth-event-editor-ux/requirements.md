@@ -31,16 +31,41 @@ Origin: successful SDDW 003 staging use and user feedback. Consolidates [#10](ht
 - Duration must reflect actual elapsed time in the event's IANA time zone, including overnight/multiday and daylight-saving changes; invalid or ambiguous local times show a validation state, not a misleading duration.
 - Retain editing of all persisted fields, form prepopulation, API request format, server validation, optimistic version conflict handling, error draft preservation, and soft deletion.
 
-## 4. Acceptance and boundaries
+## 4. User registration, profiles, and account deletion
 
-- Automated tests: automatic single-attempt magic-link sign-in/token scrubbing, code/login/logout regressions, account-menu/mobile and keyboard behavior, modal focus/discard behavior, start/end synchronization and overrides, distinct date and clock input UX, live duration and DST edge cases, Edit prefill, no public-list regression.
+- Allow individuals to **register their own user account** using a verified email address. Every active user, including every administrator, must have a **nonblank first name, nonblank last name, and unique verified email address**. Apply appropriate validation and normalization server-side; public event browsing remains anonymous.
+- Allow authenticated users to view their profile and **delete their own account** through an explicit, deliberate confirmation. Revoke sessions and login challenges, stop future authentication for deleted/unauthorized identities, and define safe handling of retained event/audit references, if any, before implementation.
+- Do not grant administrator privileges through registration or profile changes. Existing administrators retain their assigned roles, but must have first and last names added to the authoritative administrator list and their persisted user records. **Do not invent names**; actual administrator names must be supplied/verified during migration.
+- Evolve `config/admins.yaml` (currently email + enabled only) to require `first_name`, `last_name`, and `email` for each enabled administrator; update its validator, generator, generated metadata, and admin-account migration as part of the approved design.
+- Separate **account eligibility**, **registered account status**, and **administrator authorization**. An eligible person is not an admin merely because they can register, and an administrator email is not a substitute for a complete user profile.
+
+### Staging-only registration allowlist
+
+- In the **staging environment only**, permit account creation **only when the email matches an explicitly approved staging user allowlist**. Whitelist eligibility must be checked on the server before creating or activating an account and before sending registration credentials; never rely solely on UI validation.
+- A visitor may access the registration flow, but an unlisted email must **not** result in account creation. Use safe, non-enumerating public error/acknowledgment messaging to avoid exposing the whitelist.
+- Staging administrators must be covered explicitly by the same staging account-eligibility policy; administrator authorization remains a separate check.
+- Existing staging users/admins need a reviewed migration/activation policy so mandatory profile fields and eligibility are enforced without silently losing access. Treat profile completion or approved seed-data migration as a deliberate step.
+- Maintain the staging allowlist through a reviewed, environment-specific configuration/source of truth, not an open-registration switch or a client-side list. Never accidentally apply the staging restriction to production.
+- **Production registration eligibility is not specified by this requirement** and must be defined in design review before enabling production registration; no assumption of open production signup.
+
+### Acceptance criteria
+
+- Tests cover eligible/ineligible staging registration, normalized/case-insensitive email matching, verification, duplicate email handling, required name validation, self-deletion/session revocation, denial of self-assigned admin privileges, and handling of existing admins.
+- Verify ordinary users can sign in but cannot call administrator mutation APIs. Verify public events remain readable while signed out.
+- No deployment or user-account migration until requirements, design, and implementation tasks have been approved.
+
+## 5. Acceptance and boundaries
+
+- Automated tests: automatic single-attempt magic-link sign-in/token scrubbing, code/login/logout regressions, registration/profile/deletion and staging eligibility checks, account-menu/mobile and keyboard behavior, modal focus/discard behavior, start/end synchronization and overrides, distinct date and clock input UX, live duration and DST edge cases, Edit prefill, no public-list regression.
 - Verify changes on staging through normal `main` workflow after approval, fixing staging defects iteratively. **No production deployment without separate explicit authorization.**
-- Out of scope: new authentication providers, new event schema, RSVP/registration, recurrence, organization permissions, or production release.
+- Out of scope: new authentication providers, new event schema, event RSVP/signups, recurrence, organization permissions expansion, or production release.
 
-## 5. Items to settle in design review
+## 6. Items to settle in design review
 
 - Specific MUI date/time picker dependency, license constraints, and mobile clock UX.
 - Whether the duration should be shown directly beneath the equal-width time inputs or in an End time label area; the equal sizing and prominent date are required either way.
 - Exact loading/error presentation for automatic magic-link exchange.
+- User table/profile migration and deletion semantics (including retention), admin name backfill, and staging allowlist configuration and reconciliation.
+- Production registration eligibility policy (explicitly deferred; no production registration is authorized).
 
 **Next gate:** Review and approve these requirements before completing the technical design and implementation task list.
