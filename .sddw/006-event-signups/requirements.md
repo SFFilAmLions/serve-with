@@ -8,7 +8,7 @@ Enable authenticated attendees to sign up for events, withdraw, and review their
 ## Decisions approved October 11, 2026
 - **Capacity:** Optional maximum number of active signups per event; unlimited if omitted.
 - **Admin management:** Authorized administrators may sign up attendees and withdraw them on their behalf, subject to normal event and capacity rules.
-- **Signup cutoff:** Attendees cannot sign up at or after an event's start instant (event starts are stored as UTC instants). The same cutoff should apply to administrative additions by default; any exception requires explicit future approval.
+- **Signup and withdrawal cutoff:** Attendees cannot sign up or withdraw at or after an event's start instant (stored in UTC). The same cutoff applies to administrators acting on another attendee's behalf, with no override in this phase.
 - **History visibility:** Attendees can view **their own** active and withdrawn signup history; authorized administrators can view histories for their managed event rosters.
 - **Audit representation:** Signup history lives in the signup records themselves, using creation and soft-deletion timestamps. Every re-signup creates a **new row**. No separate audit table for this workflow.
 
@@ -16,7 +16,7 @@ Enable authenticated attendees to sign up for events, withdraw, and review their
 1. Public event details remain readable anonymously; signing up requires a verified, eligible authenticated account with the required profile and policy acceptance.
 2. An eligible attendee sees an explicit **Sign up** action before the event start, unless already signed up or the event is full.
 3. Signing up creates a distinct signup row and displays immediate, accessible confirmation. Avoid duplicate actions while a request is pending.
-4. An active attendee can **Withdraw** with a clear confirmation. Withdrawal sets `deleted_at` and removes the user from the active roster and active capacity count.
+4. Before the event starts, an active attendee can **Withdraw** with a clear confirmation. Withdrawal sets `deleted_at` and removes the user from the active roster and active capacity count.
 5. Withdrawing and signing up again before the cutoff creates a new row with a new ID and `created_at`; it does not revive an old row.
 6. **My signups** shows upcoming and past active signups, and a clearly distinguished history view for withdrawn signups, including signup/withdrawal timestamps. Do not imply that a signup proves attendance.
 7. Empty, loading, error, full, past-start, and already-signed-up states must be accessible and understandable.
@@ -24,7 +24,7 @@ Enable authenticated attendees to sign up for events, withdraw, and review their
 ## Administrator experience
 1. Authorized administrators can see the current roster and count for each event, and examine historical withdrawn records, with timestamps.
 2. They can add an existing attendee by selecting/searching a user, or withdraw an active attendee on that user's behalf. They cannot create an unverified account through the roster.
-3. Admin actions enforce the same one-active-signup rule, eligibility, event-start cutoff and capacity checks; admin authority is verified server-side.
+3. Admin actions enforce the same one-active-signup rule, eligibility, event-start cutoff (including withdrawal cutoff) and capacity checks; admin authority is verified server-side.
 4. Distinguish who made a change if technically feasible, but adding actor/audit columns beyond the agreed minimal model requires separate scope approval.
 5. Existing event Create/Edit/Duplicate/Delete flows remain intact. Optional capacity is an additive event field. An editor must not lower capacity below the number of active signups without an explicit, agreed resolution rule (default: reject the change).
 
@@ -35,7 +35,7 @@ Enable authenticated attendees to sign up for events, withdraw, and review their
 - Enforce a unique active pair through SQLite/D1 partial index: `UNIQUE(event_id,user_id) WHERE deleted_at IS NULL`. Permit multiple historical rows for the same pair.
 - `capacity` is nullable; null means unlimited. Only active rows count toward capacity.
 - Signup and capacity enforcement must be atomic under simultaneous requests; UI checks alone are insufficient.
-- Use server timestamps. Reject signup at `now >= event.start_at`; reject signup to missing or deleted events. Determine whether withdrawal should remain allowed after start during design review (suggested: yes, to correct commitments while preserving history).
+- Use server timestamps. Reject signup at `now >= event.start_at`; reject signup to missing or deleted events. Reject withdrawal at or after event start, including administrator-initiated withdrawals; both signup and withdrawal close at the start instant. No exceptions in this phase.
 - Preserve signup history if an event is soft-deleted, subject to existing privacy and retention policy; do not expose deleted-event rosters publicly.
 
 ## API and authorization requirements
@@ -47,7 +47,7 @@ Enable authenticated attendees to sign up for events, withdraw, and review their
 - Draft endpoint paths and payloads in design.md; this requirements document does not prescribe API surface yet.
 
 ## Validation and acceptance tests
-- Signup, withdraw and re-signup produce two records with only the newest active.
+- Signup, withdrawal before start, and re-signup before start produce two records with only the newest active. Withdrawal at or after event start is rejected and does not change the row.
 - Only one active signup per user/event under simultaneous requests; at-capacity concurrency never overbooks.
 - Unlimited and limited capacities, zero remaining places, invalid capacity edits.
 - Exact event-start boundary: before start accepted, at/after start rejected, including across timezone/DST changes.
@@ -67,7 +67,6 @@ Enable authenticated attendees to sign up for events, withdraw, and review their
 - Historical participation recovery/account-deletion flows; reconsider after signup data and retention behavior are validated.
 
 ## Questions for design review
-- May an attendee withdraw after an event starts or ends? Proposed default: yes, while keeping a transparent withdrawal timestamp.
 - Does an admin need an explicit override for cutoff/full events? Proposed default: no.
 - How should My signups organize historical withdrawn vs past active entries? Proposed default: separate history filter.
 - Should an admin roster include the author of an action? Not captured in the agreed five-column model; only introduce this if explicitly approved.
