@@ -20,6 +20,7 @@ Enable authenticated attendees to sign up for events, withdraw, and review their
 5. Withdrawing and signing up again before the cutoff creates a new row with a new ID and `created_at`; it does not revive an old row.
 6. **My signups** shows upcoming and past active signups, and a clearly distinguished history view for withdrawn signups, including signup/withdrawal timestamps. Do not imply that a signup proves attendance.
 7. Empty, loading, error, full, past-start, and already-signed-up states must be accessible and understandable.
+   - **Public capacity summary:** Anonymous and signed-in visitors can see the number of active signups (**spots taken**) and, when a capacity limit exists, **spots available** (`max(0, capacity - active signups)`) on the public event list and event detail. Never expose attendee identities via this summary. For unlimited events, show the active signup count and **Unlimited capacity** rather than a misleading remaining-spots number. Keep counts current after signup/withdrawal, with server-calculated values; a visible count is informational and never a reservation or guarantee of availability.
 8. **Participant roster:** An authenticated attendee with an **active signup** for an event may view the names of other attendees with active signups for that same event. The list must not expose email addresses, dates of birth, withdrawn signup records, or historical timestamps. A user who withdraws loses this access immediately. Anonymous visitors and authenticated nonparticipants cannot view the attendee roster. The server must enforce the access check on every request.
 
 ## Administrator experience
@@ -42,7 +43,7 @@ Enable authenticated attendees to sign up for events, withdraw, and review their
 ## API and authorization requirements
 - A signed-in attendee may read only their own signup records and create/withdraw only their own active signup. Exception: active participants may read a minimal **current participant name-only roster** for that particular event.
 - Administrators may read event rosters and history, and create/withdraw signups for an existing attendee only within their authorized scope.
-- Never expose another attendee's email, profile/DOB or signup history to participants or public endpoints; return only display names (and minimal stable non-sensitive identifiers if required by the UI) to active participants. Authorized admins may receive separate, minimally necessary roster details.
+- Never expose another attendee's email, profile/DOB or signup history to participants or public endpoints; return only display names (and minimal stable non-sensitive identifiers if required by the UI) to active participants. Authorized admins may receive separate, minimally necessary roster details. Public endpoints may expose **aggregate active signup count and remaining spots only**, without names or other identity-bearing fields.
 - Defend against cross-origin changes, duplicate submissions, race conditions, stale UI and user enumeration.
 - Make repeated withdrawal requests safe and well-defined; history should not acquire duplicate deletion timestamps or extra rows.
 - Draft endpoint paths and payloads in design.md; this requirements document does not prescribe API surface yet.
@@ -51,6 +52,7 @@ Enable authenticated attendees to sign up for events, withdraw, and review their
 - Signup, withdrawal before start, and re-signup before start produce two records with only the newest active. Withdrawal at or after event start is rejected and does not change the row.
 - Only one active signup per user/event under simultaneous requests; at-capacity concurrency never overbooks.
 - Unlimited and limited capacities, zero remaining places, invalid capacity edits.
+- Public anonymous event list/detail accurately show active spots taken and remaining capacity, update after signup/withdrawal, omit identities, and correctly label unlimited capacity.
 - Exact event-start boundary: before start accepted, at/after start rejected, including across timezone/DST changes.
 - Admin adding/withdrawing for another attendee, including unauthorized-user denial and target eligibility.
 - Attendee history shows only the owner; admin roster/history excludes private DOB and respects privilege checks.
