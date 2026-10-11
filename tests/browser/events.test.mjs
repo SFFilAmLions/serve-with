@@ -143,3 +143,27 @@ test('version conflict preserves edits and requires confirmation to reload',asyn
   assert.equal(await page.getByRole('textbox',{name:'Title'}).inputValue(),'My unsaved edit');
  }finally{await browser.close()}
 });
+
+test('keyboard Escape protects dirty editor and returns focus to Add Event',async()=>{
+ await ready();
+ const browser=await chromium.launch({headless:true});
+ try{
+  const page=await browser.newPage();
+  await page.route('**/api/auth/me',r=>r.fulfill({json:{authenticated:true,email:'admin@example.org'}}));
+  await page.route('**/api/admin/dashboard',r=>r.fulfill({json:{ok:true}}));
+  await page.route('**/api/events?view=*',r=>r.fulfill({json:{events:[]}}));
+  await page.goto(base);
+  const add=page.getByRole('button',{name:'Add Event'});
+  await add.click();
+  await page.getByRole('textbox',{name:'Title'}).fill('Unsaved');
+  await page.keyboard.press('Escape');
+  await page.getByRole('dialog',{name:'Discard unsaved changes?'}).waitFor();
+  await page.getByRole('button',{name:'Keep editing'}).click();
+  assert.equal(await page.getByRole('textbox',{name:'Title'}).inputValue(),'Unsaved');
+  await page.keyboard.press('Escape');
+  await page.getByRole('button',{name:'Discard changes'}).click();
+  await page.getByRole('dialog').first().waitFor({state:'hidden'});
+  await add.focus();
+  assert.equal(await add.evaluate(el=>el===document.activeElement),true);
+ }finally{await browser.close()}
+});
