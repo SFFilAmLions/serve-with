@@ -28,7 +28,7 @@ function BuildFooter() {
  </Box>;
 }
 const magic = new URL(location.href).searchParams.get('magic');
-if (magic) history.replaceState(null,'',location.pathname);
+if (magic) history.replaceState(null,'','/login');
 const api = async (path:string,body?:Record<string,string>) => {
  const r=await fetch('/api/auth/'+path,{method:body?'POST':'GET',headers:body?{'content-type':'application/json'}:{},body:body?JSON.stringify(body):undefined,credentials:'same-origin',cache:'no-store'});
  const data=await r.json();if(!r.ok)throw new Error(data.error||'Request failed');return data;
@@ -148,7 +148,7 @@ function AuthScreen({me,refresh}:{me:Me;refresh:()=>Promise<void>}){
  {!me.authenticated&&(stage==='email'?<Box component="form" onSubmit={e=>{e.preventDefault();void work(async()=>{const r=await submitJson('/api/auth/request',{email});setMessage(r.message);setStage('code')})}}><Stack spacing={2}><TextField required type="email" label="Email" value={email} onChange={e=>setEmail(e.target.value)} autoComplete="email"/><Button variant="contained" type="submit" disabled={busy}>Continue</Button></Stack></Box>:
  <Stack spacing={2}><Typography>Check your email at {email}</Typography><Box component="form" onSubmit={e=>{e.preventDefault();void work(async()=>{await submitJson('/api/auth/verify',{email,code});await refresh()})}}><Stack spacing={2}><TextField required label="Eight-digit code" value={code} inputProps={{inputMode:'numeric',maxLength:8,pattern:'[0-9]{8}'}} onChange={e=>setCode(e.target.value)}/><Button type="submit" disabled={busy}>Continue</Button></Stack></Box><Button disabled={busy} onClick={()=>void work(async()=>{await submitJson('/api/auth/request',{email});setMessage('If eligible, a new code will arrive shortly.')})}>Resend code</Button><Button onClick={()=>{setStage('email');setCode('');setMessage('')}}>Use a different email</Button></Stack>)}
  {me.authenticated&&!me.profileComplete&&<Stack spacing={2} component="form" onSubmit={e=>{e.preventDefault();void work(async()=>{await submitJson('/api/auth/profile',{firstName:first,lastName:last,dateOfBirth:dob});await refresh()})}}><Typography variant="h6">Complete your profile</Typography><TextField required label="First name" value={first} onChange={e=>setFirst(e.target.value)}/><TextField required label="Last name" value={last} onChange={e=>setLast(e.target.value)}/><TextField required label="Date of birth" type="date" slotProps={{inputLabel:{shrink:true}}} value={dob} onChange={e=>setDob(e.target.value)}/><Button disabled={busy} type="submit" variant="contained">Save profile</Button></Stack>}
- {me.authenticated&&me.profileComplete&&!me.agreementCurrent&&<Alert severity="info">Your account requires acceptance of the current Terms of Use and Privacy Policy before privileged access. These documents must be approved and published before acceptance can be enabled. <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a></Alert>}
+ {me.authenticated&&me.profileComplete&&!me.agreementCurrent&&<Alert severity="info">Your account requires acceptance of the current Terms of Use and Privacy Policy before privileged access. These documents must be approved and published before acceptance can be enabled.</Alert>}
  {me.authenticated&&me.profileComplete&&me.agreementCurrent&&<Button onClick={()=>go('/')}>Continue to events</Button>}
  {message&&<Alert role="status" severity="info">{message}</Alert>}
  </Stack>;
