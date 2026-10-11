@@ -10,8 +10,9 @@ globalThis.__testEligibility = (await import('data:text/javascript;base64,' + Bu
     {compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText
 ).toString('base64'))).isStagingRegistrationEligible;
 
+globalThis.__testPolicyMetadata = JSON.parse(readFileSync('src/generated/policy-versions.json','utf8'));
 const source = readFileSync('src/worker.ts','utf8')
-  .replace("import policyMetadata from './generated/policy-versions.json';", "const policyMetadata = JSON.parse(readFileSync('src/generated/policy-versions.json','utf8'));")
+  .replace("import policyMetadata from './generated/policy-versions.json';", "const policyMetadata = globalThis.__testPolicyMetadata;")
   .replace("import { Temporal } from '@js-temporal/polyfill';", "const Temporal = globalThis.__testTemporal;")
   .replace("import { isStagingRegistrationEligible } from './registration-eligibility';", "const isStagingRegistrationEligible = globalThis.__testEligibility;")
   .replace("import admins from './generated/admins.json';", "const admins = [{email:'lionaugust@icloud.com',enabled:true}];");
