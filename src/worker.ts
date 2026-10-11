@@ -55,7 +55,7 @@ function eventInput(body: Record<string,unknown>): { event?: EventFields; errors
   if (!timezone || timezone.length > 100) errors.timezone = 'Select a valid IANA time zone';
   const resolve = (field: 'start'|'end'): number | undefined => {
     const value = body[field];
-    if (typeof value !== 'string' || !/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}$/.test(value)) {
+    if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value)) {
       errors[field] = 'Enter a valid local date and time';
       return undefined;
     }
