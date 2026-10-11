@@ -92,3 +92,10 @@
 - [x] Implement anonymous public /terms and /privacy SPA routes using the approved policy sources; GitHub history is the archive (no in-app archival pages).
 - [x] Add initially unchecked version-aware combined acknowledgment UI with server-persisted acceptance and failure handling.
 - [ ] Verify CI and review the current policy presentation in a browser; no staging deployment until approved merge.
+
+## Automatic policy revision identifiers
+
+- [x] Generate each policy revision from its own last-modified Git commit timestamp plus short hash, independently of application/package version.
+- [x] Generate manifest before build and tests, using complete Git history in CI and deployment workflows.
+- [x] Require reacceptance only when either policy source is edited, not on unrelated repository releases.
+- [ ] Final CI verification of the automatic-revision change.
