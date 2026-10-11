@@ -6,12 +6,13 @@
 - [ ] Approve [requirements.md](requirements.md) and resolve any remaining policy questions.
 - [x] Record user decisions: existing administrators complete profile at next sign-in; staging whitelist is email-only; first and last names are editable.
 - [x] Confirm `config/admins.yaml` remains email-only for administrator authorization; first/last names, date of birth, and verified email belong to D1 profiles.
-- [x] Record updated account removal: one Delete/Deactivate operation, random placeholder email, scrub PII, preserve user ID/signup history, final notice with recovery identifier and required profile completion on recovery.
-- [ ] Design recovery identity proof beyond identifier plus newly verified email; guard against restoration of another user's signup history.
+- [x] Record revised account lifecycle: deactivation retains verified email but clears profile PII; deletion clears original email and optionally sends bearer recovery key; both preserve stripped historical signup records.
+- [ ] Design secure optional recovery key, email delivery before deletion, hash-only verifier, single use, and explicit transferable-key risk; no-key deletion must not be claimable.
+- [ ] Design deactivated same-email login and mandatory full profile re-entry, access restrictions, and current-role re-evaluation.
 - [ ] Define exact PII scrub scope (including data in signups), retained-email privacy/retention basis and any full-erasure request path; design no-lockout administrator transition.
 - [x] Approve administrator-only corrections to submitted date of birth; owner can view but not edit it.
 - [ ] Design audited admin date-of-birth correction, directory exclusion, privacy, retention and migration; validate a calendar date without inferring age limits.
-- [ ] Design account schema, migrations, verification, email-change confirmation, placeholder-email PII scrub and session revocation, pre-removal notification, secure same-ID restoration, staging allowlist and tests, and how existing admins transition.
+- [ ] Design account schema, migrations, verification, email-change confirmation, PII scrub and session revocation, optional pre-removal recovery email, deactivation return and deletion key claim, staging allowlist and tests, and how existing admins transition.
 - [ ] Review/approve the separate Attendee and Administrator view requirements and design accessible switching and route authorization.
 - [ ] Design authentication and account-menu interactions in [design.md](design.md); review and approve.
 - [ ] Design/test administrator-only Duplicate Event as prefilled Create Event, preserving the original event and generating a new ID on explicit Save.
