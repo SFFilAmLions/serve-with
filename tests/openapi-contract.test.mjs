@@ -19,3 +19,13 @@ test('public and administrative proof operations have stable IDs and security de
   assert.ok(mutation.responses['201']);
   assert.ok(mutation.responses['403']);
 });
+
+test('YAML generates typed Cloudflare Worker operation registry and dispatch', () => {
+  const result = spawnSync(process.execPath, ['scripts/generate-openapi-operations.mjs'], {encoding:'utf8'});
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  const generated = readFileSync('src/generated/openapi-operations.ts', 'utf8');
+  const declared = Object.values(spec.paths).flatMap(item => Object.values(item).filter(op=>op?.operationId).map(op=>op.operationId));
+  for (const id of declared) assert.ok(generated.includes('id: "'+id+'"'), id);
+  assert.match(generated, /export type WorkerHandlers =/);
+  assert.match(generated, /export function dispatchOperation/);
+});
