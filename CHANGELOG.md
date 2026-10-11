@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.1](https://github.com/SFFilAmLions/serve-with/compare/v0.3.0...v0.3.1) (2026-10-11)
+
+
+### Documentation
+
+* initiate SDDW 004 authentication and event editor UX ([#13](https://github.com/SFFilAmLions/serve-with/issues/13)) ([b7ca24e](https://github.com/SFFilAmLions/serve-with/commit/b7ca24ec8a112e5011b2c1f967b79ba98b933d42))
+
 ## [0.3.0](https://github.com/SFFilAmLions/serve-with/compare/v0.2.0...v0.3.0) (2026-10-11)
 
 
