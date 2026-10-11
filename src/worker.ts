@@ -152,9 +152,15 @@ const agreementReady = (u: UserRow, versions: {terms:string;privacy:string}|null
 const privilegeReady = (subject: Subject, env: Env) => Boolean(subject.user.email_verified_at && profileReady(subject.user) && agreementReady(subject.user,policyVersions(env)));
 const registrationEligible = (email: string, env: Env) => allowed.has(email) || isStagingRegistrationEligible(email,env,allowed);
 const validName = (x: unknown): x is string => typeof x === 'string' && x.trim().length >= 1 && x.trim().length <= 100;
+// Apply the minimum age at profile creation and administrator DOB corrections.
+const meetsMinimumAge = (dob: string, now = new Date()): boolean => {
+  const today = Temporal.PlainDate.from(now.toISOString().slice(0,10));
+  const birthday = Temporal.PlainDate.from(dob);
+  return Temporal.PlainDate.compare(birthday.add({years:13}),today) <= 0;
+};
 const validDob = (x: unknown): x is string => {
   if (typeof x !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(x)) return false;
-  try { return Temporal.PlainDate.from(x).toString() === x && x < new Date().toISOString().slice(0,10); }
+  try { return Temporal.PlainDate.from(x).toString() === x && meetsMinimumAge(x); }
   catch { return false; }
 };
 

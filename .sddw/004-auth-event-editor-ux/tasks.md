@@ -76,3 +76,12 @@
 - [ ] Obtain separate approval for production registration policy and release.
 
 **Not tasks for SDDW 004:** email changes, deactivation/reactivation controls, account deletion/erasure, historical signup anonymization, recovery keys or ownership re-claim, attendee signups. Do not implement them incidentally.
+
+## Policy and minimum-age preparation (repository only)
+
+- [x] Add approved policy wording as unversioned repository drafts; do not publish until effective date, version identifiers and any legal/factual checks are confirmed.
+- [x] Enforce registration minimum age 13 in server-side DOB validation and administrator correction; add regression tests.
+- [x] Document manual privacy requests and minimum-necessary event organizer sharing without adding lifecycle APIs or organizer roles.
+- [ ] Complete public current/archive policy routes, versioned immutable sources and unchecked acknowledgment UI when publication identifiers are approved.
+- [ ] Review age eligibility at initial email verification and cleanup/minimization of rejected incomplete identities.
+- [ ] Perform real-device accessibility and staging verification after separately approved deployment.

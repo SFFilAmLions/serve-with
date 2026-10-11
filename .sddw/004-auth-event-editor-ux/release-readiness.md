@@ -36,8 +36,8 @@ For an approved policy release:
 
 ## Required sign-offs
 
-- [ ] Actual Terms of Use approved
-- [ ] Actual Privacy Policy approved
+- [x] Actual Terms of Use wording approved by project requester; substantive legal review remains outstanding
+- [x] Actual Privacy Policy wording approved by project requester; substantive legal review remains outstanding
 - [ ] Initial Terms and Privacy version identifiers approved
 - [ ] Remote staging migration inventory reviewed
 - [ ] Staging backup/sanitized migration rehearsal reviewed

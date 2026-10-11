@@ -246,3 +246,19 @@ test('canonical user reads are owner/admin only, owner cannot correct DOB or edi
     assert.equal((await h.req('/api/users/'+guest.id,undefined,{cookie:outsider.cookie})).status,200);
   }finally{h.close()}
 });
+
+test('minimum age rejects under-13 profile completion without storing supplied DOB', async () => {
+  const h=harness();
+  try {
+    await h.req('/api/auth/request',{email:'lionaugust@icloud.com'});
+    const {code}=credentials(h.sent.at(-1));
+    const login=await h.req('/api/auth/verify',{email:'lionaugust@icloud.com',code});
+    const cookie=login.headers.get('set-cookie');
+    const today=new Date().toISOString().slice(0,10);
+    const birth=(age)=>{const d=new Date(today+'T12:00:00Z');d.setUTCFullYear(d.getUTCFullYear()-age);return d.toISOString().slice(0,10)};
+    const child=birth(12);
+    assert.equal((await h.req('/api/auth/profile',{firstName:'Minor',lastName:'Test',dateOfBirth:child},{cookie})).status,422);
+    assert.equal(h.sqlite.prepare('SELECT date_of_birth FROM users').get().date_of_birth,null);
+    assert.equal((await h.req('/api/auth/profile',{firstName:'Allowed',lastName:'Test',dateOfBirth:birth(13)},{cookie})).status,200);
+  } finally { h.close(); }
+});
