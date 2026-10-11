@@ -13,7 +13,7 @@
 ## Event redesign
 - Upcoming/Past shown as compact single-select Material pill buttons, not tabs.
 - Use outlined Material Cards for events; title, concise start/end details, location Chip with pin icon, optional small zone Chip with abbreviated timezone and tooltip full IANA zone.
-- Omit zone Chip only when event IANA timezone equals browser's IANA timezone. Same event-local day: one date with start/end time range; cross-day: show both dates. Verify year-boundary and DST formatting.
+- Omit zone Chip when event and browser time zones have equal UTC offsets at the event start instant, including DST effects. Same event-local day: one date with start/end time range; cross-day: show both dates. Verify year-boundary and DST formatting.
 - Admin dark mode uses ordinary Material dark surfaces without a separate admin accent/background color. Administrator scope remains explicitly labeled.
 - Compact action buttons; event editor has one Save action at lower right beside Cancel, not duplicate top/bottom Save. Back/close in title row, clear validation, confirm discard.
 - Footer source/version controls styled as restrained Material Chips/links.
@@ -38,3 +38,10 @@
 - Use separate public site key and server-side secret, provisioned by the operator after deployment approval. No hardcoded credentials or deployment/config changes in this PR. Document dev/test configuration and mock verification in tests.
 - Add browser accessible loading/validation/retry/error states; confirm CSP/script hosting and privacy notice implications.
 - Alternative if Turnstile is infeasible: Cloudflare WAF/rate-limiting and bot defenses on the route, but preserve server-side email quotas. Do not rely on client-only hiding of the request form.
+
+## Confirmed refinements — October 11, 2026
+- User approved automatic Gravatar lookup with initials fallback and an explicit new Privacy Policy disclosure; preserve the previous policy revision in Git history and require reacceptance when activated.
+- Cloudflare Turnstile uses **Managed** widgets, separately configured for staging and production; when configured, missing/invalid/unavailable verification blocks new login email requests. Do not change remote credentials or enable it without deployment approval.
+- Desktop event list uses a two-column card grid.
+- The zone Chip is omitted when UTC offsets match at event start; the IANA identifiers need not match.
+- Users directory is search-only without alphabet navigation.
