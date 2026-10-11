@@ -103,3 +103,31 @@ test('per-IP and per-account throttling prevents email floods',async () => {
     assert.ok(h.sent.length<=6);
   }finally{h.close();}
 });
+
+test('expired sessions lose admin access',async () => {
+  const h=harness();
+  try {
+    await h.req('/api/auth/request',{email:'lionaugust@icloud.com'});
+    const {code}=credentials(h.sent[0]);
+    const response=await h.req('/api/auth/verify',{email:'lionaugust@icloud.com',code});
+    const cookie=response.headers.get('set-cookie');
+    assert.equal((await h.req('/api/admin/dashboard',undefined,{cookie})).status,200);
+    h.sqlite.prepare('UPDATE sessions SET expires_at=0').run();
+    assert.equal((await h.req('/api/admin/dashboard',undefined,{cookie})).status,401);
+  } finally {h.close();}
+});
+test('cross-origin POST is rejected without sending an email',async () => {
+  const h=harness();
+  try {
+    const response=await worker.fetch(new Request('https://servewith-beta.sffilamlions.org/api/auth/request',{
+      method:'POST',headers:{'origin':'https://attacker.example','content-type':'application/json'},
+      body:JSON.stringify({email:'lionaugust@icloud.com'})
+    }),{
+      AUTH_DB:{prepare:()=>{throw Error('Database should not be touched');}},
+      AUTH_PEPPER:'pepper',RESEND_API_KEY:'test',AUTH_FROM_EMAIL:'login@notify.sffilamlions.org',
+      ASSETS:{fetch:async()=>new Response('asset')}
+    });
+    assert.equal(response.status,400);
+    assert.equal(h.sent.length,0);
+  }finally{h.close();}
+});
