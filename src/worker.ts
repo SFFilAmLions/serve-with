@@ -49,6 +49,18 @@ async function sendEmail(env: Env, email: string, code: string, link: string): P
     headers: { 'authorization': `Bearer ${env.RESEND_API_KEY}`, 'content-type': 'application/json' },
     body: JSON.stringify({ from: env.AUTH_FROM_EMAIL, to: [email], subject: 'Sign in to Serve With', text: `Your one-time code is ${code}. It expires in 10 minutes.\n\nOr open this link, then confirm sign-in: ${link}\n\nIf you did not request this, ignore this email.` }),
   });
+  if (!response.ok) {
+    // Avoid logging the request payload, email recipient, OTP, magic link, API key, or raw provider response.
+    let providerCode = 'unknown';
+    try {
+      const errorBody: unknown = await response.json();
+      if (errorBody && typeof errorBody === 'object' && 'name' in errorBody &&
+        typeof errorBody.name === 'string' && /^[a-z_]{1,64}$/.test(errorBody.name)) {
+        providerCode = errorBody.name;
+      }
+    } catch { /* The status alone is sufficient to diagnose transport-level errors. */ }
+    console.error('auth.email.provider_failure', { provider: 'resend', httpStatus: response.status, code: providerCode });
+  }
   return response.ok;
 }
 
