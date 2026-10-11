@@ -96,6 +96,22 @@ export default {
       const email = await sessionEmail(request, env);
       if (!email) return json({ error: 'Authentication required' }, 401);
       if (request.method === 'GET' && path === '/api/admin/dashboard') return json({ email, message: 'Admin dashboard ready' });
+      if (path.startsWith('/api/admin/events/')) {
+        if (request.method !== 'DELETE') return json({ error: 'Method not allowed' }, 405);
+        if (!originOk(request) || request.headers.get('sec-fetch-site') === 'cross-site') return error();
+        const id = path.slice('/api/admin/events/'.length);
+        if (!/^[0-9a-f-]{36}$/.test(id)) return json({ error: 'Event not found' }, 404);
+        let body: Record<string,unknown>;
+        try { body = await bodyOf(request); } catch { return error(); }
+        if (!Number.isSafeInteger(body.version) || (body.version as number) < 1) return json({ error: 'Valid event version required' }, 422);
+        const existing = await env.AUTH_DB.prepare('SELECT version FROM events WHERE id=? AND deleted_at IS NULL').bind(id).first<{version:number}>();
+        if (!existing) return json({ error: 'Event not found' }, 404);
+        const now = Date.now();
+        const result = await env.AUTH_DB.prepare('UPDATE events SET deleted_at=?,updated_at=?,version=version+1 WHERE id=? AND version=? AND deleted_at IS NULL')
+          .bind(now,now,id,body.version).run();
+        if (result.meta.changes !== 1) return json({ error: 'Event changed since you opened it', code: 'version_conflict' }, 409);
+        return new Response(null, { status: 204, headers: { 'cache-control': 'no-store' } });
+      }
       return json({ error: 'Not found' }, 404);
     }
     if (!path.startsWith('/api/auth/')) {
@@ -146,7 +162,7 @@ export default {
         const submittedEmail = normalize(body.email);
         const code = typeof body.code === 'string' ? body.code : '';
         const token = typeof body.token === 'string' ? body.token : '';
-        if (isMagic ? !/^[a-f0-9]{64}$/.test(token) : (!allowed.has(submittedEmail) || !/^\\d{8}$/.test(code))) return error();
+        if (isMagic ? !/^[a-f0-9]{64}$/.test(token) : (!allowed.has(submittedEmail) || !/^\d{8}$/.test(code))) return error();
         const now = Date.now();
         const hashed = await digest(isMagic ? token : submittedEmail + ':' + code, env.AUTH_PEPPER);
         // A magic link is a bearer credential: find the account by its token hash,
