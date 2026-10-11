@@ -13,7 +13,7 @@ CREATE TABLE users (
   accepted_terms_version TEXT,
   accepted_privacy_version TEXT,
   CHECK ((terms_accepted_at IS NULL AND accepted_terms_version IS NULL AND accepted_privacy_version IS NULL)
-     OR (terms_accepted_at IS NOT NULL AND length(trim(accepted_terms_version)) > 0 AND length(trim(accepted_privacy_version)) > 0))
+     OR (terms_accepted_at IS NOT NULL AND length(trim(coalesce(accepted_terms_version, ''))) > 0 AND length(trim(coalesce(accepted_privacy_version, ''))) > 0))
 );
 CREATE INDEX idx_users_last_first ON users(last_name, first_name, id);
 CREATE INDEX idx_users_first_last ON users(first_name, last_name, id);
