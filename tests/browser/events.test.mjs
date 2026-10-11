@@ -291,3 +291,56 @@ test('editor retains draft values and shows server field errors on 422',async()=
   assert.equal(await page.getByRole('dialog',{name:'Add Event'}).count(),1);
  }finally{await browser.close()}
 });
+
+test('save disables duplicate submission while the network request is pending',async()=>{
+ await ready();
+ const browser=await chromium.launch({headless:true});
+ try {
+  const page=await browser.newPage(); let posts=0; let release;
+  const pending=new Promise(resolve=>{release=resolve});
+  await page.route('**/api/auth/me',r=>r.fulfill({json:{authenticated:true,email:'admin@example.org'}}));
+  await page.route('**/api/admin/dashboard',r=>r.fulfill({json:{ok:true}}));
+  await page.route('**/api/events?view=*',r=>r.fulfill({json:{events:[]}}));
+  await page.route('**/api/admin/events',async r=>{posts++;await pending;await r.fulfill({status:201,json:{event:{}}})});
+  await page.goto(base);
+  await page.getByText('No upcoming events',{exact:true}).waitFor();
+  await page.getByRole('button',{name:'Add Event'}).click();
+  await page.getByRole('textbox',{name:'Title'}).fill('One event');
+  await page.getByRole('textbox',{name:'Location'}).fill('Park');
+  await page.getByLabel('Start date and time').fill('2026-11-15T09:00');
+  await page.getByLabel('End date and time').fill('2026-11-15T11:00');
+  await page.getByRole('button',{name:'Save'}).click();
+  await page.getByRole('button',{name:'Save'}).waitFor({state:'visible'});
+  await page.waitForFunction(()=>document.querySelector('button[disabled]')!==null);
+  assert.equal(await page.getByRole('button',{name:'Save'}).isDisabled(),true);
+  assert.equal(posts,1);
+  release();
+  await page.getByRole('dialog',{name:'Add Event'}).waitFor({state:'hidden'});
+  assert.equal(posts,1);
+ }finally{release?.();await browser.close()}
+});
+
+test('both color schemes give page text at least WCAG AA contrast and mobile layout does not overflow',async()=>{
+ await ready();
+ const browser=await chromium.launch({headless:true});
+ try {
+  const page=await browser.newPage({viewport:{width:375,height:812},colorScheme:'light'});
+  await page.route('**/api/auth/me',r=>r.fulfill({json:{authenticated:false}}));
+  await page.route('**/api/events?view=*',r=>r.fulfill({json:{events:[]}}));
+  await page.goto(base);
+  await page.getByText('No upcoming events',{exact:true}).waitFor();
+  for (const scheme of ['light','dark']) {
+   await page.emulateMedia({colorScheme:scheme});
+   const data=await page.evaluate(()=>{
+    const toRgb=c=>{const x=c.match(/[\d.]+/g).slice(0,3).map(Number);return x.map(v=>{v/=255;return v<=.04045?v/12.92:((v+.055)/1.055)**2.4})};
+    const brightness=c=>{const v=toRgb(c);return .2126*v[0]+.7152*v[1]+.0722*v[2]};
+    const fg=getComputedStyle(document.querySelector('h1')).color;
+    const bg=getComputedStyle(document.body).backgroundColor;
+    const a=brightness(fg),b=brightness(bg);
+    return {ratio:(Math.max(a,b)+.05)/(Math.min(a,b)+.05),overflow:document.documentElement.scrollWidth>window.innerWidth};
+   });
+   assert.ok(data.ratio>=4.5,scheme+' page heading contrast '+data.ratio);
+   assert.equal(data.overflow,false,scheme+' mobile horizontal overflow');
+  }
+ }finally{await browser.close()}
+});
