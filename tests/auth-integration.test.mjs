@@ -50,7 +50,7 @@ function harness() {
       'content-type':'application/json','CF-Connecting-IP':opts.ip || '192.0.2.1', ...(opts.cookie ? {cookie:opts.cookie}:{}) },
     ...(body ? {body:JSON.stringify(body)}:{}) }),env);
   const close = () => { globalThis.fetch=previousFetch;sqlite.close(); };
-  return {req,sent,sqlite,close};
+  return {req,sent,sqlite,env,close};
 }
 function credentials(mail) {
   const code = mail.text.match(/one-time code is (\d{8})/)[1];
@@ -278,4 +278,40 @@ test('previously stored underage profile cannot regain privileged access', async
     assert.equal(me.privileged,false);
     assert.equal((await h.req('/api/admin/dashboard',undefined,{cookie})).status,403);
   } finally { h.close(); }
+});
+
+test('Turnstile blocks email issuance unless Siteverify confirms hostname and action',async()=>{
+ const h=harness();
+ const originalFetch=globalThis.fetch;
+ try {
+  h.env.TURNSTILE_SITE_KEY='test-public-key';
+  h.env.TURNSTILE_SECRET_KEY='test-private-key';
+  let verification={success:true,hostname:'servewith-beta.sffilamlions.org',action:'request-login'};
+  let calls=0;
+  globalThis.fetch=async(url,options)=>{
+   if(String(url).includes('/siteverify')) {
+    calls++;
+    assert.equal(new URLSearchParams(options.body).get('secret'),'test-private-key');
+    return Response.json(verification);
+   }
+   h.sent.push(JSON.parse(options.body));
+   return new Response('{}',{status:200});
+  };
+  const request=(turnstileToken)=>h.req('/api/auth/request',{email:'lionaugust@icloud.com',turnstileToken});
+  assert.equal((await request(undefined)).status,403);
+  assert.equal(h.sent.length,0);
+  verification={success:false};
+  assert.equal((await request('bad')).status,403);
+  verification={success:true,hostname:'wrong.example.org',action:'request-login'};
+  assert.equal((await request('wrong-host')).status,403);
+  verification={success:true,hostname:'servewith-beta.sffilamlions.org',action:'wrong-action'};
+  assert.equal((await request('wrong-action')).status,403);
+  verification={success:true,hostname:'servewith-beta.sffilamlions.org',action:'request-login'};
+  assert.equal((await request('valid')).status,200);
+  assert.equal(h.sent.length,1);
+  assert.ok(calls>=4);
+  globalThis.fetch=async()=>{throw new Error('Siteverify unavailable')};
+  assert.equal((await request('siteverify-outage')).status,403);
+  assert.equal(h.sent.length,1);
+ }finally{globalThis.fetch=originalFetch;h.close();}
 });
