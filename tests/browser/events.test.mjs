@@ -227,3 +227,45 @@ test('system dark appearance changes theme without a manual toggle',async()=>{
   assert.equal(await page.getByRole('button',{name:/dark mode|light mode/i}).count(),0);
  }finally{await browser.close()}
 });
+
+test('email-code sign-in and logout restore public-only controls',async()=>{
+ await ready();
+ const browser=await chromium.launch({headless:true});
+ try{
+  const page=await browser.newPage();
+  let authenticated=false;
+  await page.route('**/api/events?view=*',r=>r.fulfill({json:{events:[]}}));
+  await page.route('**/api/auth/me',r=>r.fulfill({json:authenticated?{authenticated:true,email:'admin@example.org'}:{authenticated:false}}));
+  await page.route('**/api/admin/dashboard',r=>r.fulfill({json:{ok:true}}));
+  await page.route('**/api/auth/request',r=>r.fulfill({json:{message:'Code sent'}}));
+  await page.route('**/api/auth/verify',async r=>{assert.equal(r.request().postDataJSON().code,'12345678');authenticated=true;await r.fulfill({json:{authenticated:true}})});
+  await page.route('**/api/auth/logout',async r=>{authenticated=false;await r.fulfill({json:{ok:true}})});
+  await page.goto(base);
+  await page.getByRole('textbox',{name:'Administrator email'}).fill('admin@example.org');
+  await page.getByRole('button',{name:'Email me a code and sign-in link'}).click();
+  await page.getByRole('textbox',{name:'Eight-digit email code'}).fill('12345678');
+  await page.getByRole('button',{name:'Verify code'}).click();
+  await page.getByRole('button',{name:'Add Event'}).waitFor();
+  await page.getByRole('button',{name:'Sign out'}).click();
+  await page.getByRole('button',{name:'Add Event'}).waitFor({state:'hidden'});
+  await page.getByText('No upcoming events',{exact:true}).waitFor();
+ }finally{await browser.close()}
+});
+
+test('single-use magic-link confirmation uses POST and scrubs browser URL',async()=>{
+ await ready();
+ const browser=await chromium.launch({headless:true});
+ try{
+  const page=await browser.newPage();
+  let authenticated=false,magicPosts=0;
+  await page.route('**/api/events?view=*',r=>r.fulfill({json:{events:[]}}));
+  await page.route('**/api/auth/me',r=>r.fulfill({json:authenticated?{authenticated:true,email:'admin@example.org'}:{authenticated:false}}));
+  await page.route('**/api/admin/dashboard',r=>r.fulfill({json:{ok:true}}));
+  await page.route('**/api/auth/magic',async r=>{assert.equal(r.request().method(),'POST');assert.equal(r.request().postDataJSON().token,'temporary-secret');magicPosts++;authenticated=true;await r.fulfill({json:{authenticated:true}})});
+  await page.goto(base+'/?magic=temporary-secret');
+  assert.equal(new URL(page.url()).searchParams.has('magic'),false);
+  await page.getByRole('button',{name:'Confirm magic-link sign-in'}).click();
+  await page.getByRole('button',{name:'Add Event'}).waitFor();
+  assert.equal(magicPosts,1);
+ }finally{await browser.close()}
+});
