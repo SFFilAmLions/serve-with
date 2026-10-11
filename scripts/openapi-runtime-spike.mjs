@@ -37,5 +37,22 @@ const ajv=new Ajv2020({strict:false,allErrors:true,validateFormats:false});
 const validate=ajv.compile(definition);
 assert.equal(validate({title:'Test',location:'Park',timezone:'UTC',start:'2026-11-14T09:00',end:'2026-11-14T12:00'}),true);
 assert.equal(validate({title:'Test',location:'Park',timezone:'UTC',start:'bad',end:'2026-11-14T12:00'}),false);
+// Characterize schema-vs-Worker compatibility before enabling validation.
+// Today's Worker trims title/location and ignores extra JSON properties.
+const acceptedByWorker = {
+  title: '  Test  ',
+  location: ' Park ',
+  timezone: 'UTC',
+  start: '2026-11-14T09:00',
+  end: '2026-11-14T12:00',
+  legacyMetadata: 'ignored by current eventInput()',
+};
+assert.equal(validate(acceptedByWorker),false,
+  'Contract must reveal compatibility mismatch for accepted extra fields');
+assert.ok(validate.errors.some(e => e.keyword === 'additionalProperties'));
+const whitespaceOnly = {...acceptedByWorker, title:' ', legacyMetadata:undefined};
+delete whitespaceOnly.legacyMetadata;
+assert.equal(validate(whitespaceOnly),true,
+  'Schema alone permits whitespace-only title; Worker rejects it after trim');
 assert.equal(create.operationId,'createAdminEvent');
 console.log('Callable OpenAPI client and schema validation spike passed');
