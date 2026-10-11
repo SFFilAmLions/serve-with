@@ -262,3 +262,18 @@ test('minimum age rejects under-13 profile completion without storing supplied D
     assert.equal((await h.req('/api/auth/profile',{firstName:'Allowed',lastName:'Test',dateOfBirth:birth(13)},{cookie})).status,200);
   } finally { h.close(); }
 });
+
+test('previously stored underage profile cannot regain privileged access', async () => {
+  const h=harness();
+  try {
+    await h.req('/api/auth/request',{email:'lionaugust@icloud.com'});
+    const {code}=credentials(h.sent.at(-1));
+    const login=await h.req('/api/auth/verify',{email:'lionaugust@icloud.com',code});
+    const cookie=login.headers.get('set-cookie');
+    h.sqlite.prepare("UPDATE users SET first_name='Young',last_name='Member',date_of_birth='2020-01-01'").run();
+    const me=await (await h.req('/api/auth/me',undefined,{cookie})).json();
+    assert.equal(me.profileComplete,false);
+    assert.equal(me.privileged,false);
+    assert.equal((await h.req('/api/admin/dashboard',undefined,{cookie})).status,403);
+  } finally { h.close(); }
+});
