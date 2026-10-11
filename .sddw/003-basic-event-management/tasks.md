@@ -18,7 +18,7 @@ References: [requirements.md](requirements.md) (approved); [design.md](design.md
 - [x] Add DB constraints for trimmed nonblank title/location, positive version, and `end_at > start_at`; add initial list-query indexes (query-plan tuning pending).
 - [x] Implement anonymous `GET /api/events?view=upcoming|past` with only non-deleted event fields and version; default to upcoming, reject unsupported view values, return no private admin data.
 - [x] Classify upcoming by `end_at > now` (including in progress), past by `end_at <= now`; sort by `start_at, id` ascending for upcoming and descending for past; use a fixed test clock.
-- [x] Add Worker/D1 integration tests for empty state payloads, stable ordering, exact end-time boundary, in-progress events, and exclusion of soft-deleted records (CI pending).
+- [x] Add Worker/D1 integration tests for empty state payloads, stable ordering, exact end-time boundary, in-progress events, and exclusion of soft-deleted records (CI passed).
 
 **Review checkpoint:** Public events can be read anonymously; no administrative mutation route or frontend change is needed to verify this slice.
 
@@ -28,7 +28,7 @@ References: [requirements.md](requirements.md) (approved); [design.md](design.md
 - [x] Use Temporal/polyfill to convert event-local times to unambiguous UTC instants, reject DST gaps and overlaps with field-level HTTP 422 errors, allow overnight events, reject end <= start.
 - [x] Add server-side admin-only `POST /api/admin/events`, `PUT /api/admin/events/:id`, and `DELETE /api/admin/events/:id` (soft deletion). Reuse SDDW 002 session/allowlist and same-origin CSRF protections; never rely on hidden UI controls for authorization.
 - [x] Require expected `version` for PUT and DELETE with conditional atomic updates. Perform atomic conditional updates/soft deletes and increment version; return HTTP 409 on stale versions without overwriting the current record. Define missing/deleted IDs and malformed precondition response codes consistently.
-- [x] Correct local datetime regex so valid `YYYY-MM-DDTHH:mm` inputs reach Temporal validation (CI verification pending).
+- [x] Correct local datetime regex so valid `YYYY-MM-DDTHH:mm` inputs reach Temporal validation (verified by GitHub CI).
 - [ ] Add API test coverage: authorized CRUD on future and past events, anonymous/unauthorized denial, input bounds, invalid/ambiguous DST times, multi-zone and overnight intervals, missing IDs, 409 conflicts, replayed delete, DB retention after soft deletion, and safe error responses.
 
 **Review checkpoint:** API behavior and concurrency are testable without a UI; never deploy production.
