@@ -46,3 +46,9 @@
 7. Check generated client serializes cookies and current API field names without silent changes.
 
 Next: produce the initial YAML and run generation in a Worker-compatible test environment. Keep contract-first YAML authoritative.
+
+## Contract spike progress (October 11, 2026)
+
+The authoritative YAML now defines `listEvents`, `getEvent` and `createAdminEvent`. The last operation exercises a JSON mutation, cookie security declaration, required Origin header and 201/4xx/503 response envelopes. Its runtime CSRF and admin checks currently live in the handwritten Worker and **have not been replaced or tested through generated adapters**.
+
+**Important compatibility warning:** The current API's security requirements extend beyond cookie presence; OpenAPI security schemes are descriptive and do not enforce same-origin, session privileges or CSRF by themselves. The YAML's request schema is a contract target; exact validation parity must be checked against existing whitespace-trimming/unknown-field behavior before switching on runtime request validation. The first YAML draft does not establish full endpoint coverage or generation readiness.
