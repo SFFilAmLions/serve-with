@@ -15,6 +15,10 @@ test('anonymous visitor browses empty upcoming and past views',async()=>{
   await page.route('**/api/events?view=*',route=>route.fulfill({json:{events:[]}}));
   await page.goto(base);
   await page.getByText('No upcoming events',{exact:true}).waitFor();
+  const logo=page.getByRole('img',{name:'San Francisco Fil-Am Lions Club logo'});
+  await logo.waitFor();
+  assert.equal(await logo.getAttribute('src'),'/club-logo.png');
+  assert.equal(await logo.evaluate(img=>img.complete&&img.naturalWidth>0),true);
   assert.equal(await page.getByRole('button',{name:'Add Event'}).count(),0);
   await page.getByRole('tab',{name:'Past Events'}).click();
   await page.getByText('No past events yet.').waitFor();
