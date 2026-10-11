@@ -3,6 +3,8 @@ import './style.css';
 const app = document.querySelector<HTMLDivElement>('#app');
 if (!app) throw new Error('App root is missing');
 
+const commitSha = import.meta.env.VITE_COMMIT_SHA || 'local';
+const buildFooter = () => `<footer>Build: <code>${escaped(commitSha.slice(0, 12))}</code></footer>`;
 const escaped = (text: string) => text.replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' })[c] || c);
 const magic = new URL(location.href).searchParams.get('magic');
 // Prevent leaking the magic-link token through browser history or referrer headers.
@@ -36,7 +38,7 @@ function renderForm() {
         <button type="submit">Confirm magic-link sign-in</button>
       </form>
       <p id="message" role="status" aria-live="polite"></p>
-      <footer>Administrator access only · Passwordless authentication</footer>
+      <footer>Administrator access only · Passwordless authentication</footer>\n      ${buildFooter()}
     </div>`;
   const email = app!.querySelector<HTMLInputElement>('#email')!;
   const message = app!.querySelector<HTMLParagraphElement>('#message')!;
@@ -65,7 +67,7 @@ async function render() {
       // The server verifies the session again for every protected API request.
       const protectedResponse = await fetch('/api/admin/dashboard', { credentials: 'same-origin', cache: 'no-store' });
       if (!protectedResponse.ok) throw new Error('Session is no longer authorized');
-      app!.innerHTML = `<div class="shell"><div class="eyebrow">Serve With · Admin</div><h1>Dashboard</h1><p class="lead">Signed in as ${escaped(me.email)}</p><p class="description">Administrator features are coming soon.</p><button id="logout">Sign out</button></div>`;
+      app!.innerHTML = `<div class="shell"><div class="eyebrow">Serve With · Admin</div><h1>Dashboard</h1><p class="lead">Signed in as ${escaped(me.email)}</p><p class="description">Administrator features are coming soon.</p><button id="logout">Sign out</button>${buildFooter()}</div>`;
       app!.querySelector<HTMLButtonElement>('#logout')!.addEventListener('click',async () => { await request('logout',{}); renderForm(); });
       return;
     }
