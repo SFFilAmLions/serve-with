@@ -1,6 +1,6 @@
 # Tasks — SDDW 003 Basic Event Management
 
-**Status: All remaining development/verification packages authorized; PR #6 remains unmerged. Staging and production deployment remain explicitly prohibited pending separate approval.**
+**Status: Approved pre-staging verification work underway in PR #6. Last fully successful CI baseline: `7aedfcab`, [run #38118018777](https://github.com/SFFilAmLions/serve-with/actions/runs/38118018777). New security, contrast and duplicate-submit tests still require CI confirmation. No merge, migration or deployment authorized.**
 
 References: [requirements.md](requirements.md) (approved); [design.md](design.md) (approved by user on 2026-10-10). Target is **Serve With SF Fil-Am Lions**. Retain the existing Vite / Cloudflare Workers / D1 architecture, with React + MUI and a Material 3-inspired theme.
 
@@ -9,8 +9,8 @@ References: [requirements.md](requirements.md) (approved); [design.md](design.md
 - [x] Review and approve this task breakdown before any code changes, migrations, dependency installation, or deployments.
 - [x] Check current `main` and outstanding PRs before implementation; working in PR #6 alongside its existing magic-link fix.
 - [x] Verify official club logo provenance and permission: the club's published branding guidelines at https://www.sffilamlions.org/about/social identify `SF Fil-Am Lions Logo.png`, Ubuntu/Ubuntu Condensed/Alata, and `#F1C232`; user explicitly authorized reuse of the club logo. Added the matching 167,619-byte club Drive PNG as `public/club-logo.png` (small image tracked in Git normally, not LFS). Font loading uses Google Fonts with system fallbacks; font-license and contrast review still require separate validation.
-- [ ] Verify maintained Temporal polyfill compatibility with Cloudflare Workers, strict `disambiguation: 'reject'` behavior, and build/bundle impact; pin an appropriate dependency.
-- [ ] Validate the planned light/dark MUI color tokens for WCAG contrast, including focus states and interaction states.
+- [ ] Verify Temporal polyfill on a real Cloudflare Worker and inspect bundle size. Node integration tests already cover DST gaps/overlaps and event write validation; `e816c66` adds multiple IANA zones. The `@js-temporal/polyfill` version remains semver-ranged (`^0.5.1`); pin/test compatibility before staging.
+- [ ] Validate WCAG contrast and focus/interaction states. Added mobile light/dark heading foreground/background contrast >= 4.5 and horizontal-overflow browser test (`a6e8d30`); still need measured full component/focus-state contrast and screenshot/screen-reader inspection.
 
 ## Slice 1 — Event schema and public read API
 
@@ -30,14 +30,14 @@ References: [requirements.md](requirements.md) (approved); [design.md](design.md
 - [x] Require expected `version` for PUT and DELETE with conditional atomic updates. Perform atomic conditional updates/soft deletes and increment version; return HTTP 409 on stale versions without overwriting the current record. Define missing/deleted IDs and malformed precondition response codes consistently.
 - [x] Correct local datetime regex so valid `YYYY-MM-DDTHH:mm` inputs reach Temporal validation (verified by GitHub CI).
 - [x] Add additional API tests for time zones, overnight events, event input bounds, missing records and version preconditions (CI passed for initial additions).
-- [ ] Complete API test coverage: authorized CRUD on future and past events, anonymous/unauthorized denial, input bounds, invalid/ambiguous DST times, multi-zone and overnight intervals, missing IDs, 409 conflicts, replayed delete, DB retention after soft deletion, and safe error responses.
+- [ ] Complete API test coverage: existing SQLite/D1 adapter tests cover authorized CRUD, past events, input bounds, DST gaps/overlaps, multiple zones, overnight, missing IDs, version conflicts and replayed delete. `e816c66` adds cross-origin write denial and multi-zone DST; production Worker compatibility and full safe-error-path audit remain open.
 
 **Review checkpoint:** API behavior and concurrency are testable without a UI; never deploy production.
 
 ## Slice 3 — React shell, club identity, and public event list
 
-- [x] Migrate vanilla frontend entry to React + React DOM with Vite, Worker asset serving, existing auth flows and build footer (CI verification pending).
-- [ ] Complete centralized MUI brand theme: `src/theme.ts` provides light/dark tokens, MUI shapes and Ubuntu/Alata typography; approved club logo now appears in the header with accessible alt text and an image-loading browser test (`1207223`, `dd9c9d3`, CI pending). Final visual and contrast checks remain.
+- [x] Migrate vanilla frontend entry to React + React DOM with Vite, Worker asset serving, existing auth flows and build footer (original coverage CI passed at `7aedfcab`; expanded verification pending).
+- [ ] Complete centralized MUI brand theme: `src/theme.ts` provides light/dark tokens, MUI shapes and Ubuntu/Alata typography; approved club logo now appears in the header with accessible alt text and an image-loading browser test (`1207223`, `dd9c9d3`, CI passed for original coverage at `7aedfcab`; newly added verification pending). Final visual and contrast checks remain.
 - [ ] Follow `prefers-color-scheme` automatically, including changes at runtime, without a manual toggle or startup theme flash. Added Chromium system-switching test and explicit focus outlines in `a957b4e` (CI pending); contrast audit and flash check remain.
 - [x] Set visible header and browser title/description to **Serve With SF Fil-Am Lions**; keep URLs unchanged (CI/UI verification pending).
 - [x] Implement initial responsive Upcoming/Past tabs with event cards showing event-local start/end instants, time zone, and location (CI/UI verification pending).
@@ -52,7 +52,7 @@ References: [requirements.md](requirements.md) (approved); [design.md](design.md
 
 - [x] Implement initial Add Event, Edit, and Delete controls for authenticated admins, including empty states and past events; backend retains authorization enforcement (CI/UI verification pending).
 - [ ] Complete accessible Add/Edit dialog: IANA time-zone autocomplete, form validation, edit prefill, and preserved server errors implemented; keyboard/focus interaction tests pending.
-- [ ] Complete save feedback: duplicate saves blocked, field-level errors and success Snackbar implemented; `d3f919f` adds a 422 field-error draft-retention Chromium test (CI pending), duplicate-save coverage still pending. Corrected stale-event reload so it does not incorrectly announce a successful edit (`102edc8`; CI pending).
+- [ ] Complete save feedback: duplicate saves blocked and new Chromium pending-network test added (`a6e8d30`); field-level errors and success Snackbar implemented; `d3f919f` adds a 422 field-error draft-retention Chromium test (CI pending), duplicate-save coverage still pending. Corrected stale-event reload so it does not incorrectly announce a successful edit (`102edc8`; CI pending).
 - [ ] Guard Cancel, close icon, Escape, and backdrop: unsaved-change confirmation implemented and keyboard focus restoration, accessible dialog descriptions, and nested confirmation close guards added; actual browser keyboard/focus and screen-reader checks still pending.
 - [x] Implement a separate Delete confirmation naming the event, refreshing on soft-delete and preserving the event on error (CI/UI verification pending).
 - [x] Handle HTTP 409 version conflicts by preserving unsaved edits, explaining the conflict, and offering a reload action with explicit discard confirmation (automated interaction tests still pending).
@@ -73,3 +73,9 @@ References: [requirements.md](requirements.md) (approved); [design.md](design.md
 No event detail pages/permanent links, volunteer signups, organizations, permissions expansion, recurrence, map/geocoding, notifications, manual dark-mode toggle, or deleted-event restoration in SDDW 003.
 
 **Important:** This file is a proposed implementation plan, **not** approval to execute it. No checkbox should be marked complete until its work has actually been verified.
+
+## Pre-staging verification record (2026-10-10)
+
+- **Successful CI baseline:** `7aedfcab` / GitHub Actions run `38118018777` (Node tests, TypeScript + Vite build and Playwright Chromium tests).
+- **Pending CI:** commits `a6e8d30`, `e816c66`, `02e7058` extend duplicate-submit, mobile contrast, CSRF and Temporal coverage. Do not promote checks to complete until their CI run passes.
+- **Deployment boundary:** PR #6 is still open; no production or staging merge/deploy, no D1 migration applied. Cloudflare runtime, real email delivery, live event CRUD, full WCAG review and release footer remain staging acceptance items.
