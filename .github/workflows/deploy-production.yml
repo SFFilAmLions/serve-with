@@ -36,7 +36,10 @@ jobs:
           node-version: "22"
       - run: npm install
       - name: Build with released commit identifier
-        run: VITE_COMMIT_SHA="$(git rev-parse HEAD)" npm run build
+        env:
+          VITE_DEPLOY_ENV: production
+          VITE_RELEASE_TAG: ${{ inputs.release_tag }}
+        run: npm run build
       - name: Deploy production Worker
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

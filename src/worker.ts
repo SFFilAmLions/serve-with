@@ -1,6 +1,7 @@
-interface D1Statement { bind(...values: unknown[]): D1Statement; first<T>(): Promise<T | null>; run(): Promise<{ meta: { changes: number } }> }
+interface D1Statement { bind(...values: unknown[]): D1Statement; first<T>(): Promise<T | null>; all<T>(): Promise<{ results: T[] }>; run(): Promise<{ meta: { changes: number } }> }
 interface D1Database { prepare(query: string): D1Statement }
 import admins from './generated/admins.json';
+import { Temporal } from '@js-temporal/polyfill';
 
 interface Env {
   ASSETS: { fetch(request: Request): Promise<Response> };
@@ -43,6 +44,36 @@ const bodyOf = async (request: Request): Promise<Record<string, unknown>> => {
   return body as Record<string, unknown>;
 };
 
+type EventFields = { title: string; location: string; timezone: string; start_at: number; end_at: number };
+function eventInput(body: Record<string,unknown>): { event?: EventFields; errors?: Record<string,string> } {
+  const errors: Record<string,string> = {};
+  const title = typeof body.title === 'string' ? body.title.trim() : '';
+  const location = typeof body.location === 'string' ? body.location.trim() : '';
+  const timezone = typeof body.timezone === 'string' ? body.timezone : '';
+  if (!title || title.length > 200) errors.title = 'Title must contain 1–200 characters';
+  if (!location || location.length > 500) errors.location = 'Location must contain 1–500 characters';
+  if (!timezone || timezone.length > 100) errors.timezone = 'Select a valid IANA time zone';
+  const resolve = (field: 'start'|'end'): number | undefined => {
+    const value = body[field];
+    if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value)) {
+      errors[field] = 'Enter a valid local date and time';
+      return undefined;
+    }
+    try {
+      const plain = Temporal.PlainDateTime.from(value);
+      const zoned = plain.toZonedDateTime(timezone, { disambiguation: 'reject' });
+      return zoned.epochMilliseconds;
+    } catch {
+      errors[field] = 'Invalid or ambiguous local time for this time zone';
+      return undefined;
+    }
+  };
+  const start = resolve('start');
+  const end = resolve('end');
+  if (start !== undefined && end !== undefined && end <= start) errors.end = 'End must be after start';
+  return Object.keys(errors).length ? { errors } : { event: { title, location, timezone, start_at: start!, end_at: end! } };
+}
+
 async function sendEmail(env: Env, email: string, code: string, link: string): Promise<boolean> {
   const response = await fetch('https://api.resend.com/emails', {
     method: 'POST',
@@ -76,11 +107,66 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
     const path = url.pathname;
+    if (path === '/api/events') {
+      if (request.method !== 'GET') return json({ error: 'Method not allowed' }, 405);
+      if (!env.AUTH_DB) return json({ error: 'Service unavailable' }, 503);
+      const view = url.searchParams.get('view') || 'upcoming';
+      if (view !== 'upcoming' && view !== 'past') return json({ error: 'Invalid event view' }, 400);
+      const now = Date.now();
+      const comparison = view === 'upcoming' ? '>' : '<=';
+      const direction = view === 'upcoming' ? 'ASC' : 'DESC';
+      const events = await env.AUTH_DB.prepare(
+        `SELECT id,title,location,timezone,start_at,end_at,version FROM events
+         WHERE deleted_at IS NULL AND end_at ${comparison} ?
+         ORDER BY start_at ${direction}, id ${direction}`
+      ).bind(now).all<{ id: string; title: string; location: string; timezone: string; start_at: number; end_at: number; version: number }>();
+      return json({ view, events: events.results });
+    }
     if (path.startsWith('/api/admin/')) {
       if (!env.AUTH_DB || !env.AUTH_PEPPER) return json({ error: 'Service unavailable' }, 503);
       const email = await sessionEmail(request, env);
       if (!email) return json({ error: 'Authentication required' }, 401);
       if (request.method === 'GET' && path === '/api/admin/dashboard') return json({ email, message: 'Admin dashboard ready' });
+      if (path === '/api/admin/events') {
+        if (request.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
+        if (!originOk(request) || request.headers.get('sec-fetch-site') === 'cross-site') return error();
+        let body: Record<string,unknown>;
+        try { body = await bodyOf(request); } catch { return error(); }
+        const result = eventInput(body);
+        if (!result.event) return json({ error: 'Invalid event', fields: result.errors }, 422);
+        const event = result.event;
+        const now = Date.now(), id = crypto.randomUUID();
+        await env.AUTH_DB.prepare('INSERT INTO events (id,title,location,timezone,start_at,end_at,created_at,updated_at,version) VALUES (?,?,?,?,?,?,?,?,1)')
+          .bind(id,event.title,event.location,event.timezone,event.start_at,event.end_at,now,now).run();
+        return json({ event: {id,...event,version:1} },201);
+      }
+      if (path.startsWith('/api/admin/events/')) {
+        if (request.method !== 'DELETE' && request.method !== 'PUT') return json({ error: 'Method not allowed' }, 405);
+        if (!originOk(request) || request.headers.get('sec-fetch-site') === 'cross-site') return error();
+        const id = path.slice('/api/admin/events/'.length);
+        if (!/^[0-9a-f-]{36}$/.test(id)) return json({ error: 'Event not found' }, 404);
+        let body: Record<string,unknown>;
+        try { body = await bodyOf(request); } catch { return error(); }
+        if (!Number.isSafeInteger(body.version) || (body.version as number) < 1) return json({ error: 'Valid event version required' }, 422);
+        const existing = await env.AUTH_DB.prepare('SELECT version FROM events WHERE id=? AND deleted_at IS NULL').bind(id).first<{version:number}>();
+        if (!existing) return json({ error: 'Event not found' }, 404);
+        if (request.method === 'PUT') {
+          const validated = eventInput(body);
+          if (!validated.event) return json({ error: 'Invalid event', fields: validated.errors }, 422);
+          const event = validated.event;
+          const now = Date.now();
+          const updated = await env.AUTH_DB.prepare(
+            'UPDATE events SET title=?,location=?,timezone=?,start_at=?,end_at=?,updated_at=?,version=version+1 WHERE id=? AND version=? AND deleted_at IS NULL'
+          ).bind(event.title,event.location,event.timezone,event.start_at,event.end_at,now,id,body.version).run();
+          if (updated.meta.changes !== 1) return json({ error: 'Event changed since you opened it', code: 'version_conflict' }, 409);
+          return json({ event: { id,...event,version:(body.version as number)+1 } });
+        }
+        const now = Date.now();
+        const result = await env.AUTH_DB.prepare('UPDATE events SET deleted_at=?,updated_at=?,version=version+1 WHERE id=? AND version=? AND deleted_at IS NULL')
+          .bind(now,now,id,body.version).run();
+        if (result.meta.changes !== 1) return json({ error: 'Event changed since you opened it', code: 'version_conflict' }, 409);
+        return new Response(null, { status: 204, headers: { 'cache-control': 'no-store' } });
+      }
       return json({ error: 'Not found' }, 404);
     }
     if (!path.startsWith('/api/auth/')) {
@@ -127,17 +213,27 @@ export default {
         return generic;
       }
       if (path === '/api/auth/verify' || path === '/api/auth/magic') {
-        const email = normalize(body.email);
+        const isMagic = path === '/api/auth/magic';
+        const submittedEmail = normalize(body.email);
         const code = typeof body.code === 'string' ? body.code : '';
         const token = typeof body.token === 'string' ? body.token : '';
-        if (!allowed.has(email) || (path.endsWith('/verify') ? !/^\d{8}$/.test(code) : !/^[a-f0-9]{64}$/.test(token))) return error();
+        if (isMagic ? !/^[a-f0-9]{64}$/.test(token) : (!allowed.has(submittedEmail) || !/^\d{8}$/.test(code))) return error();
         const now = Date.now();
-        const hashed = await digest(path.endsWith('/verify') ? email + ':' + code : token, env.AUTH_PEPPER);
-        const field = path.endsWith('/verify') ? 'code_hash' : 'link_hash';
-        const latest = await db.prepare('SELECT id,attempts FROM login_challenges WHERE email=? AND consumed_at IS NULL AND expires_at>? ORDER BY created_at DESC LIMIT 1').bind(email,now).first<{id: string; attempts: number}>();
-        if (!latest || latest.attempts >= 5) return error();
-        // Count failed guesses against the latest outstanding challenge, regardless of token validity.
-        const row = await db.prepare(`SELECT id,attempts FROM login_challenges WHERE id=? AND ${field}=? AND consumed_at IS NULL AND expires_at>?`).bind(latest.id,hashed,now).first<{ id: string; attempts: number }>();
+        const hashed = await digest(isMagic ? token : submittedEmail + ':' + code, env.AUTH_PEPPER);
+        // A magic link is a bearer credential: find the account by its token hash,
+        // not by an email typed in the receiving browser.
+        const latest = isMagic
+          ? await db.prepare('SELECT id,email,attempts FROM login_challenges WHERE link_hash=? AND consumed_at IS NULL AND expires_at>? ORDER BY created_at DESC LIMIT 1')
+              .bind(hashed,now).first<{ id: string; email: string; attempts: number }>()
+          : await db.prepare('SELECT id,email,attempts FROM login_challenges WHERE email=? AND consumed_at IS NULL AND expires_at>? ORDER BY created_at DESC LIMIT 1')
+              .bind(submittedEmail,now).first<{ id: string; email: string; attempts: number }>();
+        const email = latest?.email || submittedEmail;
+        if (!await withinLimits(request, db, env.AUTH_PEPPER, email || 'invalid', 'verify', now)) return error();
+        if (!latest || !allowed.has(email) || latest.attempts >= 5) return error();
+        const row = isMagic
+          ? latest
+          : await db.prepare('SELECT id FROM login_challenges WHERE id=? AND code_hash=? AND consumed_at IS NULL AND expires_at>?')
+              .bind(latest.id,hashed,now).first<{ id: string }>();
         if (!row) {
           await db.prepare('UPDATE login_challenges SET attempts=attempts+1 WHERE id=? AND attempts<5 AND consumed_at IS NULL').bind(latest.id).run();
           return error();

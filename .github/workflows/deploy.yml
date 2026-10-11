@@ -21,6 +21,7 @@ jobs:
       - name: Build with commit identifier
         env:
           VITE_COMMIT_SHA: ${{ github.sha }}
+          VITE_DEPLOY_ENV: staging
         run: npm run build
       - name: Deploy staging Worker
         env:
