@@ -62,7 +62,7 @@ Staging and production use separate Worker/D1 resources; never apply staging mig
 ## Specifications and references
 
 - [SDDW 001 — Project Foundation](.sddw/001-project-foundation/requirements.md)
-- [SDDW 002](.sddw/002-admin-auth/requirements.md) (path may differ if folder naming changes)
+- [SDDW 002](.sddw/002-admin-authentication/requirements.md)
 - [SDDW 003 — Basic Event Management](.sddw/003-basic-event-management/requirements.md)
 - [SDDW 004 — Requirements](.sddw/004-auth-event-editor-ux/requirements.md)
 - [SDDW 004 — Proposed Design](.sddw/004-auth-event-editor-ux/design.md)
