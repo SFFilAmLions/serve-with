@@ -14,6 +14,13 @@ Keep the existing Vite + TypeScript + Cloudflare Worker + D1 deployment architec
 
 ## 2. Material 3-inspired visual system
 
+### Naming and site identity
+
+- **Production hostname:** `servewith.sffilamlions.org` (URL is not the display name). The staging hostname remains `servewith-beta.sffilamlions.org`; the deployment environment is named `staging`.
+- **User-facing product name:** include the Lions identity: **Serve With Lions** or **Serve With SF Fil-Am Lions**. Final visible wording is pending user selection; do not present bare **Serve With** as the main app title.
+- Use the approved product name consistently in the app header, HTML document title, sign-in screen, and metadata; use the full club name as secondary identity where appropriate. Preserve existing production release controls.
+
+
 The current handbook uses Material for MkDocs, but its configured red/amber colors are **not** definitive club branding. Use Google Sites' documented club visual identity for the logo and typography; use Material 3 for surfaces, elevation, spacing, shapes, and interaction patterns.
 
 - **Components:** MUI `AppBar`, `Container`, `Tabs`, `Card`/`CardContent`, `Button`, `TextField`, `Dialog`, `DialogTitle`, `DialogContent`, `DialogActions`, `Snackbar`/`Alert`, `CircularProgress`. Choose accessible MUI primitives over custom widgets.
