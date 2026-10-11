@@ -16,8 +16,8 @@ Consolidates [#10](https://github.com/SFFilAmLions/serve-with/issues/10), [#11](
 ## Core flow 2 — Navigate and manage accounts
 
 - Move sign-in/account identity/sign-out to the upper-right MUI app bar; remove the bottom authentication panel. Public upcoming/past events remain viewable anonymously.
-- Signed-in users default to Attendee mode. Authorized administrators can switch to a distinct Administrator workspace; enforce permissions on every server route and API, not only in the UI.
-- An owner may edit their first and last name and view verified email and DOB. Email changes are not supported; DOB corrections after initial entry require an administrator and audit logging.
+- Signed-in users default to Attendee mode. For authorized administrators, the top-right account/user menu provides a workspace switch between **Attendee** and **Administrator**. Administrator mode has exactly two primary tabs in this scope: **Events** and **Users**. Enforce permissions on every server route and API, not only in the UI.
+- Give each account one canonical `/users/:id` page and `/users/:id/edit` editor. Do not add a `/profile` alias: the account menu links directly to the signed-in user's canonical ID. In SDDW 004, user pages are restricted to the owner and authorized administrators; future public profile visibility is explicitly deferred. Owners may edit first/last name and view verified email/DOB; email changes are unsupported and DOB corrections after initial entry require an administrator with audit logging.
 - Administrator-only Users directory supports basic paginated name/email search, with no DOB in list/default API payload. Administrator Edit User can edit names and correct DOB, with actor/time audit. No Create User page, role editing, or attendee access to directory/search APIs.
 
 ## Core flow 3 — Create, edit and duplicate events
@@ -25,7 +25,7 @@ Consolidates [#10](https://github.com/SFFilAmLions/serve-with/issues/10), [#11](
 - Use dedicated Create Event and Edit Event pages with shared field controls, validation, unsaved-change protection and existing CRUD authorization/concurrency behavior.
 - Emphasize a full-width Start date. Show equal-width Start and End time clock-capable, keyboard-accessible controls and live Duration without resizing time inputs.
 - Put End date and Time zone under More options. End date follows Start date until explicitly overridden. Default to `America/Los_Angeles`; validate overnight/multiday and DST cases.
-- Duplicate Event, including a past event, opens Create prefilled with editable fields only. It does not save automatically, always creates a new ID on Save, and does not copy server metadata or alter the original.
+- Duplicate Event, including a past event, opens `/admin/events/new` prefilled with editable fields only and clearly indicates the source event. Carry the source in client navigation state rather than requiring a bookmarkable duplicate URL. It does not save automatically, always creates a new ID on Save, and does not copy server metadata or alter the original.
 - Preserve publicly readable event listings.
 
 ## Verification and release boundaries
@@ -42,4 +42,4 @@ Self-service email change; dedicated deactivation/reactivation control and lifec
 
 ## Decisions to confirm before implementation
 
-Confirm date/time picker selection and the Terms/Privacy publication/versioning procedure. Dedicated Edit Event page is the proposed design baseline.
+Use MUI X Date and Time Pickers for the event date/time controls, subject to implementation-time license/dependency verification. The remaining prerequisite is the Terms/Privacy publication/versioning procedure. Dedicated Create/Edit Event pages are the design baseline.
