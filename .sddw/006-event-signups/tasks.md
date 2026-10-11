@@ -6,9 +6,9 @@
 
 ## Gate 0 — Architecture proof and route inventory (first)
 
-- [ ] **T001** Inventory all deployed HTTP endpoints/methods, auth cookies, CSRF/origin requirements, response shapes and error codes; record characterization tests for main.
-- [ ] **T002** Write OpenAPI 3.1 YAML skeleton with security schemes, public/admin grouping and existing routes; lint schema and examples.
-- [ ] **T003** Spike pinned generation candidates on **one public GET and one authenticated mutation**, generating **both** frontend client and Worker-compatible server operation/dispatch contracts; prove runtime validation and CSRF in Worker tests. Record tool decision and limitations in `design.md`. **Blocker if no qualifying generator**.
+- [ ] **T001** Inventory all deployed HTTP endpoints/methods, auth cookies, CSRF/origin requirements, response shapes and error codes; record characterization tests for main. **In progress:** static route inventory recorded in [api-inventory.md](./api-inventory.md); runtime characterization tests remain.
+- [ ] **T002** Write OpenAPI 3.1 YAML skeleton with security schemes, public/admin grouping and existing routes; lint schema and examples. **In progress:** initial [openapi.yaml](../../openapi/openapi.yaml) contains public events routes; auth/admin schemas, lint and remaining routes still pending.
+- [ ] **T003** Spike pinned generation candidates on **one public GET and one authenticated mutation**, generating **both** frontend client and Worker-compatible server operation/dispatch contracts; prove runtime validation and CSRF in Worker tests. Record tool decision and limitations in `design.md`. **Blocker if no qualifying generator**. **Research begun:** candidate limitations are in [api-inventory.md](./api-inventory.md); no generator executed or selected yet.
 - [ ] **T004** Approve route naming and nonbreaking migration plan (including existing SPA fallback and eventual `/api/docs` and `/api/openapi.json`).
 
 **Suggested PR 1:** Architecture proof + contract/toolchain decision; no mass route rewrite.
