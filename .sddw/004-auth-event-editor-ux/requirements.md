@@ -36,7 +36,7 @@ Origin: successful SDDW 003 staging use and user feedback. Consolidates [#10](ht
 - Allow individuals to **register their own user account** using a verified email address. Every active user, including every administrator, must have a **nonblank first name, nonblank last name, and unique verified email address**. Apply appropriate validation and normalization server-side; public event browsing remains anonymous.
 - Allow authenticated users to view their profile and **edit their first and last names** (both remain required) and **delete their own account** through an explicit, deliberate confirmation. Revoke sessions and login challenges, stop future authentication for deleted/unauthorized identities, and define safe handling of retained event/audit references, if any, before implementation.
 - Do not grant administrator privileges through registration or profile changes. **Decision: existing administrators complete their first and last names through a secure required profile-completion step at their next sign-in.** Until completed, permit only the limited profile-completion and sign-out experience, not administrative operations; preserve the administrator role assignment after completion. Never invent names. Reconcile the authoritative administrator list and persisted user profiles without locking out existing admins during the transition.
-- Evolve `config/admins.yaml` (currently email + enabled only) and its validator/generator to support complete administrator identities. **Resolve the apparent conflict between requiring name values in source-controlled admin configuration and administrator-entered names at first sign-in:** design must specify an authoritative, consistent synchronization policy, avoid committing invented names, and ensure user-editable names do not become stale in configuration. Administrator role assignments remain independently controlled.
+- **Approved authority split:** keep `config/admins.yaml` as the email-based administrator authorization list (email and enabled status), not a storage location for first/last names. Store each administrator's required, editable first name and last name, alongside their verified email, **only in their D1 user profile**. Administrator access is based on the configured email plus a completed, verified user profile. Do not synchronize editable names into YAML.
 - Separate **account eligibility**, **registered account status**, and **administrator authorization**. An eligible person is not an admin merely because they can register, and an administrator email is not a substitute for a complete user profile.
 
 ### Staging-only registration allowlist
@@ -77,6 +77,7 @@ Origin: successful SDDW 003 staging use and user feedback. Consolidates [#10](ht
 - **Existing administrators:** Mandatory first/last name completion at next sign-in (not invented or pre-seeded). Until complete, restrict to completion/sign-out while preserving their existing role assignment.
 - **Staging registration allowlist:** Email addresses only; registrants supply their own mandatory names.
 - **Profile editing:** Users may change their first/last names after registration; both fields must remain valid and nonblank. Email changes are not included in this phase.
+- **Administrator identity source:** `config/admins.yaml` remains an email-only authorization source; required names and verified email reside in D1 profiles, including administrators. No names in YAML.
 
 ## 8. Items to settle in design review
 
@@ -84,7 +85,7 @@ Origin: successful SDDW 003 staging use and user feedback. Consolidates [#10](ht
 - Whether the duration should be shown directly beneath the equal-width time inputs or in an End time label area; the equal sizing and prominent date are required either way.
 - Exact loading/error presentation for automatic magic-link exchange.
 - Attendee/Admin view navigation model (route or mode switch), initial/default view and UI placement; do not imply attendee event signup is already implemented.
-- User table/profile migration and deletion semantics (including retention); authoritative synchronization of editable profile names versus admin configuration; staging email-only allowlist configuration and reconciliation.
+- User table/profile migration and deletion semantics (including retention); staging email-only allowlist configuration and reconciliation. Administrator configuration/profile source-of-truth split is approved.
 - Production registration eligibility policy (explicitly deferred; no production registration is authorized).
 
 **Next gate:** Review and approve these requirements before completing the technical design and implementation task list.
