@@ -64,17 +64,22 @@ test('administrator creates an event, then sees its event-local time and reposit
    await route.fulfill({status:201,json:{event:records[0]}});
   });
   await page.goto(base);
+  // Ensure the initial list request has settled before exercising post-save refresh.
+  await page.getByText('No upcoming events',{exact:true}).waitFor();
   await page.getByRole('button',{name:'Add Event'}).click();
   await page.getByRole('textbox',{name:'Title'}).fill('Beach clean-up');
   await page.getByRole('textbox',{name:'Location'}).fill('Ocean Beach');
   await page.getByLabel('Start date and time').fill('2026-11-15T09:00');
   await page.getByLabel('End date and time').fill('2026-11-15T11:00');
+  const posted=page.waitForResponse(r=>r.url().endsWith('/api/admin/events')&&r.request().method()==='POST');
   await page.getByRole('button',{name:'Save'}).click();
+  assert.equal((await posted).status(),201);
   try { await page.getByRole('heading',{name:'Beach clean-up'}).waitFor({timeout:8000}); }
   catch (error) {
    const dialogText=await page.getByRole('dialog').allTextContents();
    const statusText=await page.locator('[role="alert"],[role="status"]').allTextContents();
-   throw new Error('Event did not appear after save. Dialogs: '+JSON.stringify(dialogText)+'; statuses: '+JSON.stringify(statusText)+'; error: '+String(error));
+   const body=await page.locator('body').innerText();
+   throw new Error('Event did not appear after save. Dialogs: '+JSON.stringify(dialogText)+'; statuses: '+JSON.stringify(statusText)+'; body: '+body+'; error: '+String(error));
   }
   await page.getByText('Ocean Beach',{exact:false}).waitFor();
   await page.getByText('Pacific Standard Time',{exact:false}).count();
