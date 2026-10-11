@@ -57,6 +57,34 @@ Enable authenticated attendees to sign up for events, withdraw, and review their
 - Browser tests for signup button states, admin user selection, mobile layout, keyboard use, error feedback and My signups history.
 - Staging acceptance with real D1 before any production release.
 
+
+## Visual system refinement — approved addition to SDDW-006 scope
+This is a cross-cutting UI refinement implemented in the same batch as event signups. **Preserve existing routes, permissions, application behavior, centered page structure, rounded fields/cards, and established form layouts.** These changes are visual/interaction-pattern consistency only; signup behavior remains governed by the requirements above.
+
+### Material iconography
+- Replace mixed Unicode glyphs, ad hoc icons and inconsistent icon styles with **Material Symbols Rounded** throughout attendee and administrator interfaces.
+- Apply a consistent icon size system: **18px** for inline/contextual icons, **20px** within labeled action buttons and **24px** for header utilities.
+- Specifically update edit/pencil, back arrow, workspace/view switch, calendar, clock, location pin and comparable actions/status indicators. Avoid emoji or raw Unicode symbols as functional icons.
+- Ensure accessible names for icon-only controls, decorative icons hidden from screen readers, and stable alignment/spacing.
+
+### Controls and emphasis
+- Continue using rounded **pills** for filters, segmented choices, and compact status indicators.
+- Replace the underlined Administrator **Events / Users** tabs with a single-select **segmented pill control** consistent with the public **Upcoming / Past** selector.
+- Reserve **filled club-gold buttons** for the screen's primary actions. Use outlined/text Material buttons for secondary actions. Avoid additional bespoke button treatments or inconsistent control styles.
+- Keep compact controls appropriate to their context while retaining accessible touch targets and keyboard operation.
+
+### Header and colors
+- In attendee mode, display only **Serve With Lions** as the title.
+- In administrator mode, display **Serve With Lions · Admin**, where the **Admin** suffix is styled using an accessible orange warning color in both light and dark themes; do **not** display a separate Administrator Chip/pill.
+- Reserve orange for administrator context and caution/destructive states. Do not apply orange as a general decorative or primary-action color; retain gold for primary actions.
+- Preserve existing workspace-switch authorization and navigation functionality.
+
+### Consistency and accessibility
+- Apply the same Material icon, button, pill, spacing, surface and emphasis conventions across attendee pages, admin event management, users directory/profile management, event detail and event Create/Edit pages.
+- Preserve the current centered content width, card/form shape, underlying workflows and screen behavior; no changes to routes, permissions, APIs or signup semantics solely for visual restyling.
+- Validate **light and dark themes**, including admin orange and gold-button contrast, disabled/hover/focus/selected states, responsive layouts, keyboard focus visibility and screen reader labels.
+- Add regression/browser checks for icon replacement, 18/20/24px sizes, segmented admin navigation, header text and removal of Administrator Chip, theme consistency and functional equivalence.
+
 ## Explicitly deferred
 - Waitlists or automatic promotion.
 - Separate signup audit-log/change-history tables.
