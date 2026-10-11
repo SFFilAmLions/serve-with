@@ -155,3 +155,29 @@ test('event inputs accept overnight and multiple IANA zones, reject invalid fiel
     assert.equal((await h.req('/api/admin/events/'+parsed.id,'PUT',{...event,version:0},cookie)).status,422);
   } finally { h.sqlite.close(); }
 });
+
+test('past events remain editable, DST overlaps are rejected, and bad requests preserve data', async () => {
+  const h = harness();
+  try {
+    const now = Date.now(), session = 'd'.repeat(64);
+    const hash = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode('test:'+session))), b => b.toString(16).padStart(2,'0')).join('');
+    h.sqlite.prepare('INSERT INTO sessions(token_hash,email,expires_at,created_at) VALUES (?,?,?,?)').run(hash,'lionaugust@icloud.com',now+600000,now);
+    const cookie = '__Host-sw_session=' + session;
+    const value = {title:'Past clean-up',location:'SF',timezone:'America/Los_Angeles',start:'2025-01-14T09:00',end:'2025-01-14T11:00'};
+    const created = await h.req('/api/admin/events','POST',value,cookie);
+    assert.equal(created.status,201);
+    const event = (await created.json()).event;
+    assert.equal((await h.req('/api/events?view=past')).status,200);
+    const invalid = await h.req('/api/admin/events/'+event.id,'PUT',{...value,start:'2026-11-01T01:30',version:1},cookie);
+    assert.equal(invalid.status,422);
+    assert.ok((await invalid.json()).fields.start);
+    assert.equal(h.sqlite.prepare('SELECT version FROM events WHERE id=?').get(event.id).version,1);
+    const modified = await h.req('/api/admin/events/'+event.id,'PUT',{...value,title:'Updated past clean-up',version:1},cookie);
+    assert.equal(modified.status,200);
+    assert.equal((await modified.json()).event.version,2);
+    assert.equal((await h.req('/api/admin/events/'+event.id,'DELETE',{version:2},cookie)).status,204);
+    assert.equal(h.sqlite.prepare('SELECT version FROM events WHERE id=?').get(event.id).version,3);
+    assert.equal((await h.req('/api/admin/events/'+event.id,'PUT',{...value,version:3},cookie)).status,404);
+    assert.equal((await h.req('/api/admin/events/'+event.id,'DELETE',{version:3},cookie)).status,404);
+  } finally { h.sqlite.close(); }
+});
