@@ -16,7 +16,8 @@
 - [x] Define Terms/Privacy publication, immutable version identifiers, archival routes and deterministic reacceptance procedure (see [policy-publication.md](policy-publication.md)).
 - [ ] Supply/approve substantive Terms and Privacy text and first effective versions; publish them before attendee onboarding.
 - [x] Review existing D1 schema/auth/admin transition and propose additive migration/allowlist architecture (see [prerequisite-review.md](prerequisite-review.md)).
-- [ ] Approve concrete D1 migration/audit retention; verify deployed staging schema and configure staging allowlist.
+- [x] Resolve concrete D1 migration shape and DOB audit retention: additive `0004`, stable user IDs, active-session transition, append-only agreements, and actor/subject/time-only DOB correction audit (see [migration-plan.md](migration-plan.md)).
+- [ ] Verify deployed staging migration state and configure the separate server-side staging registration allowlist during authorized implementation.
 
 ## Implementation slices (not yet authorized)
 
