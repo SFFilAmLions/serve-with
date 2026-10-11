@@ -44,7 +44,7 @@ References: [requirements.md](requirements.md) (approved); [design.md](design.md
 - [x] Implement friendly public empty states, loading indicators, retries, and failure feedback independently of login (UI verification pending).
 - [ ] Preserve OTP sign-in and logout, explicit POST magic-link confirmation and token removal from browser history; integrate pending magic-link fix when appropriately merged instead of independently changing its behavior here.
 - [x] Implement club-handbook-style footer and explicit build metadata for staging/production (CI and browser acceptance pending): repository link in all views; staged deployed commit hash linking to commit; production approved release version linking to GitHub release; local-development fallback, explicitly supplied by build workflows.
-- [ ] Complete frontend tests for public browsing, loading/error/empty states, responsive layout, system-driven light/dark theme, and auth regression. Extracted event editor validation/time formatting into `src/event-form.ts` with executable unit tests for inputs, overnight events, and multiple zones; CI pending.
+- [ ] Complete frontend tests for public browsing, loading/error/empty states, responsive layout, system-driven light/dark theme, and auth regression. Extracted event editor validation/time formatting into `src/event-form.ts` with passing unit tests; initial Chromium UI tests added to CI, pending verification.
 
 **Review checkpoint:** Anonymous visitors can browse events on the landing page without signing in.
 
@@ -56,7 +56,7 @@ References: [requirements.md](requirements.md) (approved); [design.md](design.md
 - [ ] Guard Cancel, close icon, Escape, and backdrop: unsaved-change confirmation implemented and keyboard focus restoration, accessible dialog descriptions, and nested confirmation close guards added; actual browser keyboard/focus and screen-reader checks still pending.
 - [x] Implement a separate Delete confirmation naming the event, refreshing on soft-delete and preserving the event on error (CI/UI verification pending).
 - [x] Handle HTTP 409 version conflicts by preserving unsaved edits, explaining the conflict, and offering a reload action with explicit discard confirmation (automated interaction tests still pending).
-- [ ] Add comprehensive browser interaction tests for Add/Edit/Delete, past event management, unsaved-change guards, duplicate submission, version conflicts, focus restoration, error states, and authorization visibility. Initial source-contract regression checks added; these are not substitutes for UI interaction tests.
+- [ ] Add comprehensive browser interaction tests for Add/Edit/Delete, past event management, unsaved-change guards, duplicate submission, version conflicts, focus restoration, error states, and authorization visibility. Initial source-contract and executable form tests exist; added first Chromium/Playwright flows for anonymous tab browsing, admin editor, and discard confirmation. CI verification pending; broaden coverage before completion.
 
 **Review checkpoint:** End-to-end CRUD works for an authenticated staging admin; conflicts do not silently discard work.
 
