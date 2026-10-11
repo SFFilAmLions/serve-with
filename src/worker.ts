@@ -146,7 +146,7 @@ const policyVersions = (env: Env) => {
   const privacy = env.REQUIRED_PRIVACY_VERSION?.trim() || '';
   return terms && privacy && terms.length <= 100 && privacy.length <= 100 ? {terms,privacy} : null;
 };
-const profileReady = (u: UserRow) => Boolean(u.first_name && u.last_name && u.date_of_birth);
+const profileReady = (u: UserRow) => Boolean(u.first_name && u.last_name && validDob(u.date_of_birth));
 const agreementReady = (u: UserRow, versions: {terms:string;privacy:string}|null) =>
   Boolean(versions && u.terms_accepted_at && u.accepted_terms_version === versions.terms && u.accepted_privacy_version === versions.privacy);
 const privilegeReady = (subject: Subject, env: Env) => Boolean(subject.user.email_verified_at && profileReady(subject.user) && agreementReady(subject.user,policyVersions(env)));
