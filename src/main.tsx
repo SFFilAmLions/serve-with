@@ -115,7 +115,6 @@ function EventList({admin}:{admin:boolean}){
   }catch{setDeleteError('Could not reach the server')}finally{setDeleting(false)}
  };
  useEffect(()=>{let active=true;setLoading(true);setError('');fetch('/api/events?view='+view,{cache:'no-store'}).then(async r=>{if(!r.ok)throw Error('Unable to load events');return r.json()}).then(d=>{if(active)setEvents(d.events)}).catch(e=>{if(active)setError(String(e.message))}).finally(()=>{if(active)setLoading(false)});return()=>{active=false}},[view,revision]);
- const local=(instant:number,timezone:string)=>new Intl.DateTimeFormat('en-US',{weekday:'long',year:'numeric',month:'long',day:'numeric',hour:'numeric',minute:'2-digit',timeZone:timezone,timeZoneName:'short'}).format(new Date(instant));
  return <Box component="section" aria-label="Events" sx={{my:5}}>
   {admin&&<Box sx={{display:'flex',justifyContent:'flex-end',mb:2}}><Button variant="contained" onClick={e=>{editorTrigger.current=e.currentTarget;go('/admin/events/new')}}>Add Event</Button></Box>}
   <ToggleButtonGroup exclusive color="primary" size="small" value={view} onChange={(_,v:View|null)=>{if(v)setView(v)}} aria-label="Event timeline" sx={{gap:1,'& .MuiToggleButton-root':{borderRadius:'24px !important',px:2,border:'1px solid',borderColor:'divider'}}}><ToggleButton value="upcoming">Upcoming</ToggleButton><ToggleButton value="past">Past</ToggleButton></ToggleButtonGroup>
