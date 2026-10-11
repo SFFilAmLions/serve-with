@@ -58,7 +58,8 @@
 - [x] Dedicated event Create/Edit screens using Community MUI X date/time pickers and guarded close/save.
 - [x] Duplicate-prefilled Create Event route that creates a distinct ID on explicit save.
 - [x] New unit/integration and browser tests added for route, account, agreement gating and event behavior.
-- [ ] Observe green CI for the *latest* combined implementation commit and review remaining accessibility/event regression coverage.
+- [x] Combined implementation commit `fc08deef` passed GitHub Actions CI (unit/integration, TypeScript/Vite build, and browser tests; [run #38128884247](https://github.com/SFFilAmLions/serve-with/actions/runs/38128884247)).
+- [ ] Complete manual accessibility/UX review and remaining real-environment event regression verification before release.
 - [ ] Publish reviewed policies, set required Terms/Privacy versions and enable compliant acknowledgment UI (not approved in this selected batch).
 - [ ] Inspect remotely applied staging migrations and provision private staging allowlist, then validate real staging auth/D1 behavior after separately approved deployment.
 
