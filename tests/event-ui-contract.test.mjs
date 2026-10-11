@@ -32,3 +32,10 @@ test('event dialogs restore focus to their action triggers',()=>{
  assert.match(source,/onClose=\{closeEditor\}/);
  assert.match(source,/onClick=\{closeDelete\}/);
 });
+
+test('dialog accessibility descriptions and close guards are retained',()=>{
+ for(const id of ['event-editor-description','discard-description','delete-event-description']){
+  assert.ok(source.includes(id),id);
+ }
+ assert.match(source,/if\(saving\|\|discard\|\|reloadConfirm\)return/);
+});
