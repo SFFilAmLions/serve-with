@@ -10,7 +10,8 @@
 - [ ] Review/approve the separate Attendee and Administrator view requirements and design accessible switching and route authorization.
 - [ ] Design authentication and account-menu interactions in [design.md](design.md); review and approve.
 - [ ] Specify Create Event as a dedicated page and choose a consistent Edit Event page design, navigation, dirty-form safeguards, and tests.
-- [ ] Design authenticated Edit Profile and admin-only Users page with a shared **Create/Edit User page** (new and existing modes), including server authorization, staging allowlist, pending email verification/invitation, duplicate prevention, search, data exposure, and regression tests.
+- [ ] Design unified email-first login (page or home modal), eight-digit code/magic link verification, and eligible first-login account creation without a standalone Create User page.
+- [ ] Design mandatory first-login Edit Profile redirect, subsequent own-profile edits, and admin-only Users directory/Edit User page for existing users, including ownership checks, eligibility, duplicate prevention, search, and regression tests.
 - [ ] Design date/time picker choice, progressive disclosure, duration algorithm, and accessibility; review and approve.
 - [ ] Break approved design into small implementation/test slices.
 - [ ] Implement on a separate branch or PR, run automated tests, and merge to `main` only after review.
