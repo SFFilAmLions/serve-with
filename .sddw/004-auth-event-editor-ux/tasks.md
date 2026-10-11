@@ -13,7 +13,8 @@
 
 - [x] Verify picker license/package selection: MIT Community `@mui/x-date-pickers` + `dayjs`; dependency installation/compatibility tests remain for implementation.
 - [ ] Approve requirements and design.
-- [ ] Publish Terms/Privacy, define required version identifiers and reacceptance procedure.
+- [x] Define Terms/Privacy publication, immutable version identifiers, archival routes and deterministic reacceptance procedure (see [policy-publication.md](policy-publication.md)).
+- [ ] Supply/approve substantive Terms and Privacy text and first effective versions; publish them before attendee onboarding.
 - [x] Review existing D1 schema/auth/admin transition and propose additive migration/allowlist architecture (see [prerequisite-review.md](prerequisite-review.md)).
 - [ ] Approve concrete D1 migration/audit retention; verify deployed staging schema and configure staging allowlist.
 
