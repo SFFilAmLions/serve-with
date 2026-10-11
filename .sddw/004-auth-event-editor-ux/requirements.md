@@ -47,9 +47,17 @@ Origin: successful SDDW 003 staging use and user feedback. Consolidates [#10](ht
 
 - A signed-in account holder can request an email change. The new email must be unique among active real-email accounts, eligible for the current environment (including the staging email whitelist), and verified with a one-time code or magic link **sent to the new address** before the account email is changed. Until verification succeeds, keep the original email unchanged. Invalidate outstanding change attempts and rotate/revoke sessions as appropriate on success. Administrator rights must be recalculated from the new email under `config/admins.yaml`, never blindly transferred.
 
-### Account deactivation, deletion, and optional recovery
+### Simple account activation requirement (SDDW 004 core)
 
-**Deactivation and deletion have different data effects.** Deactivation preserves the full profile and blocks participation pending renewed agreement. Deletion clears PII and may retain historical participation with optional key-based recovery.
+- On initial registration/profile completion, display **one unchecked, required checkbox**: “I agree to the Terms of Use and Privacy Policy”, linking to the current documents. Never precheck it.
+- Persist a user-level boolean `is_active`: `false` until the user has verified their email, provided all mandatory profile fields, and explicitly accepted the checkbox; set it to `true` after completion. Keep the version(s) and timestamp of the agreement as separate evidence.
+- An inactive user may authenticate only into a restricted flow for completing missing details and accepting the agreement, not access attendee participation or admin operations. An existing account whose `is_active` is `false` can accept the checkbox again to reactivate without reentering already-complete personal details.
+- Deactivation in this simplified phase means setting `is_active=false`, preserving profile fields and prior agreement records; invalidate existing privileged sessions. An administrator's role remains independently configured in `config/admins.yaml`.
+- The boolean represents **service-account activation**, not legal consent to all processing. Any optional consent purposes require separate controls. Full deletion and recovery-key functionality are **deferred from the simplified release**, pending a separate scope decision; preserve those ideas as future design notes.
+
+### Account deletion and optional recovery — future scope (not part of simplified core)
+
+**Future deletion design only; do not implement from this section in the streamlined SDDW 004 release.** Deactivation and deletion have different data effects. Deactivation preserves the full profile and blocks participation pending renewed agreement. Deletion clears PII and may retain historical participation with optional key-based recovery.
 
 - **Initial agreement:** Require an unchecked Terms of Use and Privacy Policy acceptance checkbox on the initial profile form, with links to both documents. Save the accepted versions and acceptance timestamp. Distinguish agreement to terms from separate optional processing consent, where applicable.
 - **Deactivate account:** preserve the verified email, first/last names, date of birth, stable user ID, and historical signups. Mark the account inactive and clear its **current participation agreement** flag. Preserve historical records of earlier agreement; do not erase or falsify them. Restrict sessions and participation until the returning user verifies the same email and affirmatively accepts the current terms/privacy notice again. No redundant reentry of names/date of birth unless missing. Reevaluate staging eligibility and administrator status.
