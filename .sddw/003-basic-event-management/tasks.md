@@ -28,6 +28,7 @@ References: [requirements.md](requirements.md) (approved); [design.md](design.md
 - [x] Use Temporal/polyfill to convert event-local times to unambiguous UTC instants, reject DST gaps and overlaps with field-level HTTP 422 errors, allow overnight events, reject end <= start.
 - [x] Add server-side admin-only `POST /api/admin/events`, `PUT /api/admin/events/:id`, and `DELETE /api/admin/events/:id` (soft deletion). Reuse SDDW 002 session/allowlist and same-origin CSRF protections; never rely on hidden UI controls for authorization.
 - [x] Require expected `version` for PUT and DELETE with conditional atomic updates. Perform atomic conditional updates/soft deletes and increment version; return HTTP 409 on stale versions without overwriting the current record. Define missing/deleted IDs and malformed precondition response codes consistently.
+- [x] Correct local datetime regex so valid `YYYY-MM-DDTHH:mm` inputs reach Temporal validation (CI verification pending).
 - [ ] Add API test coverage: authorized CRUD on future and past events, anonymous/unauthorized denial, input bounds, invalid/ambiguous DST times, multi-zone and overnight intervals, missing IDs, 409 conflicts, replayed delete, DB retention after soft deletion, and safe error responses.
 
 **Review checkpoint:** API behavior and concurrency are testable without a UI; never deploy production.
