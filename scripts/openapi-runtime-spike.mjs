@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import YAML from 'yaml';
 import createClient from 'openapi-fetch';
 import Ajv2020 from 'ajv/dist/2020.js';
+import { normalizeLegacyEventCreate } from './normalize-openapi-spike.mjs';
 
 const contract=YAML.parse(readFileSync('openapi/openapi.yaml','utf8'));
 const seen=[];
@@ -54,5 +55,16 @@ const whitespaceOnly = {...acceptedByWorker, title:' ', legacyMetadata:undefined
 delete whitespaceOnly.legacyMetadata;
 assert.equal(validate(whitespaceOnly),true,
   'Schema alone permits whitespace-only title; Worker rejects it after trim');
+const normalized=normalizeLegacyEventCreate(acceptedByWorker);
+assert.deepEqual(normalized,{
+  title:'Test',location:'Park',timezone:'UTC',
+  start:'2026-11-14T09:00',end:'2026-11-14T12:00'
+});
+assert.equal(validate(normalized),true,'Legacy-accepted payload normalizes to contract schema');
+assert.equal(validate(normalizeLegacyEventCreate(whitespaceOnly)),false,
+  'Whitespace-only titles still fail validation after normalization');
+assert.equal(validate(normalizeLegacyEventCreate({...acceptedByWorker,title:' x '.repeat(102)})),false,
+  'Trimmed overlong title must fail validation');
+assert.deepEqual(acceptedByWorker.title,'  Test  ','Compatibility must not mutate caller input');
 assert.equal(create.operationId,'createAdminEvent');
 console.log('Callable OpenAPI client and schema validation spike passed');
