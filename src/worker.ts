@@ -1,7 +1,7 @@
 interface D1Statement { bind(...values: unknown[]): D1Statement; first<T>(): Promise<T | null>; all<T>(): Promise<{ results: T[] }>; run(): Promise<{ meta: { changes: number } }> }
 interface D1Database { prepare(query: string): D1Statement; batch(statements: D1Statement[]): Promise<unknown> }
 import admins from './generated/admins.json';
-import packageJson from '../package.json';
+import policyMetadata from './generated/policy-versions.json';
 import { Temporal } from '@js-temporal/polyfill';
 import { isStagingRegistrationEligible } from './registration-eligibility';
 
@@ -142,12 +142,7 @@ async function sessionSubject(request: Request, env: Env): Promise<Subject | nul
   if (!user || normalize(user.email) !== email) return null;
   return {user,admin:allowed.has(email)};
 }
-const policyVersions = (env: Env) => {
-  const terms = env.REQUIRED_TERMS_VERSION?.trim() || '';
-  const privacy = env.REQUIRED_PRIVACY_VERSION?.trim() || '';
-  if (!terms && !privacy) return {terms:packageJson.version,privacy:packageJson.version};
-  return terms && privacy && terms === packageJson.version && privacy === packageJson.version ? {terms,privacy} : null;
-};
+const policyVersions = (_env: Env) => ({terms:policyMetadata.terms.version,privacy:policyMetadata.privacy.version});
 const profileReady = (u: UserRow) => Boolean(u.first_name && u.last_name && validDob(u.date_of_birth));
 const agreementReady = (u: UserRow, versions: {terms:string;privacy:string}|null) =>
   Boolean(versions && u.terms_accepted_at && u.accepted_terms_version === versions.terms && u.accepted_privacy_version === versions.privacy);
