@@ -44,3 +44,35 @@ test('authenticated admin can open editor and receives unsaved changes guard',as
  }finally{await browser.close()}
 });
 process.on('exit',()=>server.kill());
+
+test('administrator creates an event, then sees its event-local time and repository footer',async()=>{
+ await ready();
+ const browser=await chromium.launch({headless:true});
+ try{
+  const page=await browser.newPage();
+  let records=[];
+  await page.route('**/api/auth/me',route=>route.fulfill({json:{authenticated:true,email:'admin@example.org'}}));
+  await page.route('**/api/admin/dashboard',route=>route.fulfill({json:{ok:true}}));
+  await page.route('**/api/events?view=*',route=>route.fulfill({json:{events:records}}));
+  await page.route('**/api/admin/events',async route=>{
+   const payload=route.request().postDataJSON();
+   assert.equal(payload.title,'Beach clean-up');
+   assert.equal(payload.timezone,'America/Los_Angeles');
+   records=[{id:'event-1',title:payload.title,location:payload.location,timezone:payload.timezone,start_at:Date.parse('2026-11-15T17:00:00Z'),end_at:Date.parse('2026-11-15T19:00:00Z'),version:1}];
+   await route.fulfill({status:201,json:{event:records[0]}});
+  });
+  await page.goto(base);
+  await page.getByRole('button',{name:'Add Event'}).click();
+  await page.getByRole('textbox',{name:'Title'}).fill('Beach clean-up');
+  await page.getByRole('textbox',{name:'Location'}).fill('Ocean Beach');
+  await page.getByLabel('Start date and time').fill('2026-11-15T09:00');
+  await page.getByLabel('End date and time').fill('2026-11-15T11:00');
+  await page.getByRole('button',{name:'Save'}).click();
+  await page.getByRole('heading',{name:'Beach clean-up'}).waitFor();
+  await page.getByText('Ocean Beach',{exact:false}).waitFor();
+  await page.getByText('Pacific Standard Time',{exact:false}).count();
+  const repoLink=page.getByRole('link',{name:'Serve With GitHub repository'});
+  assert.equal(await repoLink.getAttribute('href'),'https://github.com/SFFilAmLions/serve-with');
+  await page.getByText('Development build').waitFor();
+ }finally{await browser.close()}
+});
