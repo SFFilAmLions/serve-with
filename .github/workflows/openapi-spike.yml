@@ -1,0 +1,30 @@
+name: OpenAPI generator spike
+on:
+  pull_request:
+    paths:
+      - 'openapi/**'
+      - '.github/workflows/openapi-spike.yml'
+      - 'scripts/validate-openapi.mjs'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  client-types:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install
+      - name: Validate YAML structure
+        run: node scripts/validate-openapi.mjs
+      - name: Generate TypeScript operation types from authoritative YAML
+        run: npx --yes --package=openapi-typescript@7.13.0 openapi-typescript openapi/openapi.yaml -o /tmp/serve-with-api-types.d.ts
+      - name: Verify generated operations exist
+        run: |
+          test -s /tmp/serve-with-api-types.d.ts
+          grep -F '"/api/events/{id}"' /tmp/serve-with-api-types.d.ts
+          grep -F '"/api/admin/events"' /tmp/serve-with-api-types.d.ts
+          grep -F 'createAdminEvent' /tmp/serve-with-api-types.d.ts
