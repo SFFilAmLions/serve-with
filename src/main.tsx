@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { AppBar, Box, Button, Card, CardContent, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Alert, Autocomplete, Snackbar, Container, CssBaseline, Stack, Tab, Tabs, TextField, ThemeProvider, Typography, createTheme, useMediaQuery } from '@mui/material';
+import { AppBar, Box, Button, Card, CardContent, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Alert, Autocomplete, Snackbar, Container, CssBaseline, Stack, Tab, Tabs, TextField, ThemeProvider, Typography, useMediaQuery } from '@mui/material';
 import './style.css';
+import { createClubTheme } from './theme';
 import { type Draft, timeZones, validateDraft, emptyDraft, localInput } from './event-form';
 
 type EventRecord = { id:string; title:string; location:string; timezone:string; start_at:number; end_at:number; version:number };
@@ -114,7 +115,7 @@ function SignIn({onAuthChange}:{onAuthChange:(value:boolean)=>void}){
 function App(){
  const [admin,setAdmin]=useState(false);
  const dark=useMediaQuery('(prefers-color-scheme: dark)');
- const theme=React.useMemo(()=>createTheme({palette:{mode:dark?'dark':'light',primary:{main:dark?'#f1c232':'#705400'}},shape:{borderRadius:16}}),[dark]);
+ const theme=React.useMemo(()=>createClubTheme(dark?'dark':'light'),[dark]);
  return <ThemeProvider theme={theme}><CssBaseline/><AppBar position="static" color="default" elevation={0}><Container><Typography variant="h6" sx={{py:2}}>Serve With SF Fil-Am Lions</Typography></Container></AppBar><Container maxWidth="md" component="main"><Typography variant="h3" component="h1" sx={{mt:5}}>Serve With SF Fil-Am Lions</Typography><Typography color="text.secondary">Making it easier to serve together.</Typography><EventList admin={admin}/><SignIn onAuthChange={setAdmin}/><BuildFooter/></Container></ThemeProvider>
 }
 createRoot(document.getElementById('app')!).render(<App/>);
