@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { AppBar, Box, Button, Card, CardContent, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Alert, Autocomplete, Container, CssBaseline, Stack, Tab, Tabs, TextField, ThemeProvider, Typography, createTheme, useMediaQuery } from '@mui/material';
+import { AppBar, Box, Button, Card, CardContent, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Alert, Autocomplete, Snackbar, Container, CssBaseline, Stack, Tab, Tabs, TextField, ThemeProvider, Typography, createTheme, useMediaQuery } from '@mui/material';
 import './style.css';
 
 type EventRecord = { id:string; title:string; location:string; timezone:string; start_at:number; end_at:number; version:number };
@@ -52,7 +52,7 @@ function Editor({event,onClose,onSaved}:{event:EventRecord|null;onClose:()=>void
  const [form,setForm]=useState<Draft>(original),[saving,setSaving]=useState(false),[errors,setErrors]=useState<Record<string,string>>({}),[message,setMessage]=useState(''),[discard,setDiscard]=useState(false),[conflict,setConflict]=useState(false),[reloadConfirm,setReloadConfirm]=useState(false);
  const changed=JSON.stringify(form)!==JSON.stringify(original);
  const close=()=>{if(saving)return;if(changed)setDiscard(true);else onClose()};
- const set=(key:keyof Draft,value:string)=>setForm(previous=>({...previous,[key]:value}));
+ const set=(key:keyof Draft,value:string)=>{setForm(previous=>({...previous,[key]:value}));setErrors(previous=>({...previous,[key]:''}));};
  const save=async()=>{if(saving)return;const validation=validateDraft(form);if(Object.keys(validation).length){setErrors(validation);setMessage('Correct the highlighted fields before saving');return;}setSaving(true);setErrors({});setMessage('');
   try{
    const response=await fetch(event?'/api/admin/events/'+encodeURIComponent(event.id):'/api/admin/events',{
@@ -87,11 +87,11 @@ function Editor({event,onClose,onSaved}:{event:EventRecord|null;onClose:()=>void
 }
 function EventList({admin}:{admin:boolean}){
  const [view,setView]=useState<View>('upcoming'),[events,setEvents]=useState<EventRecord[]>([]),[loading,setLoading]=useState(true),[error,setError]=useState(''),[revision,reload]=useState(0);
- const [editor,setEditor]=useState<{open:boolean;event:EventRecord|null}>({open:false,event:null}),[toDelete,setToDelete]=useState<EventRecord|null>(null),[deleting,setDeleting]=useState(false),[deleteError,setDeleteError]=useState('');
+ const [editor,setEditor]=useState<{open:boolean;event:EventRecord|null}>({open:false,event:null}),[toDelete,setToDelete]=useState<EventRecord|null>(null),[deleting,setDeleting]=useState(false),[deleteError,setDeleteError]=useState(''),[notice,setNotice]=useState('');
  const remove=async()=>{if(!toDelete||deleting)return;setDeleting(true);setDeleteError('');
   try{const response=await fetch('/api/admin/events/'+encodeURIComponent(toDelete.id),{method:'DELETE',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify({version:toDelete.version})});
    if(!response.ok){setDeleteError(response.status===409?'This event was changed by another administrator. Refresh the list.':'Unable to delete event');return;}
-   setToDelete(null);reload(n=>n+1);
+   setToDelete(null);setNotice('Event deleted');reload(n=>n+1);
   }catch{setDeleteError('Could not reach the server')}finally{setDeleting(false)}
  };
  useEffect(()=>{let active=true;setLoading(true);setError('');fetch('/api/events?view='+view,{cache:'no-store'}).then(async r=>{if(!r.ok)throw Error('Unable to load events');return r.json()}).then(d=>{if(active)setEvents(d.events)}).catch(e=>{if(active)setError(String(e.message))}).finally(()=>{if(active)setLoading(false)});return()=>{active=false}},[view,revision]);
@@ -101,7 +101,8 @@ function EventList({admin}:{admin:boolean}){
   <Tabs value={view} onChange={(_,v:View)=>setView(v)} aria-label="Event timeline"><Tab label="Upcoming Events" value="upcoming"/><Tab label="Past Events" value="past"/></Tabs>
   {loading?<Box sx={{p:4}} role="status"><CircularProgress aria-label="Loading events"/></Box>:error?<Stack sx={{p:3}} spacing={2}><Typography role="alert">{error}</Typography><Button onClick={()=>reload(n=>n+1)}>Retry</Button></Stack>:events.length===0?<Box sx={{p:4}}><Typography variant="h6">{view==='upcoming'?'No upcoming events':'No past events yet.'}</Typography>{view==='upcoming'&&<Typography>Check back soon for new opportunities to serve.</Typography>}</Box>:
   <Stack spacing={2} sx={{pt:3}}>{events.map(e=><Card key={e.id} variant="outlined"><CardContent><Typography variant="h6">{e.title}</Typography><Typography sx={{mt:1}}>{local(e.start_at,e.timezone)} – {local(e.end_at,e.timezone)}</Typography><Typography color="text.secondary">{e.timezone}</Typography><Typography sx={{mt:1}}>Location: {e.location}</Typography>{admin&&<Stack direction="row" spacing={1} sx={{mt:2}}><Button onClick={()=>setEditor({open:true,event:e})}>Edit</Button><Button color="error" onClick={()=>{setToDelete(e);setDeleteError('')}}>Delete</Button></Stack>}</CardContent></Card>)}</Stack>}
- {editor.open&&<Editor key={editor.event?.id||'new'} event={editor.event} onClose={()=>setEditor({open:false,event:null})} onSaved={()=>{setEditor({open:false,event:null});reload(n=>n+1)}}/>}
+ {editor.open&&<Editor key={editor.event?.id||'new'} event={editor.event} onClose={()=>setEditor({open:false,event:null})} onSaved={()=>{setNotice(editor.event?'Event updated':'Event created');setEditor({open:false,event:null});reload(n=>n+1)}}/>}
+ <Snackbar open={!!notice} autoHideDuration={4500} onClose={()=>setNotice('')} anchorOrigin={{vertical:'bottom',horizontal:'center'}}><Alert severity="success" onClose={()=>setNotice('')}>{notice}</Alert></Snackbar>
  <Dialog open={!!toDelete} onClose={()=>{if(!deleting)setToDelete(null)}} aria-labelledby="delete-event-title"><DialogTitle id="delete-event-title">Delete {toDelete?.title}?</DialogTitle><DialogContent>{deleteError&&<Alert severity="error">{deleteError}</Alert>}This removes the event from public listings.</DialogContent><DialogActions><Button disabled={deleting} onClick={()=>setToDelete(null)}>Cancel</Button><Button color="error" loading={deleting} onClick={()=>void remove()}>Delete event</Button></DialogActions></Dialog>
  </Box>
 }
