@@ -70,7 +70,13 @@ components:
         start:
           type: string
           description: Local start time in YYYY-MM-DDTHH:mm format
-          pattern: '^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}      type: object
+          pattern: '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$'
+        end:
+          type: string
+          description: Local end time in YYYY-MM-DDTHH:mm format
+          pattern: '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$'
+    EventDetail:
+      type: object
       required: [event]
       properties:
         event:
