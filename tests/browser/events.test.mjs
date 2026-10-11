@@ -269,3 +269,25 @@ test('single-use magic-link confirmation uses POST and scrubs browser URL',async
   assert.equal(magicPosts,1);
  }finally{await browser.close()}
 });
+
+test('editor retains draft values and shows server field errors on 422',async()=>{
+ await ready();
+ const browser=await chromium.launch({headless:true});
+ try{
+  const page=await browser.newPage();
+  await page.route('**/api/auth/me',r=>r.fulfill({json:{authenticated:true,email:'admin@example.org'}}));
+  await page.route('**/api/admin/dashboard',r=>r.fulfill({json:{ok:true}}));
+  await page.route('**/api/events?view=*',r=>r.fulfill({json:{events:[]}}));
+  await page.route('**/api/admin/events',r=>r.fulfill({status:422,json:{error:'Invalid event',fields:{start:'Invalid or ambiguous local time for this time zone'}}}));
+  await page.goto(base);
+  await page.getByRole('button',{name:'Add Event'}).click();
+  await page.getByRole('textbox',{name:'Title'}).fill('Save draft');
+  await page.getByRole('textbox',{name:'Location'}).fill('Main hall');
+  await page.getByLabel('Start date and time').fill('2026-11-15T09:00');
+  await page.getByLabel('End date and time').fill('2026-11-15T11:00');
+  await page.getByRole('button',{name:'Save'}).click();
+  await page.getByText('Invalid or ambiguous local time for this time zone').waitFor();
+  assert.equal(await page.getByRole('textbox',{name:'Title'}).inputValue(),'Save draft');
+  assert.equal(await page.getByRole('dialog',{name:'Add Event'}).count(),1);
+ }finally{await browser.close()}
+});
