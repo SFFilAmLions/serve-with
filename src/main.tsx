@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { AppBar, Box, Button, Card, CardContent, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Alert, Autocomplete, Snackbar, Container, CssBaseline, Stack, Tab, Tabs, TextField, ThemeProvider, Typography, createTheme, useMediaQuery } from '@mui/material';
 import './style.css';
+import { type Draft, timeZones, validateDraft, emptyDraft, localInput } from './event-form';
 
 type EventRecord = { id:string; title:string; location:string; timezone:string; start_at:number; end_at:number; version:number };
 type View = 'upcoming'|'past';
@@ -25,27 +26,6 @@ if (magic) history.replaceState(null,'',location.pathname);
 const api = async (path:string,body?:Record<string,string>) => {
  const r=await fetch('/api/auth/'+path,{method:body?'POST':'GET',headers:body?{'content-type':'application/json'}:{},body:body?JSON.stringify(body):undefined,credentials:'same-origin',cache:'no-store'});
  const data=await r.json();if(!r.ok)throw new Error(data.error||'Request failed');return data;
-};
-type Draft = {title:string;location:string;timezone:string;start:string;end:string};
-const timeZones = (() => {
- const zones = typeof Intl.supportedValuesOf === 'function' ? Intl.supportedValuesOf('timeZone') : ['America/Los_Angeles','America/New_York','America/Chicago','America/Denver','UTC'];
- return Array.from(new Set(['America/Los_Angeles','UTC',...zones])).sort();
-})();
-const validateDraft = (draft:Draft):Record<string,string> => {
- const errors:Record<string,string>={};
- if(!draft.title.trim()||draft.title.trim().length>200)errors.title='Enter a title (1–200 characters)';
- if(!draft.location.trim()||draft.location.trim().length>500)errors.location='Enter a location (1–500 characters)';
- if(!timeZones.includes(draft.timezone))errors.timezone='Choose a valid time zone';
- if(!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(draft.start))errors.start='Enter a start date and time';
- if(!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(draft.end))errors.end='Enter an end date and time';
- if(!errors.start&&!errors.end&&draft.end<=draft.start)errors.end='End must be after start';
- return errors;
-};
-const emptyDraft = ():Draft => ({title:'',location:'',timezone:'America/Los_Angeles',start:'',end:''});
-const localInput = (timestamp:number,zone:string) => {
- const parts = new Intl.DateTimeFormat('en-US',{timeZone:zone,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(new Date(timestamp));
- const part=(key:string)=>parts.find(p=>p.type===key)?.value || '';
- return `${part('year')}-${part('month')}-${part('day')}T${part('hour')}:${part('minute')}`;
 };
 function Editor({event,onClose,onSaved}:{event:EventRecord|null;onClose:()=>void;onSaved:()=>void}){
  const original=React.useMemo<Draft>(()=>event?{title:event.title,location:event.location,timezone:event.timezone,start:localInput(event.start_at,event.timezone),end:localInput(event.end_at,event.timezone)}:emptyDraft(),[event]);
