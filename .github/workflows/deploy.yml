@@ -18,7 +18,10 @@ jobs:
         with:
           node-version: '22'
       - run: npm install
-      - name: Build with commit identifier\n        env:\n          VITE_COMMIT_SHA: ${{ github.sha }}\n        run: npm run build
+      - name: Build with commit identifier
+        env:
+          VITE_COMMIT_SHA: ${{ github.sha }}
+        run: npm run build
       - name: Deploy staging Worker
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
