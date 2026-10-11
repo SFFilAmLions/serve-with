@@ -36,7 +36,7 @@ Enable authenticated attendees to sign up for events, withdraw, and review their
 
 ## Administrator experience
 1. Authorized administrators can see the current roster and count for each event, and examine historical withdrawn records, with timestamps.
-2. They can add an existing attendee by selecting/searching a user, or withdraw an active attendee on that user's behalf. They cannot create an unverified account through the roster.
+2. They can add an existing attendee by selecting/searching a user, or withdraw an active attendee on that user's behalf. They may create an unclaimed stub via the separate admin Create User page and return to select it for signup; no implicit user creation occurs from roster search or signup submission.
 3. Admin actions enforce the same one-active-signup rule, eligibility, event-start cutoff (including withdrawal cutoff) and capacity checks; admin authority is verified server-side.
 4. Distinguish who made a change if technically feasible, but adding actor/audit columns beyond the agreed minimal model requires separate scope approval.
 5. Existing event Create/Edit/Duplicate/Delete flows remain intact. Optional capacity is an additive event field. An editor must not lower capacity below the number of active signups without an explicit, agreed resolution rule (default: reject the change).
@@ -147,4 +147,4 @@ This is a cross-cutting UI refinement implemented in the same batch as event sig
 - How should My signups organize historical withdrawn vs past active entries? Proposed default: separate history filter.
 - Should an admin roster include the author of an action? Not captured in the agreed five-column model; only introduce this if explicitly approved.
 
-**Next:** Prepare `design.md` and `tasks.md` for approval. Do not implement database migrations or app changes as part of this specification PR.
+**Next:** Review the proposed `design.md` and `tasks.md`, beginning with the OpenAPI generation and D1 concurrency proof-of-concept gates. Do not implement database migrations or app changes as part of this specification PR.
