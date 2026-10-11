@@ -1,6 +1,6 @@
 # Tasks — SDDW 003 Basic Event Management
 
-**Status: Implementation authorized on PR #6. Slice 1 committed for CI review; remaining tasks pending.**
+**Status: Slices 1–2 implemented in PR #6; API coverage is expanding. React frontend and staging acceptance remain pending.**
 
 References: [requirements.md](requirements.md) (approved); [design.md](design.md) (approved by user on 2026-10-10). Target is **Serve With SF Fil-Am Lions**. Retain the existing Vite / Cloudflare Workers / D1 architecture, with React + MUI and a Material 3-inspired theme.
 
@@ -29,7 +29,8 @@ References: [requirements.md](requirements.md) (approved); [design.md](design.md
 - [x] Add server-side admin-only `POST /api/admin/events`, `PUT /api/admin/events/:id`, and `DELETE /api/admin/events/:id` (soft deletion). Reuse SDDW 002 session/allowlist and same-origin CSRF protections; never rely on hidden UI controls for authorization.
 - [x] Require expected `version` for PUT and DELETE with conditional atomic updates. Perform atomic conditional updates/soft deletes and increment version; return HTTP 409 on stale versions without overwriting the current record. Define missing/deleted IDs and malformed precondition response codes consistently.
 - [x] Correct local datetime regex so valid `YYYY-MM-DDTHH:mm` inputs reach Temporal validation (verified by GitHub CI).
-- [ ] Add API test coverage: authorized CRUD on future and past events, anonymous/unauthorized denial, input bounds, invalid/ambiguous DST times, multi-zone and overnight intervals, missing IDs, 409 conflicts, replayed delete, DB retention after soft deletion, and safe error responses.
+- [x] Add additional API tests for time zones, overnight events, event input bounds, missing records and version preconditions (CI passed for initial additions).
+- [ ] Complete API test coverage: authorized CRUD on future and past events, anonymous/unauthorized denial, input bounds, invalid/ambiguous DST times, multi-zone and overnight intervals, missing IDs, 409 conflicts, replayed delete, DB retention after soft deletion, and safe error responses.
 
 **Review checkpoint:** API behavior and concurrency are testable without a UI; never deploy production.
 
