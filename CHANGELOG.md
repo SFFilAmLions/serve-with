@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/SFFilAmLions/serve-with/compare/v0.2.0...v0.3.0) (2026-10-11)
+
+
+### Features
+
+* SDDW 003 event management UI and magic-link sign-in fix ([#6](https://github.com/SFFilAmLions/serve-with/issues/6)) ([90e10f9](https://github.com/SFFilAmLions/serve-with/commit/90e10f9b265bd4bd5a2214ef078fb831d79e4e26))
+
 ## [0.2.0](https://github.com/SFFilAmLions/serve-with/compare/v0.1.0...v0.2.0) (2026-10-11)
 
 
