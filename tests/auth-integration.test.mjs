@@ -1,0 +1,105 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { DatabaseSync } from 'node:sqlite';
+import ts from 'typescript';
+
+const source = readFileSync('src/worker.ts', 'utf8')
+  .replace("import admins from './generated/admins.json';", "const admins = [{email:'lionaugust@icloud.com',enabled:true},{email:'lsvalera58@gmail.com',enabled:true}];");
+const compiled = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText;
+const worker = (await import('data:text/javascript;base64,' + Buffer.from(compiled).toString('base64'))).default;
+function database() {
+  const sqlite = new DatabaseSync(':memory:');
+  sqlite.exec(readFileSync('migrations/0001_auth.sql','utf8'));
+  sqlite.exec(readFileSync('migrations/0002_auth_rate_limits.sql','utf8'));
+  const adapter = { prepare(sql) { const stmt = sqlite.prepare(sql); return {
+    bind(...params) { return { first: async () => stmt.get(...params) || null,
+      run: async () => { const result = stmt.run(...params); return { meta: { changes: Number(result.changes) } }; }
+    }; }
+  }; }};
+  return { sqlite, adapter };
+}
+function harness() {
+  const { sqlite, adapter } = database();
+  const env = { AUTH_DB: adapter, AUTH_PEPPER: 'test-secret-not-for-production',
+    RESEND_API_KEY:'fake',AUTH_FROM_EMAIL:'login@notify.sffilamlions.org',
+    ASSETS:{fetch: async () => new Response('asset')} };
+  const sent = [];
+  const previousFetch = globalThis.fetch;
+  globalThis.fetch = async (_url,options) => {
+    const body = JSON.parse(options.body);
+    sent.push(body);
+    return new Response('{}',{status:200});
+  };
+  const req = (path,body,opts={}) => worker.fetch(new Request('https://servewith-beta.sffilamlions.org'+path,{
+    method:body ? 'POST':'GET', headers: {'origin':'https://servewith-beta.sffilamlions.org',
+      'content-type':'application/json','CF-Connecting-IP':opts.ip || '192.0.2.1', ...(opts.cookie ? {cookie:opts.cookie}:{}) },
+    ...(body ? {body:JSON.stringify(body)}:{}) }),env);
+  const close = () => { globalThis.fetch=previousFetch;sqlite.close(); };
+  return {req,sent,sqlite,close};
+}
+function credentials(mail) {
+  const code = mail.text.match(/one-time code is (\d{8})/)[1];
+  const token = new URL(mail.text.match(/https:\/\/[^\s]+/)[0]).searchParams.get('magic');
+  return {code,token};
+}
+test('OTP signs in, creates secure session, protects dashboard and revokes on logout', async () => {
+  const h = harness();
+  try {
+    assert.equal((await h.req('/api/admin/dashboard')).status,401);
+    assert.equal((await h.req('/api/auth/request',{email:'LionAugust@icloud.com'})).status,200);
+    assert.equal(h.sent.length,1);
+    const {code} = credentials(h.sent[0]);
+    const login = await h.req('/api/auth/verify',{email:'lionaugust@icloud.com',code});
+    assert.equal(login.status,200);
+    const cookie = login.headers.get('set-cookie');
+    assert.match(cookie,/__Host-sw_session=.*HttpOnly; Secure; SameSite=Strict/);
+    assert.equal((await h.req('/api/admin/dashboard',undefined,{cookie})).status,200);
+    assert.equal((await h.req('/api/auth/me',undefined,{cookie})).status,200);
+    assert.equal((await h.req('/api/auth/verify',{email:'lionaugust@icloud.com',code})).status,400);
+    assert.equal((await h.req('/api/auth/logout',{}, {cookie})).status,200);
+    assert.equal((await h.req('/api/admin/dashboard',undefined,{cookie})).status,401);
+  } finally {h.close();}
+});
+test('magic link requires POST and is single-use, even after OTP is consumed',async () => {
+  const h=harness();
+  try {
+    await h.req('/api/auth/request',{email:'LSValera58@gmail.com'});
+    const {token}=credentials(h.sent[0]);
+    assert.equal((await h.req('/api/auth/magic')).status,400);
+    assert.equal((await h.req('/api/auth/magic',{email:'lsvalera58@gmail.com',token})).status,200);
+    assert.equal((await h.req('/api/auth/magic',{email:'lsvalera58@gmail.com',token})).status,400);
+  }finally{h.close();}
+});
+test('unauthorized accounts get indistinguishable response and no email',async () => {
+  const h=harness();
+  try {
+    const result=await h.req('/api/auth/request',{email:'notadmin@example.com'});
+    assert.equal(result.status,200);
+    assert.equal(h.sent.length,0);
+    assert.equal((await h.req('/api/auth/magic',{email:'notadmin@example.com',token:'a'.repeat(64)})).status,400);
+  }finally{h.close();}
+});
+test('expired token fails; repeated incorrect guesses exhaust challenge',async () => {
+  const h=harness();
+  try {
+    await h.req('/api/auth/request',{email:'lionaugust@icloud.com'});
+    const {code,token}=credentials(h.sent[0]);
+    h.sqlite.prepare('UPDATE login_challenges SET expires_at=0').run();
+    assert.equal((await h.req('/api/auth/verify',{email:'lionaugust@icloud.com',code})).status,400);
+    await h.req('/api/auth/request',{email:'lionaugust@icloud.com'});
+    const fresh=credentials(h.sent.at(-1));
+    for(let i=0;i<5;i++) assert.equal((await h.req('/api/auth/verify',{email:'lionaugust@icloud.com',code:'00000000'})).status,400);
+    assert.equal((await h.req('/api/auth/magic',{email:'lionaugust@icloud.com',token:fresh.token})).status,400);
+    assert.equal((await h.req('/api/auth/magic',{email:'lionaugust@icloud.com',token})).status,400);
+  }finally{h.close();}
+});
+test('per-IP and per-account throttling prevents email floods',async () => {
+  const h=harness();
+  try {
+    for(let i=0;i<5;i++) await h.req('/api/auth/request',{email:'lionaugust@icloud.com'});
+    assert.equal(h.sent.length,3);
+    for(let i=0;i<20;i++) await h.req('/api/auth/request',{email:'lsvalera58@gmail.com'});
+    assert.ok(h.sent.length<=6);
+  }finally{h.close();}
+});

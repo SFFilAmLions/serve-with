@@ -40,4 +40,11 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           test -n "$CLOUDFLARE_API_TOKEN" && test -n "$CLOUDFLARE_ACCOUNT_ID" || { echo "::error::Missing Cloudflare secrets"; exit 1; }
-          npx wrangler deploy --name serve-with
+          # Require explicit production D1 configuration in the approved release.
+          # Staging and production use independent databases and migration histories.
+          if ! grep -q '"production"' wrangler.jsonc; then
+            echo "::error::Production D1 binding is not configured in this release. Refusing deployment."
+            exit 1
+          fi
+          npx wrangler d1 migrations apply serve-with-prod-db --env production --remote
+          npx wrangler deploy --env production

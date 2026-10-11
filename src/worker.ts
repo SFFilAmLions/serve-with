@@ -12,11 +12,11 @@ interface Env {
 
 const allowed = new Set(admins.filter(a => a.enabled).map(a => a.email));
 const encoder = new TextEncoder();
-const json = (body: unknown, status = 200, headers?: HeadersInit) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', ...headers } });
+const json = (body: unknown, status = 200, headers?: HeadersInit) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', 'referrer-policy': 'no-referrer', 'x-content-type-options': 'nosniff', ...headers } });
 const normalize = (email: unknown) => typeof email === 'string' ? email.trim().toLowerCase() : '';
 const random = (bytes = 32) => Array.from(crypto.getRandomValues(new Uint8Array(bytes)), n => n.toString(16).padStart(2, '0')).join('');
 const digest = async (value: string, pepper: string) => Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', encoder.encode(pepper + ':' + value))), n => n.toString(16).padStart(2, '0')).join('');
-const cookie = (value: string, age: number) => `sw_session=${value}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=${age}`;
+const cookie = (value: string, age: number) => `__Host-sw_session=${value}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=${age}`;
 const originOk = (request: Request) => request.headers.get('origin') === new URL(request.url).origin;
 const error = () => json({ error: 'Unable to complete request' }, 400);
 const WINDOW = 10 * 60 * 1000;
@@ -53,7 +53,7 @@ async function sendEmail(env: Env, email: string, code: string, link: string): P
 }
 
 async function sessionEmail(request: Request, env: Env): Promise<string | null> {
-  const match = request.headers.get('cookie')?.match(/(?:^|;\s*)sw_session=([a-f0-9]{64})(?:;|$)/);
+  const match = request.headers.get('cookie')?.match(/(?:^|;\s*)__Host-sw_session=([a-f0-9]{64})(?:;|$)/);
   if (!match || !env.AUTH_DB || !env.AUTH_PEPPER) return null;
   const hash = await digest(match[1], env.AUTH_PEPPER);
   const row = await env.AUTH_DB.prepare('SELECT email FROM sessions WHERE token_hash=? AND expires_at>?').bind(hash, Date.now()).first<{ email: string }>();
@@ -71,14 +71,20 @@ export default {
       if (request.method === 'GET' && path === '/api/admin/dashboard') return json({ email, message: 'Admin dashboard ready' });
       return json({ error: 'Not found' }, 404);
     }
-    if (!path.startsWith('/api/auth/')) return env.ASSETS.fetch(request);
+    if (!path.startsWith('/api/auth/')) {
+      const response = await env.ASSETS.fetch(request);
+      const headers = new Headers(response.headers);
+      headers.set('Referrer-Policy', 'no-referrer');
+      headers.set('X-Content-Type-Options', 'nosniff');
+      return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+    }
     if (!env.AUTH_DB || !env.AUTH_PEPPER || !env.RESEND_API_KEY || !env.AUTH_FROM_EMAIL) return json({ error: 'Sign-in is not configured' }, 503);
     const db = env.AUTH_DB;
     if (request.method === 'GET' && path === '/api/auth/me') {
       const email = await sessionEmail(request, env);
       return json({ authenticated: Boolean(email), email });
     }
-    if (request.method !== 'POST' || !originOk(request)) return error();
+    if (request.method !== 'POST' || !originOk(request) || request.headers.get('sec-fetch-site') === 'cross-site') return error();
     try {
       const body = await bodyOf(request);
       if (path === '/api/auth/request') {
@@ -131,7 +137,7 @@ export default {
         return json({ authenticated: true },200,{'set-cookie':cookie(session,604800)});
       }
       if (path === '/api/auth/logout') {
-        const match = request.headers.get('cookie')?.match(/(?:^|;\s*)sw_session=([a-f0-9]{64})(?:;|$)/);
+        const match = request.headers.get('cookie')?.match(/(?:^|;\s*)__Host-sw_session=([a-f0-9]{64})(?:;|$)/);
         if (match) await db.prepare('DELETE FROM sessions WHERE token_hash=?').bind(await digest(match[1],env.AUTH_PEPPER)).run();
         return json({ authenticated: false },200,{'set-cookie':cookie('',0)});
       }

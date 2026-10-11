@@ -5,6 +5,8 @@ if (!app) throw new Error('App root is missing');
 
 const escaped = (text: string) => text.replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' })[c] || c);
 const magic = new URL(location.href).searchParams.get('magic');
+// Prevent leaking the magic-link token through browser history or referrer headers.
+if (magic) history.replaceState(null, '', location.pathname);
 
 async function request(path: string, payload?: Record<string,string>) {
   const response = await fetch('/api/auth/' + path, { method: payload ? 'POST' : 'GET', headers: payload ? { 'content-type': 'application/json' } : {}, body: payload ? JSON.stringify(payload) : undefined, credentials: 'same-origin' });
