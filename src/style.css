@@ -1,1 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Alata&family=Ubuntu:ital,wght@0,400;0,700;1,400&family=Ubuntu+Condensed&display=swap');
 *{box-sizing:border-box}html,body,#app{min-height:100%;margin:0}body{margin:0}#app{min-height:100vh}code{overflow-wrap:anywhere}@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+:focus-visible{outline:3px solid #A47A00;outline-offset:3px}
+@media(prefers-color-scheme:dark){:focus-visible{outline-color:#F1C232}}
