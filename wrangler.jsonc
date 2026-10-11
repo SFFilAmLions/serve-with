@@ -15,7 +15,10 @@
           "database_name": "serve-with-prod-db",
           "database_id": "d3855bcb-bdc3-4bd2-a0a5-b1fc5d7cdca6"
         }
-      ]
+      ],
+      "vars": {
+        "ENVIRONMENT": "production"
+      }
     },
     "staging": {
       "name": "serve-with-staging",
@@ -25,7 +28,10 @@
           "database_name": "serve-with-staging-db",
           "database_id": "97a54923-d1b5-4f55-bc33-0787c63cd1a1"
         }
-      ]
+      ],
+      "vars": {
+        "ENVIRONMENT": "staging"
+      }
     }
   }
 }
