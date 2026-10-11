@@ -16,6 +16,10 @@ function harness() {
   sqlite.exec(readFileSync('migrations/0001_auth.sql','utf8'));
   sqlite.exec(readFileSync('migrations/0003_events.sql','utf8'));
   sqlite.exec(readFileSync('migrations/0004_users_and_agreements.sql','utf8'));
+  const versionTerms='test-terms', versionPrivacy='test-privacy';
+  // Event regressions retain an already-completed authorized administrator session.
+  sqlite.prepare('INSERT INTO users(id,email,first_name,last_name,date_of_birth,email_verified_at,created_at,updated_at,terms_accepted_at,accepted_terms_version,accepted_privacy_version) VALUES(?,?,?,?,?,?,?,?,?,?,?)')
+    .run('11111111-1111-4111-8111-111111111111','lionaugust@icloud.com','Admin','Example','1990-01-01',1,1,1,1,versionTerms,versionPrivacy);
   const adapter = { prepare(sql) { const statement = sqlite.prepare(sql); return {
     bind(...args) { return {
       all: async () => ({ results: statement.all(...args) }),
@@ -27,7 +31,7 @@ function harness() {
     method, headers:{ origin:'https://servewith-beta.sffilamlions.org', 'content-type':'application/json', ...(cookie ? {cookie}:{}) },
     ...(body ? {body:JSON.stringify(body)}:{})
   }),{
-    AUTH_DB:adapter, AUTH_PEPPER:'test', ASSETS:{fetch:async()=>new Response('asset')}
+    AUTH_DB:adapter, AUTH_PEPPER:'test', REQUIRED_TERMS_VERSION:versionTerms, REQUIRED_PRIVACY_VERSION:versionPrivacy, ASSETS:{fetch:async()=>new Response('asset')}
   });
   const insert = (id,start,end,deleted=null) => sqlite.prepare(
     'INSERT INTO events (id,title,location,timezone,start_at,end_at,created_at,updated_at,deleted_at) VALUES (?,?,?,?,?,?,?,?,?)'

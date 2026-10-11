@@ -1,7 +1,8 @@
 interface D1Statement { bind(...values: unknown[]): D1Statement; first<T>(): Promise<T | null>; all<T>(): Promise<{ results: T[] }>; run(): Promise<{ meta: { changes: number } }> }
-interface D1Database { prepare(query: string): D1Statement }
+interface D1Database { prepare(query: string): D1Statement; batch(statements: D1Statement[]): Promise<unknown> }
 import admins from './generated/admins.json';
 import { Temporal } from '@js-temporal/polyfill';
+import { isStagingRegistrationEligible } from './registration-eligibility';
 
 interface Env {
   ASSETS: { fetch(request: Request): Promise<Response> };
@@ -9,6 +10,10 @@ interface Env {
   AUTH_PEPPER?: string;
   RESEND_API_KEY?: string;
   AUTH_FROM_EMAIL?: string;
+  ENVIRONMENT?: string;
+  STAGING_REGISTRATION_EMAILS?: string;
+  REQUIRED_TERMS_VERSION?: string;
+  REQUIRED_PRIVACY_VERSION?: string;
 }
 
 const allowed = new Set(admins.filter(a => a.enabled).map(a => a.email));
@@ -109,22 +114,49 @@ async function sendEmail(env: Env, email: string, code: string, link: string): P
   return response.ok;
 }
 
-async function sessionEmail(request: Request, env: Env): Promise<string | null> {
-  const match = request.headers.get('cookie')?.match(/(?:^|;\s*)__Host-sw_session=([a-f0-9]{64})(?:;|$)/);
-  if (!match || !env.AUTH_DB || !env.AUTH_PEPPER) return null;
-  const hash = await digest(match[1], env.AUTH_PEPPER);
-  const now = Date.now();
-  const row = await env.AUTH_DB.prepare('SELECT email,user_id FROM sessions WHERE token_hash=? AND expires_at>?')
-    .bind(hash, now).first<{ email: string; user_id: string | null }>();
-  if (!row || !allowed.has(normalize(row.email))) return null;
-  if (!row.user_id) {
-    // A valid legacy session keeps the same cookie, expiry and email.
-    const id = await resolveUser(env.AUTH_DB, row.email, now);
-    await env.AUTH_DB.prepare('UPDATE sessions SET user_id=? WHERE token_hash=? AND user_id IS NULL AND expires_at>?')
-      .bind(id, hash, now).run();
-  }
-  return normalize(row.email);
+type UserRow = {
+  id: string; email: string; first_name: string | null; last_name: string | null;
+  date_of_birth: string | null; email_verified_at: number | null;
+  terms_accepted_at: number | null; accepted_terms_version: string | null; accepted_privacy_version: string | null;
+};
+type Subject = { user: UserRow; admin: boolean };
+const sessionTokenHash = async (request: Request, env: Env): Promise<string | null> => {
+  const match = request.headers.get('cookie')?.match(/(?:^|;\\s*)__Host-sw_session=([a-f0-9]{64})(?:;|$)/);
+  return match && env.AUTH_PEPPER ? digest(match[1], env.AUTH_PEPPER) : null;
+};
+async function sessionSubject(request: Request, env: Env): Promise<Subject | null> {
+  if (!env.AUTH_DB) return null;
+  const hash = await sessionTokenHash(request, env);
+  if (!hash) return null;
+  const now = Date.now(), db = env.AUTH_DB;
+  const session = await db.prepare('SELECT email,user_id FROM sessions WHERE token_hash=? AND expires_at>?')
+    .bind(hash,now).first<{email:string;user_id:string|null}>();
+  if (!session) return null;
+  const email = normalize(session.email);
+  const id = session.user_id || await resolveUser(db,email,now);
+  if (!session.user_id) await db.prepare('UPDATE sessions SET user_id=? WHERE token_hash=? AND user_id IS NULL AND expires_at>?')
+    .bind(id,hash,now).run();
+  const user = await db.prepare('SELECT id,email,first_name,last_name,date_of_birth,email_verified_at,terms_accepted_at,accepted_terms_version,accepted_privacy_version FROM users WHERE id=?')
+    .bind(id).first<UserRow>();
+  if (!user || normalize(user.email) !== email) return null;
+  return {user,admin:allowed.has(email)};
 }
+const policyVersions = (env: Env) => {
+  const terms = env.REQUIRED_TERMS_VERSION?.trim() || '';
+  const privacy = env.REQUIRED_PRIVACY_VERSION?.trim() || '';
+  return terms && privacy && terms.length <= 100 && privacy.length <= 100 ? {terms,privacy} : null;
+};
+const profileReady = (u: UserRow) => Boolean(u.first_name && u.last_name && u.date_of_birth);
+const agreementReady = (u: UserRow, versions: {terms:string;privacy:string}|null) =>
+  Boolean(versions && u.terms_accepted_at && u.accepted_terms_version === versions.terms && u.accepted_privacy_version === versions.privacy);
+const privilegeReady = (subject: Subject, env: Env) => Boolean(subject.user.email_verified_at && profileReady(subject.user) && agreementReady(subject.user,policyVersions(env)));
+const registrationEligible = (email: string, env: Env) => allowed.has(email) || isStagingRegistrationEligible(email,env,allowed);
+const validName = (x: unknown): x is string => typeof x === 'string' && x.trim().length >= 1 && x.trim().length <= 100;
+const validDob = (x: unknown): x is string => {
+  if (typeof x !== 'string' || !/^\\d{4}-\\d{2}-\\d{2}$/.test(x)) return false;
+  try { return Temporal.PlainDate.from(x).toString() === x && x < new Date().toISOString().slice(0,10); }
+  catch { return false; }
+};
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -147,8 +179,11 @@ export default {
     }
     if (path.startsWith('/api/admin/')) {
       if (!env.AUTH_DB || !env.AUTH_PEPPER) return json({ error: 'Service unavailable' }, 503);
-      const email = await sessionEmail(request, env);
-      if (!email) return json({ error: 'Authentication required' }, 401);
+      const subject = await sessionSubject(request, env);
+      if (!subject) return json({ error: 'Authentication required' }, 401);
+      if (!subject.admin) return json({ error: 'Forbidden' }, 403);
+      if (!privilegeReady(subject,env)) return json({ error: 'Profile or current agreement required', code: 'account_completion_required' }, 403);
+      const email = subject.user.email;
       if (request.method === 'GET' && path === '/api/admin/dashboard') return json({ email, message: 'Admin dashboard ready' });
       if (path === '/api/admin/events') {
         if (request.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
@@ -199,21 +234,57 @@ export default {
       headers.set('X-Content-Type-Options', 'nosniff');
       return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
     }
-    if (!env.AUTH_DB || !env.AUTH_PEPPER || !env.RESEND_API_KEY || !env.AUTH_FROM_EMAIL) return json({ error: 'Sign-in is not configured' }, 503);
+    if (!env.AUTH_DB || !env.AUTH_PEPPER) return json({ error: 'Sign-in is not configured' }, 503);
     const db = env.AUTH_DB;
     if (request.method === 'GET' && path === '/api/auth/me') {
-      const email = await sessionEmail(request, env);
-      return json({ authenticated: Boolean(email), email });
+      const subject = await sessionSubject(request, env);
+      if (!subject) return json({ authenticated: false, email: null });
+      const {user,admin} = subject;
+      return json({ authenticated:true, email:user.email, userId:user.id,
+        firstName:user.first_name, lastName:user.last_name, emailVerified:Boolean(user.email_verified_at),
+        profileComplete:profileReady(user), agreementCurrent:agreementReady(user,policyVersions(env)),
+        administratorEligible:admin, privileged:privilegeReady(subject,env) });
     }
     if (request.method !== 'POST' || !originOk(request) || request.headers.get('sec-fetch-site') === 'cross-site') return error();
     try {
       const body = await bodyOf(request);
+      if (path === '/api/auth/profile') {
+        const subject = await sessionSubject(request, env);
+        if (!subject || !subject.user.email_verified_at) return json({ error:'Authentication required' },401);
+        if (!validName(body.firstName) || !validName(body.lastName) || !validDob(body.dateOfBirth))
+          return json({ error:'Invalid profile' },422);
+        const now=Date.now(), u=subject.user;
+        // Initial DOB is write-once here; later admin correction is a separate audited workflow.
+        const result=await db.prepare('UPDATE users SET first_name=?,last_name=?,date_of_birth=?,updated_at=? WHERE id=? AND date_of_birth IS NULL')
+          .bind(body.firstName.trim(),body.lastName.trim(),body.dateOfBirth,now,u.id).run();
+        if (result.meta.changes !== 1) return json({ error:'Profile already initialized' },409);
+        return json({ profileComplete:true });
+      }
+      if (path === '/api/auth/agreements') {
+        const subject=await sessionSubject(request,env);
+        if (!subject || !subject.user.email_verified_at) return json({error:'Authentication required'},401);
+        if (!profileReady(subject.user)) return json({error:'Complete profile first'},403);
+        const versions=policyVersions(env);
+        if (!versions) return json({error:'Required policies unavailable'},503);
+        if (body.accepted !== true || body.termsVersion !== versions.terms || body.privacyVersion !== versions.privacy)
+          return json({error:'Current policy versions required', requiredVersions:versions},409);
+        const now=Date.now(), id=crypto.randomUUID(), userId=subject.user.id;
+        // D1 batch commits both statements transactionally or rolls both back.
+        await db.batch([
+          db.prepare('INSERT INTO agreement_acceptances(id,user_id,terms_version,privacy_version,accepted_at) VALUES(?,?,?,?,?)')
+            .bind(id,userId,versions.terms,versions.privacy,now),
+          db.prepare('UPDATE users SET terms_accepted_at=?,accepted_terms_version=?,accepted_privacy_version=?,updated_at=? WHERE id=?')
+            .bind(now,versions.terms,versions.privacy,now,userId)
+        ]);
+        return json({agreementCurrent:true});
+      }
       if (path === '/api/auth/request') {
         const email = normalize(body.email);
         const generic = json({ message: 'If this account is authorized, a sign-in email will arrive shortly.' });
         const now = Date.now();
         const withinRate = await withinLimits(request, db, env.AUTH_PEPPER, email || 'invalid', 'request', now);
-        if (!withinRate || !allowed.has(email)) return generic;
+        if (!withinRate || !registrationEligible(email,env)) return generic;
+        if (!env.RESEND_API_KEY || !env.AUTH_FROM_EMAIL) return json({error:'Email service unavailable'},503);
         const count = await db.prepare('SELECT COUNT(*) AS n FROM login_challenges WHERE email=? AND created_at>?').bind(email, now - 3600000).first<{ n: number }>();
         if ((count?.n || 0) >= 5) return generic;
         // Rejection sampling avoids modulo bias in the eight-digit OTP.
@@ -240,7 +311,7 @@ export default {
         const submittedEmail = normalize(body.email);
         const code = typeof body.code === 'string' ? body.code : '';
         const token = typeof body.token === 'string' ? body.token : '';
-        if (isMagic ? !/^[a-f0-9]{64}$/.test(token) : (!allowed.has(submittedEmail) || !/^\d{8}$/.test(code))) return error();
+        if (isMagic ? !/^[a-f0-9]{64}$/.test(token) : (!registrationEligible(submittedEmail,env) || !/^\d{8}$/.test(code))) return error();
         const now = Date.now();
         const hashed = await digest(isMagic ? token : submittedEmail + ':' + code, env.AUTH_PEPPER);
         // A magic link is a bearer credential: find the account by its token hash,
@@ -252,7 +323,7 @@ export default {
               .bind(submittedEmail,now).first<{ id: string; email: string; attempts: number }>();
         const email = latest?.email || submittedEmail;
         if (!await withinLimits(request, db, env.AUTH_PEPPER, email || 'invalid', 'verify', now)) return error();
-        if (!latest || !allowed.has(email) || latest.attempts >= 5) return error();
+        if (!latest || !registrationEligible(email,env) || latest.attempts >= 5) return error();
         const row = isMagic
           ? latest
           : await db.prepare('SELECT id FROM login_challenges WHERE id=? AND code_hash=? AND consumed_at IS NULL AND expires_at>?')
