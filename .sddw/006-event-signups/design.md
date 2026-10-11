@@ -26,6 +26,14 @@ Evaluate **OpenAPI Generator** (TypeScript fetch client + TypeScript server inte
 
 Acceptance for the spike: one existing public event GET and one authenticated mutating endpoint are driven from YAML through generated client and server signature/dispatch, run in a Worker test environment, enforce cookie auth/origin checks and actual runtime request validation, and preserve current response/status behavior. Document findings/selection in this file before full migration. If no candidate meets the requirement, stop for design review rather than silently reverting to handwritten server routing.
 
+### Leading candidate and proof requirements (research, not approval)
+
+The leading proof-of-concept stack is **OpenAPI YAML → openapi-typescript generated TypeScript operation types → openapi-fetch browser client**, plus **OpenAPI Backend** as an OpenAPI 3.1-driven router/validator, coupled to **generated typed server handler contracts and an operation binding layer** that run in Cloudflare Workers. OpenAPI Backend supplies runtime dispatch and request validation, **not** generated server implementation; generate the missing server bindings rather than presenting a handwritten handler map as generated code. Avoid Node-only adapters.
+
+Run the proof before selecting or pinning versions: generate code from the YAML, compile with existing Worker/Vite toolchain, exercise `GET /api/events/{id}` and `POST /api/admin/events` against a Worker-compatible test harness, verify handler parameter types, secure-cookie behavior, same-origin Origin/Fetch Metadata, role gate, invalid input behavior, exact 201/error schema, and that OpenAPI-derived runtime validation neither inadvertently coerces nor rejects previously valid payloads. Measure startup/bundle size and ensure YAML compilation into bundled JSON does not rely on filesystem access at runtime.
+
+If runtime validation conflicts with current handler-side trimming or lenient extra fields, document an explicit contract/migration choice instead of silently altering production semantics. Server operation bindings must be generated and drift-tested; a client-only generation demonstration is insufficient to mark T003 complete.
+
 ### Contract migration and publication
 
 Inventory *all* existing API routes/methods, including authentication and profile gates, before writing schemas. Freeze observed payloads/status codes as characterization tests, then migrate route by route without changing behavior unexpectedly. Publish docs/schema publicly (staging then production through existing release process); API example data must be fictitious, and interactive “try” operations do not bypass auth/CSRF checks. Coordinate SPA fallback to avoid serving `index.html` at API docs/schema routes.
