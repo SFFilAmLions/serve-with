@@ -1,6 +1,6 @@
 # SDDW 003 — Basic Event Management: Technical Design
 
-Status: **Proposed for review only — implementation not authorized.** Branding decision 1 and time-zone decision 2 approved; decisions 3–4 pending.
+Status: **Proposed for review only — implementation not authorized.** Branding decision 1, time-zone decision 2, and concurrency decision 3 approved; decision 4 pending.
 Requirements: [requirements.md](requirements.md). This design adopts **React + Material UI (MUI)** with a **Material Design 3-inspired custom theme**; it does not claim native/full Material 3 compliance.
 
 ## 1. Architectural overview
@@ -55,6 +55,7 @@ Add migration `0003_events.sql` (name subject to migration numbering at implemen
 | `end_at` | INTEGER NOT NULL | UTC epoch milliseconds, > start |
 | `created_at` | INTEGER NOT NULL | UTC epoch milliseconds |
 | `updated_at` | INTEGER NOT NULL | UTC epoch milliseconds |
+| `version` | INTEGER NOT NULL DEFAULT 1 | Monotonically incremented on every update and soft deletion for optimistic concurrency |
 | `deleted_at` | INTEGER NULL | UTC epoch milliseconds for soft deletion |
 
 Enforce nonempty strings and chronological ordering with DB CHECK constraints as defense in depth; API performs all semantic validation. Index `(deleted_at, end_at, start_at, id)` or query-specific partial indexes after inspecting SQLite query plans. Keep event times in UTC and original IANA zone; format event-local wall times from these values. Event values never rely on the viewer's clock zone.
@@ -87,10 +88,10 @@ All JSON responses set `Cache-Control: no-store` initially to prevent stale publ
 | PUT | `/api/admin/events/:id` | Admin session | Replace editable fields; 200 |
 | DELETE | `/api/admin/events/:id` | Admin session | Set `deleted_at`; no hard delete; 204 |
 
-- Return JSON validation errors with stable field codes and generic safe messages; 400 for malformed requests, 401 for unauthenticated writes, 403 for non-authorized users when appropriate, 404 for absent/deleted IDs, 422 for invalid fields/time resolution, 409 for edit/delete conflicts if optimistic locking is adopted later.
+- Return JSON validation errors with stable field codes and generic safe messages; 400 for malformed requests, 401 for unauthenticated writes, 403 for non-authorized users when appropriate, 404 for absent/deleted IDs, 422 for invalid fields/time resolution, 409 for edit/delete conflicts due to optimistic concurrency.
 - Bound title and location lengths (proposed max 200 and 500 characters), restrict JSON body size, validate time inputs, and treat unexpected properties conservatively.
 - Require same-origin POST/PUT/DELETE and protect against CSRF using existing origin/SameSite controls. Do not expose raw SQL or provider exceptions.
-- Prevent silent lost updates where possible: consider `updated_at` precondition for edits in implementation planning; minimum requirement is no silent loss of form state on failed requests.
+- **Approved decision 3:** Include an event `version` in public/admin event reads. Require an expected version on PUT and DELETE. Use an atomic conditional D1 update (`WHERE id=? AND version=? AND deleted_at IS NULL`) that increments the version. Return HTTP 409 if stale; never silently overwrite other edits. Preserve the unsaved form contents, explain the conflict, and offer to reload current event details (with explicit confirmation before discarding edits).
 
 ## 7. File/module organization (proposed, not created)
 
@@ -112,7 +113,7 @@ Only after design approval: break work into small tasks and a separate implement
 
 1. Verify approved club logo and brand-font asset sourcing and whether to load fonts remotely or bundle suitably licensed copies.
 2. **Resolved:** Temporal with a polyfill, explicit rejection of DST gaps/folds; Cloudflare Workers compatibility and bundle size remain implementation verification criteria.
-3. Decide whether optimistic concurrency is essential in the first CRUD implementation; document explicit behavior.
+3. **Resolved:** Require optimistic concurrency with event versions and 409 stale-write conflicts, preserving unsaved form values.
 4. Review final MUI theme colors for accessibility on light/dark surfaces. Default to a light interface; defer dark-mode toggle unless required.
 
 This document is a design proposal, not permission to implement.
