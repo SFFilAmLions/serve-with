@@ -5,8 +5,14 @@ import { DatabaseSync } from 'node:sqlite';
 import ts from 'typescript';
 
 globalThis.__testTemporal = (await import('@js-temporal/polyfill')).Temporal;
+globalThis.__testEligibility = (await import('data:text/javascript;base64,' + Buffer.from(
+  ts.transpileModule(readFileSync('src/registration-eligibility.ts','utf8'),
+    {compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText
+).toString('base64'))).isStagingRegistrationEligible;
+
 const source = readFileSync('src/worker.ts','utf8')
   .replace("import { Temporal } from '@js-temporal/polyfill';", "const Temporal = globalThis.__testTemporal;")
+  .replace("import { isStagingRegistrationEligible } from './registration-eligibility';", "const isStagingRegistrationEligible = globalThis.__testEligibility;")
   .replace("import admins from './generated/admins.json';", "const admins = [{email:'lionaugust@icloud.com',enabled:true}];");
 const compiled = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText;
 const worker = (await import('data:text/javascript;base64,' + Buffer.from(compiled).toString('base64'))).default;

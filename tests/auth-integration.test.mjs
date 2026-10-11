@@ -5,8 +5,14 @@ import { DatabaseSync } from 'node:sqlite';
 import ts from 'typescript';
 
 globalThis.__testTemporal = (await import('@js-temporal/polyfill')).Temporal;
+globalThis.__testEligibility = (await import('data:text/javascript;base64,' + Buffer.from(
+  ts.transpileModule(readFileSync('src/registration-eligibility.ts','utf8'),
+    {compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText
+).toString('base64'))).isStagingRegistrationEligible;
+
 const source = readFileSync('src/worker.ts', 'utf8')
   .replace("import { Temporal } from '@js-temporal/polyfill';", "const Temporal = globalThis.__testTemporal;")
+  .replace("import { isStagingRegistrationEligible } from './registration-eligibility';", "const isStagingRegistrationEligible = globalThis.__testEligibility;")
   .replace("import admins from './generated/admins.json';", "const admins = [{email:'lionaugust@icloud.com',enabled:true},{email:'lsvalera58@gmail.com',enabled:true}];");
 const compiled = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText;
 const worker = (await import('data:text/javascript;base64,' + Buffer.from(compiled).toString('base64'))).default;
@@ -27,6 +33,7 @@ function harness() {
   const { sqlite, adapter } = database();
   const env = { AUTH_DB: adapter, AUTH_PEPPER: 'test-secret-not-for-production',
     RESEND_API_KEY:'fake',AUTH_FROM_EMAIL:'login@notify.sffilamlions.org',
+    REQUIRED_TERMS_VERSION:'test-terms',REQUIRED_PRIVACY_VERSION:'test-privacy',ENVIRONMENT:'staging',STAGING_REGISTRATION_EMAILS:'guest@example.org',
     ASSETS:{fetch: async () => new Response('asset')} };
   const sent = [];
   const previousFetch = globalThis.fetch;
@@ -58,8 +65,17 @@ test('OTP signs in, creates secure session, protects dashboard and revokes on lo
     assert.equal(login.status,200);
     const cookie = login.headers.get('set-cookie');
     assert.match(cookie,/__Host-sw_session=.*HttpOnly; Secure; SameSite=Strict/);
+    assert.equal((await h.req('/api/admin/dashboard',undefined,{cookie})).status,403);
+    const profile=await h.req('/api/auth/profile',{firstName:'Example',lastName:'Admin',dateOfBirth:'1990-01-01'},{cookie});
+    assert.equal(profile.status,200);
+    assert.equal((await h.req('/api/admin/dashboard',undefined,{cookie})).status,403);
+    const agreement=await h.req('/api/auth/agreements',{accepted:true,termsVersion:'test-terms',privacyVersion:'test-privacy'},{cookie});
+    assert.equal(agreement.status,200);
     assert.equal((await h.req('/api/admin/dashboard',undefined,{cookie})).status,200);
-    assert.equal((await h.req('/api/auth/me',undefined,{cookie})).status,200);
+    const me=await (await h.req('/api/auth/me',undefined,{cookie})).json();
+    assert.equal(me.privileged,true);
+    assert.equal(me.profileComplete,true);
+    assert.equal(me.agreementCurrent,true);
     assert.equal((await h.req('/api/auth/verify',{email:'lionaugust@icloud.com',code})).status,400);
     assert.equal((await h.req('/api/auth/logout',{}, {cookie})).status,200);
     assert.equal((await h.req('/api/admin/dashboard',undefined,{cookie})).status,401);
@@ -115,7 +131,7 @@ test('expired sessions lose admin access',async () => {
     const {code}=credentials(h.sent[0]);
     const response=await h.req('/api/auth/verify',{email:'lionaugust@icloud.com',code});
     const cookie=response.headers.get('set-cookie');
-    assert.equal((await h.req('/api/admin/dashboard',undefined,{cookie})).status,200);
+    assert.equal((await h.req('/api/admin/dashboard',undefined,{cookie})).status,403);
     h.sqlite.prepare('UPDATE sessions SET expires_at=0').run();
     assert.equal((await h.req('/api/admin/dashboard',undefined,{cookie})).status,401);
   } finally {h.close();}
@@ -152,4 +168,34 @@ test('verified login resolves stable user ID, while a legacy email session upgra
     assert.equal((await h.req('/api/admin/dashboard',undefined,{cookie})).status,200);
     assert.equal(h.sqlite.prepare('SELECT count(*) n FROM users').get().n,1);
   } finally { h.close(); }
+});
+
+test('staging invitation can verify, but is never authorized as administrator',async()=>{
+  const h=harness();try{
+    assert.equal((await h.req('/api/auth/request',{email:' Guest@Example.org '})).status,200);
+    assert.equal(h.sent.length,1);
+    const {code}=credentials(h.sent[0]);
+    const login=await h.req('/api/auth/verify',{email:'guest@example.org',code});
+    assert.equal(login.status,200);
+    const cookie=login.headers.get('set-cookie');
+    assert.equal((await h.req('/api/admin/dashboard',undefined,{cookie})).status,403);
+    assert.equal((await (await h.req('/api/auth/me',undefined,{cookie})).json()).administratorEligible,false);
+  }finally{h.close();}
+});
+test('agreement is rejected without profile and rejects mismatched or unchecked versions',async()=>{
+  const h=harness();try{
+    await h.req('/api/auth/request',{email:'lionaugust@icloud.com'});
+    const login=await h.req('/api/auth/verify',{email:'lionaugust@icloud.com',code:credentials(h.sent[0]).code});
+    const cookie=login.headers.get('set-cookie');
+    const accept=(body)=>h.req('/api/auth/agreements',body,{cookie});
+    assert.equal((await accept({accepted:true,termsVersion:'test-terms',privacyVersion:'test-privacy'})).status,403);
+    assert.equal((await h.req('/api/auth/profile',{firstName:' ',lastName:'Valid',dateOfBirth:'2026-02-30'},{cookie})).status,422);
+    assert.equal((await h.req('/api/auth/profile',{firstName:'Alice',lastName:'Example',dateOfBirth:'1990-05-02'},{cookie})).status,200);
+    assert.equal((await h.req('/api/auth/profile',{firstName:'New',lastName:'Value',dateOfBirth:'1980-03-02'},{cookie})).status,409);
+    assert.equal((await accept({accepted:false,termsVersion:'test-terms',privacyVersion:'test-privacy'})).status,409);
+    assert.equal((await accept({accepted:true,termsVersion:'old',privacyVersion:'test-privacy'})).status,409);
+    assert.equal((await accept({accepted:true,termsVersion:'test-terms',privacyVersion:'test-privacy'})).status,200);
+    assert.equal(h.sqlite.prepare('SELECT count(*) n FROM agreement_acceptances').get().n,1);
+    assert.equal((await h.req('/api/admin/dashboard',undefined,{cookie})).status,200);
+  }finally{h.close();}
 });

@@ -1,6 +1,6 @@
 # SDDW 004 — Core-Flow Tasks
 
-**Status: Batch 1 foundation implemented in the PR branch; later slices and all deployment remain unapproved/pending. GitHub CI verification is tracked separately from code completion.**
+**Status: Batch 1 CI green; Batch 2 backend security foundation in progress on the draft PR. Frontend, policy publication, staging validation and deployment remain pending.**
 
 ## Specification cleanup
 
@@ -32,9 +32,18 @@
 - [x] Resolve verified-email sign-ins and existing valid administrator email sessions idempotently to stable IDs without replacing their cookies; keep challenge and rate limits unchanged.
 - [x] Add private staging registration eligibility helper independent of administrator role, with enabled admins eligible in staging; do not activate attendee registration.
 - [x] Add database, existing-session resolution and staging-eligibility tests.
-- [ ] Confirm green CI test/build results for the implementation commit.
+- [x] Confirm green CI test/build results for Batch 1 implementation commit.
 - [ ] Confirm remote staging D1 migration state, configure staging secret, and validate staged migration before any deployment.
 - [ ] Implement Batch 2 login/registration experience, profile/current-policy gates, acceptance transaction writes and policy publication after approvals.
+
+## Batch 2 — Backend-only security foundation
+
+- [x] Add server-side staging eligibility enforcement to existing code/magic login, preserving non-enumerating requests and rate limits; existing enabled admins remain eligible.
+- [x] Add session-limited initial profile completion and required-version agreement endpoints with server validation and atomic D1 acceptance history/summary persistence.
+- [x] Add minimum-account state in `/api/auth/me` and enforce verified profile/current-agreement/admin-role gates before administrator APIs.
+- [ ] Observe green CI for this backend batch; fix any test/build regressions.
+- [ ] Add/complete email-first UI, automatic magic exchange, published approved policy sources, and configuration for staging before attendee onboarding.
+- [ ] Implement owner/admin user profile and directory authorization in the later account-management slice.
 
 ## Release gates
 
