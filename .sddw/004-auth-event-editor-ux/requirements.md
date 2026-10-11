@@ -54,17 +54,30 @@ Origin: successful SDDW 003 staging use and user feedback. Consolidates [#10](ht
 - Verify ordinary users can sign in but cannot call administrator mutation APIs. Verify public events remain readable while signed out.
 - No deployment or user-account migration until requirements, design, and implementation tasks have been approved.
 
-## 5. Acceptance and boundaries
+## 5. Separate Attendee and Administrator experiences
 
-- Automated tests: automatic single-attempt magic-link sign-in/token scrubbing, code/login/logout regressions, registration/profile/deletion and staging eligibility checks, account-menu/mobile and keyboard behavior, modal focus/discard behavior, start/end synchronization and overrides, distinct date and clock input UX, live duration and DST edge cases, Edit prefill, no public-list regression.
+- Provide **distinct Attendee and Administrator views**, not one public event page with scattered admin editing controls. Attendee is the normal/default experience for signed-in people.
+- **Attendee view:** Browse Upcoming and Past events, use personal account/profile controls, and access attendee-facing capabilities as those are introduced. Do not invent registration-for-events, RSVP, signup, or attendance features as part of SDDW 004; those remain future work.
+- **Administrator view:** A clearly identified management workspace for permitted staff, with Add/Edit/Delete Event controls and any future administrative functions. Keep editing controls out of the attendee experience.
+- An authenticated administrator can **switch between Attendee and Administrator views** without signing out or changing identity. A standard attendee must not be offered an administrator switch or gain access to admin routes.
+- The app bar must make the current view obvious. Provide a discoverable, mobile-friendly view switch for eligible admins, and place the account menu (identity/profile/logout) separately from mode switching.
+- Authorization remains **server-enforced** for all administrative APIs and routes; changing a client-side view must never grant privileges.
+- Preserve anonymous public event browsing, with an appropriate attendee/public entry view when signed out.
+- When returning from admin to attendee, retain the attendee's normal browsing experience; define back/navigation and optional view persistence in design. Never leak admin-only information into the attendee view.
+- Browser tests must cover attendee-only accounts, administrators switching both directions, direct navigation to protected administrator views, logout and expired-session behavior, keyboard/mobile switching, and no accidental admin controls in attendee view.
+
+## 6. Acceptance and boundaries
+
+- Automated tests: automatic single-attempt magic-link sign-in/token scrubbing, code/login/logout regressions, registration/profile/deletion and staging eligibility checks, account-menu/mobile, attendee/admin view switching and keyboard behavior, modal focus/discard behavior, start/end synchronization and overrides, distinct date and clock input UX, live duration and DST edge cases, Edit prefill, no public-list regression.
 - Verify changes on staging through normal `main` workflow after approval, fixing staging defects iteratively. **No production deployment without separate explicit authorization.**
 - Out of scope: new authentication providers, new event schema, event RSVP/signups, recurrence, organization permissions expansion, or production release.
 
-## 6. Items to settle in design review
+## 7. Items to settle in design review
 
 - Specific MUI date/time picker dependency, license constraints, and mobile clock UX.
 - Whether the duration should be shown directly beneath the equal-width time inputs or in an End time label area; the equal sizing and prominent date are required either way.
 - Exact loading/error presentation for automatic magic-link exchange.
+- Attendee/Admin view navigation model (route or mode switch), initial/default view and UI placement; do not imply attendee event signup is already implemented.
 - User table/profile migration and deletion semantics (including retention), admin name backfill, and staging allowlist configuration and reconciliation.
 - Production registration eligibility policy (explicitly deferred; no production registration is authorized).
 
