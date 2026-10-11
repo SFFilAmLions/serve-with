@@ -1,33 +1,20 @@
-# SDDW 004 — Tasks
+# SDDW 004 — Simplified Tasks
 
-**Status: Scope discovery complete; final requirements and design review pending. Implementation not authorized.**
+**Status: Scope trimmed; design and implementation await approval.** Full deletion/recovery and email changes are **not** implementation tasks here.
 
-- [x] Complete user-led SDDW 004 feature scoping (no further feature additions requested).
-- [ ] Approve [requirements.md](requirements.md) and resolve any remaining policy questions.
-- [x] Record user decisions: existing administrators complete profile at next sign-in; staging whitelist is email-only; first and last names are editable.
-- [x] Confirm `config/admins.yaml` remains email-only for administrator authorization; first/last names, date of birth, and verified email belong to D1 profiles.
-- [x] Record revised account lifecycle: deactivation retains full PII but resets active Terms/Privacy acceptance; deletion clears profile PII with optional recovery key.
-- [ ] Defer full deletion, optional recovery key, and historical re-claim to later account-lifecycle scope; do not implement in simplified SDDW 004.
-- [ ] Implement/design a single required, unchecked Terms of Use and Privacy Policy checkbox on first registration and any reactivation, with versioned acceptance evidence.
-- [ ] Store `created_at` separately from nullable `terms_accepted_at` and accepted document versions; derive access from verified email, complete profile and current required versions (no activation boolean).
-- [ ] Require reacceptance on new terms/privacy versions and on deactivation, preserving historical acceptance evidence and profile PII.
-- [ ] Define exact PII scrub scope (including data in signups), retained-email privacy/retention basis and any full-erasure request path; design no-lockout administrator transition.
-- [x] Approve administrator-only corrections to submitted date of birth; owner can view but not edit it.
-- [ ] Design audited admin date-of-birth correction, directory exclusion, privacy, retention and migration; validate a calendar date without inferring age limits.
-- [ ] Design account schema, migrations, verification, email-change confirmation, deletion-only PII scrub, agreement-based deactivation and session restriction, optional recovery email and deletion key claim, staging allowlist and tests, and how existing admins transition.
-- [ ] Review/approve the separate Attendee and Administrator view requirements and design accessible switching and route authorization.
-- [ ] Design authentication and account-menu interactions in [design.md](design.md); review and approve.
-- [ ] Design/test administrator-only Duplicate Event as prefilled Create Event, preserving the original event and generating a new ID on explicit Save.
-- [ ] Specify Create Event as a dedicated page and choose a consistent Edit Event page design, navigation, dirty-form safeguards, and tests.
-- [ ] Design dedicated email-first login page, eight-digit code/magic link verification, and eligible first-login account creation without a standalone Create User page.
-- [ ] Test attendee denial for direct Users page navigation and directory list/search APIs; admin-only directory access.
-- [ ] Design inline, post-verification first-login required name/date-of-birth completion, subsequent own-profile edits, and admin-only Users directory/Edit User page for existing users, including ownership checks, eligibility, duplicate prevention, search, and regression tests.
-- [ ] Design date/time picker choice, progressive disclosure, duration algorithm, and accessibility; review and approve.
-- [x] Refresh README on the SDDW 004 draft branch with current staging status and staging/production URLs.
-- [ ] Recheck README accuracy after SDDW 004 is implemented or deployed.
-- [ ] Break approved design into small implementation/test slices.
-- [ ] Implement on a separate branch or PR, run automated tests, and merge to `main` only after review.
-- [ ] Validate on staging after `main` deployment; resolve defects.
-- [ ] Keep production release separately gated.
+- [x] Complete user-led scope review and retain core registration, account, navigation and event UX.
+- [x] Move email-change, account deletion, anonymized history and optional recovery ideas to [deferred-account-lifecycle.md](deferred-account-lifecycle.md).
+- [x] Record required Terms/Privacy checkbox with `terms_accepted_at`, immutable `created_at` and version-aware reacceptance; **no `is_active` boolean**.
+- [x] Refresh README with current staging/production URLs and project status.
+- [ ] Approve [requirements.md](requirements.md) and [design.md](design.md); confirm dedicated Edit Event page and picker choice.
+- [ ] Publish Terms of Use and Privacy Policy, set required version identifiers and reacceptance policy.
+- [ ] Slice A: migrate D1 users + agreement history, staging-only email allowlist and existing-admin profile transition; verify role separation.
+- [ ] Slice A: dedicated email-first code/magic login, auto token exchange, inline required name/DOB and linked unchecked agreement.
+- [ ] Slice B: account menu, Attendee/Admin mode switch, self-profile editing and restricted incomplete/outdated agreement flow.
+- [ ] Slice B: admin-only Users listing/search and Edit User with audited DOB correction; deny attendee direct URLs and APIs.
+- [ ] Slice C: dedicated Create/Edit Event pages, shared date/time controls, duration, advanced end date/zone, Duplicate Event creating a new ID.
+- [ ] Slice D: comprehensive automated auth, privacy, permissions, mobile, DST and event regression tests; review PR and green CI.
+- [ ] Upon approved merge, test staging including real email and D1 changes, reconcile README with actual deployed features.
+- [ ] Keep production registration policy and release separately gated.
 
-This is a planning checklist, not permission to implement.
+**No implementation or deployment approval is implied by scope cleanup.**
