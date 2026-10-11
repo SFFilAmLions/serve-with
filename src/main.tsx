@@ -231,11 +231,11 @@ const policyVersion = packageJson.version;
 function PolicyPage({kind}:{kind:'terms'|'privacy'}) {
  const source=kind==='terms'?termsPolicy:privacyPolicy;
  const title=kind==='terms'?'Terms of Use':'Privacy Policy';
- const renderInline=(line:string)=>line.split(/(\\*\\*[^*]+\\*\\*)/g).map((part,i)=>part.startsWith('**')&&part.endsWith('**')?<strong key={i}>{part.slice(2,-2)}</strong>:part);
+ const renderInline=(line:string)=>line.split(/(\*\*[^*]+\*\*)/g).map((part,i)=>part.startsWith('**')&&part.endsWith('**')?<strong key={i}>{part.slice(2,-2)}</strong>:part);
  return <Box component="article" sx={{my:4,maxWidth:850}}>
   <Typography variant="h4" component="h1" gutterBottom>{title}</Typography>
   <Typography color="text.secondary" sx={{mb:3}}>Version {policyVersion} · Effective October 11, 2026</Typography>
-  {source.split('\\n').map((line,i)=>{
+  {source.split('\n').map((line,i)=>{
     if(!line.trim()||line.startsWith('# '))return null;
     if(line.startsWith('### '))return <Typography key={i} variant="h6" component="h2" sx={{mt:3,mb:1}}>{renderInline(line.slice(4))}</Typography>;
     if(line.startsWith('- '))return <Typography key={i} component="p" sx={{pl:3,mb:0.75}}>• {renderInline(line.slice(2))}</Typography>;
