@@ -31,7 +31,7 @@ Enable authenticated attendees to sign up for events, withdraw, and review their
 ## Standard event page vs administrator event page
 - **Standard event page:** The canonical public event page and its Sign up / Sign up as {first name} action behave identically for all visitors, including administrators. Administrator status must not add an on-behalf-of selector or privileged actions to this page.
 - **Administrator event page:** Provide a distinct administrator-facing event management page with the additional roster, signup history, searchable attendee selection, and on-behalf-of signup/withdrawal controls. These controls remain server-authorized.
-- **Non-administrator navigation:** Any non-admin who opens an admin event page URL must be redirected to the corresponding standard event page rather than shown the admin interface. This redirect is a user experience rule, not a replacement for API authorization; the server must still deny unauthorized admin requests.
+- **Non-administrator navigation:** Any non-admin who opens an admin event page URL must be redirected to the corresponding standard event page rather than shown the admin interface. **After redirect, show a brief, accessible warning toast** (for example, `You don't have access to the administrator event page. Showing the public event page instead.`). Use the application's existing Material Snackbar/Alert pattern; avoid an intrusive modal. Display the warning once per redirect, not repeatedly on reload or subsequent navigation. This redirect and toast are user experience rules, not replacements for API authorization; the server must still deny unauthorized admin requests.
 - Retain the existing standard event route. Define the admin event detail route in the technical design, avoiding conflicts with existing admin editor routes.
 
 ## Administrator experience
@@ -71,7 +71,7 @@ Enable authenticated attendees to sign up for events, withdraw, and review their
 - Participant roster shows active names only to an active signup holder; anonymous visitors, nonparticipants and withdrawn users are denied. Verify access is revoked after withdrawal and no email/DOB/history fields are returned.
 - Deleted event, missing event, user re-signup, repeated withdrawal, and deleted signup race behavior.
 - Browser tests for signup button states, including anonymous `Sign up` vs authenticated `Sign up as {first name}`, admin user selection on the **admin event page only**, mobile layout, keyboard use, error feedback and My signups history.
-- Verify identical standard event page functionality for admins and attendees; verify non-admin admin-event-page URLs redirect to corresponding standard event pages and admin API access remains forbidden.
+- Verify identical standard event page functionality for admins and attendees; verify non-admin admin-event-page URLs redirect to corresponding standard event pages, display one accessible warning toast after redirect, and admin API access remains forbidden.
 - Anonymous event Sign up button launches login/new-account onboarding, survives the magic-link round trip, automatically submits exactly once after profile and policy gates, and reports success/full/started/errors without extra user interaction. Verify intent cleanup, refresh/replay protection and no open redirects.
 - Staging acceptance with real D1 before any production release.
 
