@@ -1,6 +1,6 @@
 # SDDW 004 — Core Authentication, Account & Event UX Requirements
 
-**Status: Draft for review; no implementation, merge or deployment approval.**
+**Status: Implementation-ready specification; implementation and deployment require explicit approval.**
 
 Consolidates [#10](https://github.com/SFFilAmLions/serve-with/issues/10), [#11](https://github.com/SFFilAmLions/serve-with/issues/11), and [#12](https://github.com/SFFilAmLions/serve-with/issues/12). Future lifecycle features are recorded separately in [deferred-account-lifecycle.md](deferred-account-lifecycle.md) and are not acceptance criteria for this release.
 
