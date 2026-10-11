@@ -1,8 +1,9 @@
 # SDDW 004 — Tasks
 
-**Status: Not yet authorized. Requirements review first.**
+**Status: Scope discovery complete; final requirements and design review pending. Implementation not authorized.**
 
-- [ ] Approve [requirements.md](requirements.md).
+- [x] Complete user-led SDDW 004 feature scoping (no further feature additions requested).
+- [ ] Approve [requirements.md](requirements.md) and resolve any remaining policy questions.
 - [x] Record user decisions: existing administrators complete profile at next sign-in; staging whitelist is email-only; first and last names are editable.
 - [x] Confirm `config/admins.yaml` remains email-only for administrator authorization; first/last names, date of birth, and verified email belong to D1 profiles.
 - [ ] Review/approve remaining registration and deletion requirements; design a no-lockout administrator profile-completion transition.
