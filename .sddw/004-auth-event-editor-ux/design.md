@@ -63,7 +63,7 @@ Configure staging allowlist as a separate reviewed server-side email-only config
 
 ## 6. Event form and responsive editor
 
-Create Event is a dedicated page. Prefer dedicated Edit Event using the same form component (requires user approval). Show a full-width, prominent **Start date** row; beneath it, equal-width **Start time** and **End time** clock-enabled inputs, with the live duration nearby but without changing input widths. MUI accessible date/time picker options and license impact to be reviewed; provide keyboard/manual input fallback.
+Create Event is a dedicated page. **Duplicate Event** is an administrator-only action from the event management list that navigates to Create Event with a copy of the source event's editable fields (not its identity, version, or deletion metadata); no save occurs until the administrator explicitly submits the create form. The copy should be held in router navigation state or a safe source-ID lookup (without trusting client-provided authorization), with a direct-refresh fallback. Prefer dedicated Edit Event using the same form component (requires user approval). Show a full-width, prominent **Start date** row; beneath it, equal-width **Start time** and **End time** clock-enabled inputs, with the live duration nearby but without changing input widths. MUI accessible date/time picker options and license impact to be reviewed; provide keyboard/manual input fallback.
 
 Collapse **End date** and **Time zone** under More options. Initial End date follows Start date; once explicitly overridden, don't reset it with later start-date changes. Open More options for edited multiday/nondefault-zone events, and summarize important nondefault values even when collapsed.
 
@@ -78,6 +78,7 @@ Tests:
 - First-login pending-profile gate; required names; existing admin transition; update own profile versus admin editing others; direct URL/API denial for attendee; role changes only through YAML.
 - Directory pagination/search; session invalidation on self-deletion; no admin creation path.
 - Attendee/admin view switching, app bar account menu, deep linking, accessibility, mobile and light/dark themes.
+- Duplicate Event from upcoming/past events, copied values, distinct new ID, no modification of source, no automatic save, and create-form validation.
 - Date/time alignment, editable End date and timezone, duration and DST cases, unsaved-navigation guards, regression of CRUD/public event listings.
 
 Implementation requires separate review of task slices, then a PR with green CI and an approved merge to `main`. Staging runs through existing deployment pipeline; real email, D1 migration, CRUD and account acceptance tests happen there. Production registration/deployments are separately gated.
