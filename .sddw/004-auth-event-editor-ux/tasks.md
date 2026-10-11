@@ -1,6 +1,6 @@
 # SDDW 004 — Core-Flow Tasks
 
-**Status: Batch 1 CI green; Batch 2 backend security foundation in progress on the draft PR. Frontend, policy publication, staging validation and deployment remain pending.**
+**Status: Approved SDDW-004 combined feature batch implemented on the draft PR for CI/review. Policy publication, staging configuration, real-email/D1 validation, acceptance UX, and release approval remain pending.**
 
 ## Specification cleanup
 
@@ -44,6 +44,23 @@
 - [x] GitHub Actions CI passed for backend implementation commit `09385073` (unit/integration, build and browser tests; [run #38127862126](https://github.com/SFFilAmLions/serve-with/actions/runs/38127862126)).
 - [ ] Add/complete email-first UI, automatic magic exchange, published approved policy sources, and configuration for staging before attendee onboarding.
 - [ ] Implement owner/admin user profile and directory authorization in the later account-management slice.
+
+## Approved combined implementation batch (code review/CI pending)
+
+- [x] Email-first `/login` with code entry, resend, change-email and automatic one-time magic POST, including browser URL scrubbing.
+- [x] Inline registration profile completion for eligible staging accounts and configured administrators; eligibility enforced by the server.
+- [x] Top-right account controls, canonical My Profile, logout and Attendee/Administrator workspace navigation.
+- [x] Light/Dark/System appearance controls (signed-out and signed-in), client-persisted preference and labeled administrator workspace.
+- [x] Canonical user read/edit endpoints and pages; owners edit names and administrators may correct DOB with actor/subject/time-only audit.
+- [x] Admin-only paginated Users directory with server search/sort/letter navigation, responsive fields and preserved query/letter preferences.
+- [x] Public canonical event details and contextual administrator edit navigation.
+- [x] Administrator event navigation and responsive event rows, with Create/Edit/Duplicate/Delete entry points.
+- [x] Dedicated event Create/Edit screens using Community MUI X date/time pickers and guarded close/save.
+- [x] Duplicate-prefilled Create Event route that creates a distinct ID on explicit save.
+- [x] New unit/integration and browser tests added for route, account, agreement gating and event behavior.
+- [ ] Observe green CI for the *latest* combined implementation commit and review remaining accessibility/event regression coverage.
+- [ ] Publish reviewed policies, set required Terms/Privacy versions and enable compliant acknowledgment UI (not approved in this selected batch).
+- [ ] Inspect remotely applied staging migrations and provision private staging allowlist, then validate real staging auth/D1 behavior after separately approved deployment.
 
 ## Release gates
 
