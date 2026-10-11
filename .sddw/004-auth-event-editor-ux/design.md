@@ -1,6 +1,6 @@
 # SDDW 004 — Core-Flow Technical Design
 
-**Status: Proposed; implementation not approved.** Derived from [requirements.md](requirements.md).
+**Status: Implementation-ready design; implementation not yet approved.** Derived from [requirements.md](requirements.md).
 
 ## Existing stack and boundaries
 
