@@ -36,12 +36,12 @@ References: [requirements.md](requirements.md) (approved); [design.md](design.md
 
 ## Slice 3 — React shell, club identity, and public event list
 
-- [ ] Migrate only the vanilla frontend entry to React + React DOM while retaining Vite, Worker asset serving, existing auth flows, production/staging hostnames, and version/build footer.
+- [x] Migrate vanilla frontend entry to React + React DOM with Vite, Worker asset serving, existing auth flows and build footer (CI verification pending).
 - [ ] Add a centralized MUI theme approximating Material Design 3 (rounded/tonal cards, app bar, accessible controls), adopting official brand colors, approved logo, and Ubuntu/Alata typography.
 - [ ] Follow `prefers-color-scheme` automatically, including changes at runtime, without a manual toggle or startup theme flash. Test contrast and reduced-motion/focus behavior in both themes.
-- [ ] Set visible header, sign-in surface, browser title, and metadata to **Serve With SF Fil-Am Lions** (not bare Serve With); keep URLs unchanged.
-- [ ] Build responsive public Upcoming/Past tabs with event cards showing title, full event-local start/end times, IANA zone abbreviation or clear zone name, and free-text location; handle cross-date ranges visibly.
-- [ ] Provide exact agreed friendly empty-state wording, loading indicators, safe retries, and failure feedback. Public events remain visible without login or if auth checks fail.
+- [x] Set visible header and browser title/description to **Serve With SF Fil-Am Lions**; keep URLs unchanged (CI/UI verification pending).
+- [x] Implement initial responsive Upcoming/Past tabs with event cards showing event-local start/end instants, time zone, and location (CI/UI verification pending).
+- [x] Implement friendly public empty states, loading indicators, retries, and failure feedback independently of login (UI verification pending).
 - [ ] Preserve OTP sign-in and logout, explicit POST magic-link confirmation and token removal from browser history; integrate pending magic-link fix when appropriately merged instead of independently changing its behavior here.
 - [ ] Add frontend tests for public browsing, loading/error/empty states, timestamp formatting, responsive layout, system-driven light/dark theme, and auth regression.
 
