@@ -43,6 +43,7 @@ References: [requirements.md](requirements.md) (approved); [design.md](design.md
 - [x] Implement initial responsive Upcoming/Past tabs with event cards showing event-local start/end instants, time zone, and location (CI/UI verification pending).
 - [x] Implement friendly public empty states, loading indicators, retries, and failure feedback independently of login (UI verification pending).
 - [ ] Preserve OTP sign-in and logout, explicit POST magic-link confirmation and token removal from browser history; integrate pending magic-link fix when appropriately merged instead of independently changing its behavior here.
+- [ ] Implement and test the club-handbook-style footer: repository link in all views; staged deployed commit hash linking to commit; production approved release version linking to GitHub release; local-development fallback, explicitly supplied by build workflows.
 - [ ] Add frontend tests for public browsing, loading/error/empty states, timestamp formatting, responsive layout, system-driven light/dark theme, and auth regression.
 
 **Review checkpoint:** Anonymous visitors can browse events on the landing page without signing in.
@@ -63,7 +64,7 @@ References: [requirements.md](requirements.md) (approved); [design.md](design.md
 
 - [ ] Run TypeScript checks, relevant security tests, React interaction tests, and build/size checks; confirm existing authentication and CI are still green.
 - [ ] After code and task approval, deploy **staging only** through the existing GitHub workflow and apply the migration to `serve-with-staging-db`. Validate data and migrations before changes.
-- [ ] Verify live `https://servewith-beta.sffilamlions.org/` on desktop/mobile: anonymous Upcoming/Past, timezone boundaries, admin CRUD, in-progress classification, deletion, conflicting edits, empty state, official brand, light/dark system switching, OTP/magic-link regression, and deployed build SHA.
+- [ ] Verify live `https://servewith-beta.sffilamlions.org/` on desktop/mobile: anonymous Upcoming/Past, timezone boundaries, admin CRUD, in-progress classification, deletion, conflicting edits, empty state, official brand, light/dark system switching, OTP/magic-link regression, and correct environment-specific repo/version-or-commit footer.
 - [ ] Document any deviations and update this checklist with evidence/checks; obtain explicit sign-off on staging.
 - [ ] **Stop at staging.** Do not merge the Release Please production release PR or deploy `servewith.sffilamlions.org` without a separate, explicit authorization.
 
