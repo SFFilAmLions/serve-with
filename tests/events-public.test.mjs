@@ -270,3 +270,32 @@ test('OpenAPI-generated route table reaches real Worker event handlers with auth
     assert.equal((await detail.json()).event.id,event.id);
   } finally {h.sqlite.close();}
 });
+
+test('compatibility normalizer forwards legacy event-create bodies to real Worker without changing authorization', async () => {
+  const {normalizeLegacyEventCreate}=await import('../scripts/normalize-openapi-spike.mjs');
+  const h=harness();
+  try {
+    const origin='https://servewith-beta.sffilamlions.org',now=Date.now(),session='7'.repeat(64);
+    const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode('test:'+session))),b=>b.toString(16).padStart(2,'0')).join('');
+    h.sqlite.prepare('INSERT INTO sessions(token_hash,email,expires_at,created_at) VALUES (?,?,?,?)')
+      .run(hash,'lionaugust@icloud.com',now+600000,now);
+    const value={title:'  Cleanup  ',location:' Park ',timezone:'America/Los_Angeles',start:'2026-11-14T09:00',end:'2026-11-14T12:00',unexpected:'ignored'};
+    const original=structuredClone(value);
+    const req=(body,headers={})=>new Request(origin+'/api/admin/events',{method:'POST',
+      headers:{'content-type':'application/json',origin,cookie:'__Host-sw_session='+session,...headers},
+      body:JSON.stringify(body)});
+    const env={AUTH_DB:h.adapter,AUTH_PEPPER:'test',ASSETS:{fetch:async()=>new Response('asset')}};
+    const normalized=normalizeLegacyEventCreate(value);
+    assert.deepEqual(value,original,'normalizer does not mutate browser input');
+    assert.deepEqual(Object.keys(normalized).sort(),['end','location','start','timezone','title']);
+    const response=await worker.fetch(req(normalized),env);
+    assert.equal(response.status,201);
+    const event=(await response.json()).event;
+    assert.equal(event.title,'Cleanup');
+    assert.equal(event.location,'Park');
+    assert.equal((await worker.fetch(req(normalized,{origin:'https://attacker.example'}),env)).status,400);
+    assert.equal((await worker.fetch(req(normalized,{'sec-fetch-site':'cross-site'}),env)).status,400);
+    assert.equal((await worker.fetch(req({...normalized,title:'  '}),env)).status,422);
+    assert.equal(h.sqlite.prepare('SELECT COUNT(*) n FROM events').get().n,1);
+  } finally {h.sqlite.close();}
+});
