@@ -1,6 +1,6 @@
 # SDDW 004 — Proposed Technical Design
 
-**Status: Proposed for review. Requirements and design are not yet approved for implementation.**
+**Status: Proposed design for review following completed scope discovery. Not approved for implementation.**
 Source: [requirements.md](requirements.md). References: issues #10, #11, and #12.
 
 ## 1. Scope and architecture
