@@ -51,11 +51,11 @@ References: [requirements.md](requirements.md) (approved); [design.md](design.md
 ## Slice 4 — Administrator event dialogs
 
 - [x] Implement initial Add Event, Edit, and Delete controls for authenticated admins, including empty states and past events; backend retains authorization enforcement (CI/UI verification pending).
-- [ ] Complete accessible Add/Edit dialog: initial fields, edit prefill, and preserved server errors implemented; IANA time-zone picker, keyboard and focus checks pending.
-- [ ] Disable duplicate saves; display field-level client/server validation errors, progress, and success status; close and refresh correct view only after confirmed success.
+- [ ] Complete accessible Add/Edit dialog: IANA time-zone autocomplete, form validation, edit prefill, and preserved server errors implemented; keyboard/focus interaction tests pending.
+- [ ] Complete save feedback: duplicate saves blocked and field-level client/server validation implemented; explicit success status and UI interaction tests pending.
 - [ ] Guard Cancel, close icon, Escape, and backdrop: if values changed, ask **Discard unsaved changes?**; otherwise close immediately. Ensure keyboard navigation, trapping/restoring focus, and screen-reader labels.
 - [x] Implement a separate Delete confirmation naming the event, refreshing on soft-delete and preserving the event on error (CI/UI verification pending).
-- [ ] Handle HTTP 409 version conflicts by keeping unsaved edits and explaining that another administrator changed the record; offer a deliberate reload/current-version action that asks before discarding edits.
+- [x] Handle HTTP 409 version conflicts by preserving unsaved edits, explaining the conflict, and offering a reload action with explicit discard confirmation (automated interaction tests still pending).
 - [ ] Add UI tests for Add/Edit/Delete, past event management, unsaved-change guards, duplicate submission, concurrency conflict preservation, focus restoration, error states, and authorization visibility.
 
 **Review checkpoint:** End-to-end CRUD works for an authenticated staging admin; conflicts do not silently discard work.
