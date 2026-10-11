@@ -9,7 +9,7 @@ Design review must cover:
 - Distinct attendee and administrator views; authorized administrator mode switching, route boundaries, app-bar affordances, and mobile behavior.
 - Material AppBar sign-in and account menu, with dialogs and mobile behavior.
 - Dedicated Create Event page (not a modal), shared event form/edit presentation, URL routing and unsaved-navigation guard; prominent date and equal-width clock pickers, expandable end date/time zone, end-date synchronization, DST-aware duration preview.
-- Administrator-only User List page, per-user Edit User page, and authenticated self-service Edit Profile page, with ownership checks, list/search, and server-side field authorization.
+- Administrator-only Users list and **single shared Create/Edit User page/form** with distinct create/edit modes; authenticated self-service Edit Profile uses compatible fields with separate ownership permissions. Include create/invite, verified-email activation, staging allowlist checks, search, and server-side field authorization.
 - Required first/last/email profile fields and user-editable names; secure mandatory profile completion for existing admins at next sign-in without role loss.
 - **Approved:** `config/admins.yaml` retains email-based authorization entries only; required user names and verified emails are held in D1 profiles. No duplication/synchronization of editable names into YAML. Design the profile-completion guard and server-owned registration/self-deletion flows.
 - Staging-only eligibility allowlist, distinct from the administrator role list; existing-account reconciliation, verification and non-enumerating errors.
