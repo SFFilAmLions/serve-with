@@ -8,7 +8,7 @@ References: [requirements.md](requirements.md) (approved); [design.md](design.md
 
 - [x] Review and approve this task breakdown before any code changes, migrations, dependency installation, or deployments.
 - [x] Check current `main` and outstanding PRs before implementation; working in PR #6 alongside its existing magic-link fix.
-- [ ] Verify official club logo provenance/permission and official `#F1C232` color from club-owned source. Ubuntu uses Canonical's Ubuntu Font Licence 1.0; Alata and Ubuntu fonts loaded from Google Fonts with system fallbacks, avoiding bundled font binaries. Confirm precise Alata licensing and logo before checking this task.
+- [x] Verify official club logo provenance and permission: the club's published branding guidelines at https://www.sffilamlions.org/about/social identify `SF Fil-Am Lions Logo.png`, Ubuntu/Ubuntu Condensed/Alata, and `#F1C232`; user explicitly authorized reuse of the club logo. Added the matching 167,619-byte club Drive PNG as `public/club-logo.png` (small image tracked in Git normally, not LFS). Font loading uses Google Fonts with system fallbacks; font-license and contrast review still require separate validation.
 - [ ] Verify maintained Temporal polyfill compatibility with Cloudflare Workers, strict `disambiguation: 'reject'` behavior, and build/bundle impact; pin an appropriate dependency.
 - [ ] Validate the planned light/dark MUI color tokens for WCAG contrast, including focus states and interaction states.
 
@@ -37,7 +37,7 @@ References: [requirements.md](requirements.md) (approved); [design.md](design.md
 ## Slice 3 — React shell, club identity, and public event list
 
 - [x] Migrate vanilla frontend entry to React + React DOM with Vite, Worker asset serving, existing auth flows and build footer (CI verification pending).
-- [ ] Complete centralized MUI brand theme: `src/theme.ts` now provides contrast-oriented light/dark tokens, MUI shapes and Ubuntu/Alata typography; official club logo provenance and visual approval are still pending (CI pending).
+- [ ] Complete centralized MUI brand theme: `src/theme.ts` provides light/dark tokens, MUI shapes and Ubuntu/Alata typography; approved club logo now appears in the header with accessible alt text and an image-loading browser test (`1207223`, `dd9c9d3`, CI pending). Final visual and contrast checks remain.
 - [ ] Follow `prefers-color-scheme` automatically, including changes at runtime, without a manual toggle or startup theme flash. Added Chromium system-switching test and explicit focus outlines in `a957b4e` (CI pending); contrast audit and flash check remain.
 - [x] Set visible header and browser title/description to **Serve With SF Fil-Am Lions**; keep URLs unchanged (CI/UI verification pending).
 - [x] Implement initial responsive Upcoming/Past tabs with event cards showing event-local start/end instants, time zone, and location (CI/UI verification pending).
