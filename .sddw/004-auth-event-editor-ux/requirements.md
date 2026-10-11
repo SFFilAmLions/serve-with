@@ -43,3 +43,13 @@ Self-service email change; dedicated deactivation/reactivation control and lifec
 ## Decisions to confirm before implementation
 
 Use MUI X Date and Time Pickers for the event date/time controls, subject to implementation-time license/dependency verification. The remaining prerequisite is the Terms/Privacy publication/versioning procedure. Dedicated Create/Edit Event pages are the design baseline.
+
+
+## Cross-cutting interaction and presentation requirements
+
+- Use canonical event pages at `/events/:id` for public, attendee and administrator viewing. Public/attendee event rows and the main area of administrator event rows open the canonical event page; administrators receive a contextual pencil/Edit action there. Keep Duplicate and Delete as management actions on `/admin/events`. Attendee event signup remains out of scope.
+- Present Events as Material list rows with subtle horizontal separators rather than default cards. Administrator desktop/wide rows expose event/date/time plus icon-and-text actions; constrained/mobile rows stack secondary date/time/location information and collapse actions to icons. Keep Upcoming/Past tabs; do not add an All tab in this scope.
+- On successful Create/Edit save, navigate to `/events/:id`. Duplicate opens Create without persisting; Delete requires an explicit textual confirmation dialog. Preserve drafts on validation, network and concurrency failures.
+- Keep app bars/navigation stable while loading and prefer content-shaped Material skeletons over full-page spinners. Use concise empty states and local Retry actions. Keep validation next to fields and preserve entered data after save failures.
+- Do not rely on cards as the default page container; prefer app bars, tabs, lists, dividers and forms. Cards remain available only when content genuinely benefits from grouping.
+- All icon-only controls need accessible names and adequate touch targets; all actions must be keyboard reachable. Associate validation messages with fields, announce important asynchronous failures appropriately, restore focus after dialogs, respect reduced-motion preferences and maintain sufficient contrast in Light/Dark/System themes. Administrator identity must remain explicit beyond color, and A–Z navigation needs keyboard/screen-reader equivalence.
