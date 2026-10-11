@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0](https://github.com/SFFilAmLions/serve-with/compare/v0.3.1...v0.4.0) (2026-10-11)
+
+
+### Features
+
+* refine Serve With material UX (SDDW-005) ([#16](https://github.com/SFFilAmLions/serve-with/issues/16)) ([32ed39b](https://github.com/SFFilAmLions/serve-with/commit/32ed39b63cb71130b7c58e776e213de778493416))
+
 ## [0.3.1](https://github.com/SFFilAmLions/serve-with/compare/v0.3.0...v0.3.1) (2026-10-11)
 
 
