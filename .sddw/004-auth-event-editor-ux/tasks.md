@@ -3,7 +3,8 @@
 **Status: Not yet authorized. Requirements review first.**
 
 - [ ] Approve [requirements.md](requirements.md).
-- [ ] Review/approve mandatory first and last name, email-based registration, self-deletion, and staging-only allowlist requirements; collect verified existing administrator names before migrating them.
+- [x] Record user decisions: existing administrators complete profile at next sign-in; staging whitelist is email-only; first and last names are editable.
+- [ ] Review/approve remaining registration and deletion requirements; design no-lockout admin profile transition and consistency with existing administrator YAML.
 - [ ] Design account schema, migrations, verification, self-deletion/session revocation, staging allowlist policy and tests, and how existing admins transition.
 - [ ] Review/approve the separate Attendee and Administrator view requirements and design accessible switching and route authorization.
 - [ ] Design authentication and account-menu interactions in [design.md](design.md); review and approve.
