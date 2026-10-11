@@ -63,6 +63,12 @@
 - [ ] Publish reviewed policies, set required Terms/Privacy versions and enable compliant acknowledgment UI (not approved in this selected batch).
 - [ ] Inspect remotely applied staging migrations and provision private staging allowlist, then validate real staging auth/D1 behavior after separately approved deployment.
 
+## Release readiness preparation
+
+- [x] Add explicit staging/production Worker environment markers (no invitation addresses or policy versions committed).
+- [x] Document remote D1 inspection, sanitized rehearsal, private allowlist provisioning, policy approval, and staged verification in [release-readiness.md](release-readiness.md).
+- [ ] Verify remote staging state and policy/source approval before deployment.
+
 ## Release gates
 
 - [ ] Review implementation PR(s); merge only after approval.
