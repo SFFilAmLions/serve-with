@@ -5,7 +5,7 @@ import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { TimePicker } from '@mui/x-date-pickers/TimePicker';
-import { AppBar, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Alert, Autocomplete, Snackbar, Container, CssBaseline, Stack, Tab, Tabs, TextField, ThemeProvider, Typography, useMediaQuery, IconButton, Menu, MenuItem, ListItemButton, ListItemText, Divider, Tooltip, Skeleton } from '@mui/material';
+import { AppBar, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Alert, Autocomplete, Snackbar, Container, CssBaseline, Stack, Tab, Tabs, TextField, ThemeProvider, Typography, useMediaQuery, IconButton, Menu, MenuItem, ListItemButton, Divider, Tooltip, Skeleton } from '@mui/material';
 import './style.css';
 import { createClubTheme } from './theme';
 import { type Draft, timeZones, validateDraft, emptyDraft, localInput } from './event-form';
@@ -164,13 +164,25 @@ function UserView({id,edit}:{id:string;edit:boolean}){
  {message&&<Alert severity="error">{message}</Alert>}</Stack>;
 }
 function UsersDirectory(){
- const [people,setPeople]=useState<any[]>([]),[query,setQuery]=useState(''),[sort,setSort]=useState<'first'|'last'>('last'),[direction,setDirection]=useState<'asc'|'desc'>('asc'),[letter,setLetter]=useState(''),[offset,setOffset]=useState(0),[more,setMore]=useState(false),[error,setError]=useState('');
+ const [people,setPeople]=useState<any[]>([]),[query,setQuery]=useState(()=>sessionStorage.getItem('sw-users-q')||''),[sort,setSort]=useState<'first'|'last'>(()=>sessionStorage.getItem('sw-users-sort')==='first'?'first':'last'),[direction,setDirection]=useState<'asc'|'desc'>(()=>sessionStorage.getItem('sw-users-direction')==='desc'?'desc':'asc'),[letter,setLetter]=useState(()=>sessionStorage.getItem('sw-users-letter')||''),[offset,setOffset]=useState(0),[more,setMore]=useState(false),[error,setError]=useState('');
  const load=async(next=0)=>{try{const params=new URLSearchParams({q:query,sort,direction,letter,offset:String(next)});const data=await requestJson('/api/admin/users?'+params);setPeople(old=>next?[...old,...data.users]:data.users);setMore(data.hasMore);setOffset(data.nextOffset);setError('')}catch(e){setError(String(e))}};
- useEffect(()=>{void load(0)},[query,sort,direction,letter]);
+ useEffect(()=>{sessionStorage.setItem('sw-users-q',query);sessionStorage.setItem('sw-users-sort',sort);sessionStorage.setItem('sw-users-direction',direction);sessionStorage.setItem('sw-users-letter',letter);void load(0)},[query,sort,direction,letter]);
  const sortBy=(v:'first'|'last')=>{if(sort===v)setDirection(d=>d==='asc'?'desc':'asc');else{setSort(v);setDirection('asc')}};
- return <Stack sx={{my:4}} spacing={2}><Typography variant="h4">Users</Typography><TextField label="Search name or email" value={query} onChange={e=>setQuery(e.target.value)}/><Stack direction="row" spacing={1}><Button onClick={()=>sortBy('first')}>First name {sort==='first'?(direction==='asc'?'↑':'↓'):''}</Button><Button onClick={()=>sortBy('last')}>Last name {sort==='last'?(direction==='asc'?'↑':'↓'):''}</Button></Stack>
- <Box sx={{display:'flex',gap:1}}><Box sx={{flex:1}}>{people.map(p=><React.Fragment key={p.id}><ListItemButton onClick={()=>go('/users/'+p.id)}><ListItemText primary={p.first_name+' '+p.last_name} secondary={p.email}/></ListItemButton><Divider/></React.Fragment>)}{!people.length&&<Typography>No matching users.</Typography>}{more&&<Button onClick={()=>void load(offset)}>Load more</Button>}</Box><Stack sx={{position:'sticky',top:16,alignSelf:'flex-start'}}>{'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map(x=><Button key={x} size="small" aria-label={'Jump to '+x} onClick={()=>setLetter(x)}>{x}</Button>)}<Button size="small" onClick={()=>setLetter('')}>All</Button></Stack></Box>{error&&<Alert severity="error">{error}</Alert>}</Stack>;
+ const gridColumns={xs:'minmax(0,1fr)',sm:'minmax(0,1fr) minmax(0,1fr)',lg:'minmax(0,1fr) minmax(0,1fr) minmax(0,2fr)'};
+ return <Stack sx={{my:4}} spacing={2}><Typography variant="h4">Users</Typography><TextField label="Search name or email" value={query} onChange={e=>setQuery(e.target.value)}/><Box sx={{display:{xs:'none',sm:'grid'},gridTemplateColumns:gridColumns,gap:1}}>
+ <Button sx={{justifyContent:'flex-start'}} onClick={()=>sortBy('first')}>First name {sort==='first'?(direction==='asc'?'↑':'↓'):''}</Button>
+ <Button sx={{justifyContent:'flex-start'}} onClick={()=>sortBy('last')}>Last name {sort==='last'?(direction==='asc'?'↑':'↓'):''}</Button>
+ <Typography sx={{display:{xs:'none',lg:'block'},px:1,alignSelf:'center',color:'text.secondary'}}>Email</Typography>
+ </Box>
+ <Box sx={{display:'flex',gap:1}}><Box sx={{flex:1,minWidth:0}}>{people.map(p=><React.Fragment key={p.id}><ListItemButton onClick={()=>go('/users/'+p.id)} sx={{display:'grid',gridTemplateColumns:gridColumns,gap:1,minHeight:52}}>
+ <Typography sx={{display:{xs:'none',sm:'block'},overflow:'hidden',textOverflow:'ellipsis'}}>{p.first_name||'—'}</Typography>
+ <Typography sx={{display:{xs:'none',sm:'block'},overflow:'hidden',textOverflow:'ellipsis'}}>{p.last_name||'—'}</Typography>
+ <Typography sx={{display:{xs:'block',sm:'none'}}}>{[p.first_name,p.last_name].filter(Boolean).join(' ')||p.email}</Typography>
+ <Typography color="text.secondary" sx={{display:{xs:'none',lg:'block'},overflow:'hidden',textOverflow:'ellipsis'}}>{p.email}</Typography>
+ </ListItemButton><Divider/></React.Fragment>)}{!people.length&&<Typography sx={{p:2}}>No matching users. Try a different name or email.</Typography>}{more&&<Button onClick={()=>void load(offset)}>Load more</Button>}</Box>
+ <Stack aria-label="Alphabetical directory navigation" sx={{position:'sticky',top:16,alignSelf:'flex-start',maxHeight:'70vh',overflowY:'auto',width:42}}>{'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map(x=><Button key={x} sx={{minWidth:36,minHeight:26,p:0}} aria-label={'Jump to '+x} onClick={()=>setLetter(x)} variant={letter===x?'contained':'text'}>{x}</Button>)}<Button size="small" onClick={()=>setLetter('')}>All</Button></Stack></Box>{error&&<Alert severity="error">{error}</Alert>}</Stack>;
 }
+
 function EventDetail({id,admin}:{id:string;admin:boolean}){
  const [event,setEvent]=useState<EventRecord|null>(null),[error,setError]=useState('');
  useEffect(()=>{void requestJson('/api/events/'+id).then(r=>setEvent(r.event)).catch(e=>setError(e.message))},[id]);
