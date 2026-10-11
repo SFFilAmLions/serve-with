@@ -17,11 +17,17 @@ Retain React/Vite/MUI, Cloudflare Worker, D1, Resend and current events APIs. Re
 | `/users/:id/edit` | Owner or eligible administrator | Canonical editor; fields vary by permission |
 | `/admin` | Eligible administrator | Redirect to `/admin/events` |
 | `/admin/events` | Eligible administrator | Event management; default Administrator tab |
-| `/admin/users` | Eligible administrator | Paginated name/email directory |
+| `/admin/users` | Eligible administrator | Searchable/sortable directory with incremental A–Z navigation |
 | `/admin/events/new` | Eligible administrator | Create or duplicate-prefilled event |
 | `/admin/events/:id/edit` | Eligible administrator | Edit existing event |
 
 All privileged APIs independently verify authenticated session, verified email, complete profile, current agreement and role. Incomplete or outdated accounts may access only completion/reacceptance/logout; do not expose privileged endpoints through direct navigation.
+
+## Login screen flow
+
+Use `/login` as one continuous Material flow rather than separate Sign In and Register pages. State 1 asks only for Email with a **Continue** action. After submission, State 2 says to check email, identifies the submitted address, accepts the eight-digit code, and offers **Continue**, **Resend code**, and **Use a different email** without revealing whether an account existed. A valid magic link automatically completes verification and advances to the required next state without a confirmation button.
+
+After verification, existing complete/current users finish sign-in immediately. New or incomplete users remain on `/login` and advance to **Complete your profile** with First name, Last name, DOB, and one initially unchecked acknowledgment linking Terms of Use and Privacy Policy. Users whose profile is complete but agreement versions are outdated see only the required reacceptance state rather than reentering valid profile fields. The first-step action is labeled **Continue**, not implementation-specific wording such as “Email me a code and sign-in link.”
 
 ## Authentication and persistence
 
