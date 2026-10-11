@@ -96,8 +96,8 @@ test('administrator workspace has Events and Users tabs and separate appearance 
   await page.getByRole('button',{name:'Account and appearance menu'}).click();
   await page.getByRole('menuitem',{name:'Administrator workspace'}).click();
   await page.getByText('Administrator',{exact:true}).first().waitFor();
-  await page.getByRole('tab',{name:'Events'}).waitFor();
-  await page.getByRole('tab',{name:'Users'}).waitFor();
+  await page.getByRole('tab',{name:'Events',exact:true}).waitFor();
+  await page.getByRole('tab',{name:'Users',exact:true}).waitFor();
   await page.getByRole('button',{name:'Account and appearance menu'}).click();
   await page.getByRole('menuitem',{name:'Dark appearance'}).click();
   assert.equal(await page.evaluate(()=>localStorage.getItem('servewith-appearance')),'dark');
@@ -130,7 +130,7 @@ test('administrator event editor uses date/time pickers and protects dirty draft
   await page.getByRole('button',{name:'Keep editing'}).click();
   assert.equal(await page.getByRole('textbox',{name:'Event title'}).inputValue(),'Draft event');
   await page.getByRole('button',{name:'More options'}).click();
-  await page.getByText('Time zone').waitFor();
+  await page.getByText('Time zone',{exact:true}).first().waitFor();
  }finally{await browser.close()}
 });
 
