@@ -26,7 +26,7 @@ function database() {
     bind(...params) { return { first: async () => stmt.get(...params) || null,
       run: async () => { const result = stmt.run(...params); return { meta: { changes: Number(result.changes) } }; }
     }; }
-  }; }}, batch: async (statements) => { sqlite.exec('BEGIN'); try { for(const statement of statements) await statement.run(); sqlite.exec('COMMIT'); } catch(e) {sqlite.exec('ROLLBACK');throw e;} } };
+  }; }, batch: async (statements) => { sqlite.exec('BEGIN'); try { for(const statement of statements) await statement.run(); sqlite.exec('COMMIT'); } catch(e) {sqlite.exec('ROLLBACK');throw e;} } };
   return { sqlite, adapter };
 }
 function harness() {
