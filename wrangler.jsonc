@@ -7,6 +7,16 @@
     "binding": "ASSETS"
   },
   "env": {
+    "production": {
+      "name": "serve-with",
+      "d1_databases": [
+        {
+          "binding": "AUTH_DB",
+          "database_name": "serve-with-prod-db",
+          "database_id": "d3855bcb-bdc3-4bd2-a0a5-b1fc5d7cdca6"
+        }
+      ]
+    },
     "staging": {
       "name": "serve-with-staging",
       "d1_databases": [
