@@ -1,6 +1,5 @@
 # Serve With — Terms of Use
 
-**Version:** 0.1.0  
 **Effective Date:** October 11, 2026  
 **Operated by:** San Francisco Fil-Am Lions Club
 
