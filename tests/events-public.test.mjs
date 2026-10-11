@@ -31,7 +31,7 @@ function harness() {
   const insert = (id,start,end,deleted=null) => sqlite.prepare(
     'INSERT INTO events (id,title,location,timezone,start_at,end_at,created_at,updated_at,deleted_at) VALUES (?,?,?,?,?,?,?,?,?)'
   ).run(id,'Event '+id,'San Jose','America/Los_Angeles',start,end,1,1,deleted);
-  return {sqlite,req,insert};
+  return {sqlite,req,insert,adapter};
 }
 
 test('public events API handles empty lists, invalid view and methods',async()=>{
@@ -191,7 +191,7 @@ test('admin writes enforce CSRF origin even with a valid authenticated session',
   const event={title:'Service',location:'San Francisco',timezone:'America/Los_Angeles',start:'2026-11-14T09:00',end:'2026-11-14T11:00'};
   const response=await worker.fetch(new Request('https://servewith-beta.sffilamlions.org/api/admin/events',{
    method:'POST',headers:{origin:'https://malicious.example','content-type':'application/json',cookie:'__Host-sw_session='+session},body:JSON.stringify(event)
-  }),{AUTH_DB:{prepare:h.sqlite.prepare.bind(h.sqlite)},AUTH_PEPPER:'test',ASSETS:{fetch:async()=>new Response('asset')}});
+  }),{AUTH_DB:h.adapter,AUTH_PEPPER:'test',ASSETS:{fetch:async()=>new Response('asset')}});
   assert.equal(response.status,400);
   assert.equal(h.sqlite.prepare('SELECT COUNT(*) AS n FROM events').get().n,0);
  }finally{h.sqlite.close()}
