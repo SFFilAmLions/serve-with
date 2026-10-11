@@ -41,7 +41,9 @@ Propose public versioned routes `/terms` and `/privacy` for current readable doc
 
 ## Remaining gates
 
-1. Approve and publish Terms/Privacy documents and versions.
-2. Approve concrete D1 migration and audit retention choices; confirm deployed staging database state and allowlist secret configuration.
-3. During authorized implementation, install Community picker + Day.js, commit lockfile and run build/browser accessibility/DST tests.
-4. Keep PR #13 draft and do not merge/deploy or enable production attendee registration without separate approval.
+The specification and migration/audit design are ready for implementation approval. The following are execution/rollout gates rather than unresolved SDDW design questions:
+
+1. Supply/approve substantive Terms/Privacy documents and first versions; they must be published before attendee onboarding.
+2. During authorized implementation, confirm deployed staging migration state and configure the separate staging registration allowlist before enabling attendee registration.
+3. Install Community picker + Day.js, commit the resolved dependency lockfile, and run build/browser/accessibility/DST tests.
+4. Keep PR #13 draft until explicitly approved; do not merge/deploy or enable production attendee registration without separate approval.
