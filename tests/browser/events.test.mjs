@@ -156,15 +156,16 @@ test('directory is paginated, searchable, sortable, and links to canonical profi
   await page.route('**/api/users/'+adminId,r=>r.fulfill({json:{user:{id:adminId,first_name:'Admin',last_name:'Example',email:'admin@example.org',date_of_birth:'1990-01-01'},canCorrectDob:true}}));
   await page.goto(base+'/admin/users');
   await page.getByRole('heading',{name:'Users'}).waitFor();
+  const alphabetRequest=page.waitForResponse(r=>r.url().includes('letter=A'));
   await page.getByRole('button',{name:'Jump to A'}).click();
-  await page.waitForFunction(()=>document.querySelector('button[aria-label="Jump to A"]')!==null);
+  await alphabetRequest;
   assert.ok(last.includes('letter=A'));
   await page.getByRole('textbox',{name:'Search name or email'}).fill('Admin');
   await page.getByText('admin@example.org').first().click();
   assert.equal(new URL(page.url()).pathname,'/users/'+adminId);
   await page.getByRole('heading',{name:'Admin Example'}).waitFor();
   await page.getByRole('button',{name:'Edit profile'}).click();
-  await page.getByRole('textbox',{name:'Date of birth'}).waitFor();
+  await page.getByLabel('Date of birth').waitFor();
  }finally{await browser.close()}
 });
 
