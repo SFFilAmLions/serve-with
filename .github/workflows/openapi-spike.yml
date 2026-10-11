@@ -24,10 +24,10 @@ jobs:
         run: npx --yes --package=openapi-typescript@7.13.0 openapi-typescript openapi/openapi.yaml -o /tmp/api-types.d.ts
       - name: Verify generated operations exist
         run: |
-          test -s /tmp/serve-with-api-types.d.ts
-          grep -F '"/api/events/{id}"' /tmp/serve-with-api-types.d.ts
-          grep -F '"/api/admin/events"' /tmp/serve-with-api-types.d.ts
-          grep -F 'createAdminEvent' /tmp/serve-with-api-types.d.ts
+          test -s /tmp/api-types.d.ts
+          grep -F '"/api/events/{id}"' /tmp/api-types.d.ts
+          grep -F '"/api/admin/events"' /tmp/api-types.d.ts
+          grep -F 'createAdminEvent' /tmp/api-types.d.ts
       - name: Generate typed Worker operation interfaces from YAML
         run: node scripts/generate-server-contract.mjs openapi/openapi.yaml /tmp/api-server-contract.ts
       - name: Type-check generated Worker interfaces against generated OpenAPI operations
