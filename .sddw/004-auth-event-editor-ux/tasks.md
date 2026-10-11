@@ -41,7 +41,7 @@
 - [x] Add server-side staging eligibility enforcement to existing code/magic login, preserving non-enumerating requests and rate limits; existing enabled admins remain eligible.
 - [x] Add session-limited initial profile completion and required-version agreement endpoints with server validation and atomic D1 acceptance history/summary persistence.
 - [x] Add minimum-account state in `/api/auth/me` and enforce verified profile/current-agreement/admin-role gates before administrator APIs.
-- [ ] Observe green CI for this backend batch; fix any test/build regressions.
+- [x] GitHub Actions CI passed for backend implementation commit `09385073` (unit/integration, build and browser tests; [run #38127862126](https://github.com/SFFilAmLions/serve-with/actions/runs/38127862126)).
 - [ ] Add/complete email-first UI, automatic magic exchange, published approved policy sources, and configuration for staging before attendee onboarding.
 - [ ] Implement owner/admin user profile and directory authorization in the later account-management slice.
 
