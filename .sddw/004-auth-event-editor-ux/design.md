@@ -6,6 +6,7 @@ Prepare a design only after reviewing [requirements.md](requirements.md).
 
 Design review must cover:
 - Single-attempt automatic magic-link POST exchange and token scrubbing.
+- Distinct attendee and administrator views; authorized administrator mode switching, route boundaries, app-bar affordances, and mobile behavior.
 - Material AppBar sign-in and account menu, with dialogs and mobile behavior.
 - Prominent date and equal-width clock pickers, expandable end date/time zone, end-date synchronization, DST-aware duration preview.
 - Mandatory user profile storage and migration of existing administrator names; server-owned registration and self-deletion flows.
