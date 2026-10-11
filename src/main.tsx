@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { AppBar, Box, Button, Card, CardContent, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Alert, Container, CssBaseline, Stack, Tab, Tabs, TextField, ThemeProvider, Typography, createTheme, useMediaQuery } from '@mui/material';
+import { AppBar, Box, Button, Card, CardContent, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Alert, Autocomplete, Container, CssBaseline, Stack, Tab, Tabs, TextField, ThemeProvider, Typography, createTheme, useMediaQuery } from '@mui/material';
 import './style.css';
 
 type EventRecord = { id:string; title:string; location:string; timezone:string; start_at:number; end_at:number; version:number };
@@ -11,7 +11,7 @@ const buildSha = import.meta.env.VITE_COMMIT_SHA || '';
 const releaseTag = import.meta.env.VITE_RELEASE_TAG || '';
 function BuildFooter() {
  const staged = buildEnvironment === 'staging' && /^[a-f0-9]{40}$/.test(buildSha);
- const released = buildEnvironment === 'production' && /^v\\d+\\.\\d+\\.\\d+$/.test(releaseTag);
+ const released = buildEnvironment === 'production' && /^v\d+\.\d+\.\d+$/.test(releaseTag);
  const label = staged ? 'Commit ' + buildSha.slice(0,12) : released ? 'Version ' + releaseTag : 'Development build';
  const href = staged ? repositoryUrl + '/commit/' + buildSha : released ? repositoryUrl + '/releases/tag/' + releaseTag : undefined;
  return <Box component="footer" sx={{my:5,color:'text.secondary',fontSize:12,display:'flex',flexWrap:'wrap',gap:1,alignItems:'center'}}>
@@ -27,6 +27,20 @@ const api = async (path:string,body?:Record<string,string>) => {
  const data=await r.json();if(!r.ok)throw new Error(data.error||'Request failed');return data;
 };
 type Draft = {title:string;location:string;timezone:string;start:string;end:string};
+const timeZones = (() => {
+ const zones = typeof Intl.supportedValuesOf === 'function' ? Intl.supportedValuesOf('timeZone') : ['America/Los_Angeles','America/New_York','America/Chicago','America/Denver','UTC'];
+ return Array.from(new Set(['America/Los_Angeles','UTC',...zones])).sort();
+})();
+const validateDraft = (draft:Draft):Record<string,string> => {
+ const errors:Record<string,string>={};
+ if(!draft.title.trim()||draft.title.trim().length>200)errors.title='Enter a title (1–200 characters)';
+ if(!draft.location.trim()||draft.location.trim().length>500)errors.location='Enter a location (1–500 characters)';
+ if(!timeZones.includes(draft.timezone))errors.timezone='Choose a valid time zone';
+ if(!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(draft.start))errors.start='Enter a start date and time';
+ if(!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(draft.end))errors.end='Enter an end date and time';
+ if(!errors.start&&!errors.end&&draft.end<=draft.start)errors.end='End must be after start';
+ return errors;
+};
 const emptyDraft = ():Draft => ({title:'',location:'',timezone:'America/Los_Angeles',start:'',end:''});
 const localInput = (timestamp:number,zone:string) => {
  const parts = new Intl.DateTimeFormat('en-US',{timeZone:zone,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(new Date(timestamp));
@@ -35,11 +49,11 @@ const localInput = (timestamp:number,zone:string) => {
 };
 function Editor({event,onClose,onSaved}:{event:EventRecord|null;onClose:()=>void;onSaved:()=>void}){
  const original=React.useMemo<Draft>(()=>event?{title:event.title,location:event.location,timezone:event.timezone,start:localInput(event.start_at,event.timezone),end:localInput(event.end_at,event.timezone)}:emptyDraft(),[event]);
- const [form,setForm]=useState<Draft>(original),[saving,setSaving]=useState(false),[errors,setErrors]=useState<Record<string,string>>({}),[message,setMessage]=useState(''),[discard,setDiscard]=useState(false);
+ const [form,setForm]=useState<Draft>(original),[saving,setSaving]=useState(false),[errors,setErrors]=useState<Record<string,string>>({}),[message,setMessage]=useState(''),[discard,setDiscard]=useState(false),[conflict,setConflict]=useState(false),[reloadConfirm,setReloadConfirm]=useState(false);
  const changed=JSON.stringify(form)!==JSON.stringify(original);
  const close=()=>{if(saving)return;if(changed)setDiscard(true);else onClose()};
  const set=(key:keyof Draft,value:string)=>setForm(previous=>({...previous,[key]:value}));
- const save=async()=>{if(saving)return;setSaving(true);setErrors({});setMessage('');
+ const save=async()=>{if(saving)return;const validation=validateDraft(form);if(Object.keys(validation).length){setErrors(validation);setMessage('Correct the highlighted fields before saving');return;}setSaving(true);setErrors({});setMessage('');
   try{
    const response=await fetch(event?'/api/admin/events/'+encodeURIComponent(event.id):'/api/admin/events',{
     method:event?'PUT':'POST',headers:{'content-type':'application/json'},credentials:'same-origin',
@@ -47,7 +61,8 @@ function Editor({event,onClose,onSaved}:{event:EventRecord|null;onClose:()=>void
    });
    if(!response.ok){const result=await response.json() as {error?:string;fields?:Record<string,string>};
      setErrors(result.fields||{});
-     setMessage(response.status===409?'Another administrator changed this event. Copy your edits before reloading.':result.error||'Unable to save event');
+     if(response.status===409)setConflict(true);
+     setMessage(response.status===409?'Another administrator changed this event. Your edits are preserved.':result.error||'Unable to save event');
      return;
    }
    onSaved();
@@ -57,15 +72,16 @@ function Editor({event,onClose,onSaved}:{event:EventRecord|null;onClose:()=>void
  <Dialog open onClose={close} fullWidth maxWidth="sm" aria-labelledby="event-editor-title">
  <DialogTitle id="event-editor-title">{event?'Edit Event':'Add Event'}</DialogTitle>
  <DialogContent><Stack spacing={2} sx={{mt:1}}>
- {message&&<Alert severity="error">{message}</Alert>}
+ {message&&<Alert severity="error" action={conflict?<Button color="inherit" size="small" onClick={()=>setReloadConfirm(true)}>Reload current event</Button>:undefined}>{message}</Alert>}
  <TextField label="Title" required inputProps={{maxLength:200}} value={form.title} onChange={e=>set('title',e.target.value)} error={!!errors.title} helperText={errors.title}/>
  <TextField label="Location" required multiline inputProps={{maxLength:500}} value={form.location} onChange={e=>set('location',e.target.value)} error={!!errors.location} helperText={errors.location}/>
- <TextField label="Time zone (IANA)" required value={form.timezone} onChange={e=>set('timezone',e.target.value)} error={!!errors.timezone} helperText={errors.timezone||'Example: America/Los_Angeles'}/>
+ <Autocomplete options={timeZones} value={form.timezone} onChange={(_,value)=>set('timezone',value||'')} renderInput={params=><TextField {...params} label="Time zone (IANA)" required error={!!errors.timezone} helperText={errors.timezone||'Choose the event’s local time zone'}/>}/>
  <TextField label="Start date and time" type="datetime-local" slotProps={{inputLabel:{shrink:true}}} required value={form.start} onChange={e=>set('start',e.target.value)} error={!!errors.start} helperText={errors.start}/>
  <TextField label="End date and time" type="datetime-local" slotProps={{inputLabel:{shrink:true}}} required value={form.end} onChange={e=>set('end',e.target.value)} error={!!errors.end} helperText={errors.end}/>
  </Stack></DialogContent>
  <DialogActions><Button disabled={saving} onClick={close}>Cancel</Button><Button loading={saving} variant="contained" onClick={()=>void save()}>Save</Button></DialogActions>
  </Dialog>
+ <Dialog open={reloadConfirm} onClose={()=>setReloadConfirm(false)} aria-labelledby="reload-title"><DialogTitle id="reload-title">Discard edits and load current event?</DialogTitle><DialogContent>Your unsaved changes will be lost. The event list will reload with the latest saved version.</DialogContent><DialogActions><Button onClick={()=>setReloadConfirm(false)}>Keep editing</Button><Button color="error" onClick={onSaved}>Discard edits and reload</Button></DialogActions></Dialog>
  <Dialog open={discard} onClose={()=>setDiscard(false)} aria-labelledby="discard-title"><DialogTitle id="discard-title">Discard unsaved changes?</DialogTitle><DialogActions><Button onClick={()=>setDiscard(false)}>Keep editing</Button><Button color="error" onClick={onClose}>Discard changes</Button></DialogActions></Dialog>
  </>;
 }
