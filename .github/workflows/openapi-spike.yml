@@ -5,6 +5,8 @@ on:
       - 'openapi/**'
       - '.github/workflows/openapi-spike.yml'
       - 'scripts/validate-openapi.mjs'
+      - 'scripts/openapi-runtime-spike.mjs'
+      - 'scripts/generate-server-contract.mjs'
   workflow_dispatch:
 permissions:
   contents: read
@@ -32,3 +34,7 @@ jobs:
         run: node scripts/generate-server-contract.mjs openapi/openapi.yaml /tmp/api-server-contract.ts
       - name: Type-check generated Worker interfaces against generated OpenAPI operations
         run: npx tsc --noEmit --skipLibCheck --target es2022 --module esnext --moduleResolution bundler --lib es2022,dom /tmp/api-server-contract.ts
+      - name: Install pinned runtime spike dependencies (not production)
+        run: npm install --no-save --package-lock=false openapi-fetch@0.15.0 ajv@8.17.1
+      - name: Exercise callable OpenAPI client and JSON Schema validation
+        run: node scripts/openapi-runtime-spike.mjs
