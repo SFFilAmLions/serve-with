@@ -21,8 +21,8 @@ Origin: successful SDDW 003 staging use and user feedback. Consolidates [#10](ht
 
 ## 3. Streamlined Add/Edit Event dialog
 
-- Use the existing MUI theme, with an accessible **X close button in the upper-right dialog header** in place of the bottom Cancel button; keep a prominent Save action.
-- All close paths (X, Escape, backdrop) share the existing **Discard unsaved changes?** behavior, including focus restoration after close.
+- **Revised decision:** Event creation must use a **dedicated Create Event page**, not a modal dialog. Provide a normal page header, navigation/back affordance, and prominent Save action. Reuse the same event field component for editing; the final Edit Event presentation (dedicated page recommended for consistency) is specified during design.
+- Navigation away from an event form with unsaved changes must prompt before discarding edits, including browser back/navigation where supported. The earlier modal-specific X/Cancel requirement no longer applies to the Create Event page.
 - Display a **prominent, full-width Start date**, followed by **equal-sized Start time and End time controls next to each other**; use easy-to-operate clock/time pickers with keyboard/manual input support.
 - Show a live **Duration** preview aligned under the time row or near End time without making either time control narrower.
 - Keep **End date** and **Time zone** collapsed under a discoverable **More options** section by default. Default end date to the chosen start date and zone to `America/Los_Angeles`.
@@ -54,7 +54,16 @@ Origin: successful SDDW 003 staging use and user feedback. Consolidates [#10](ht
 - Verify ordinary users can sign in but cannot call administrator mutation APIs. Verify public events remain readable while signed out.
 - No deployment or user-account migration until requirements, design, and implementation tasks have been approved.
 
-## 5. Separate Attendee and Administrator experiences
+## 5. Profile editor and administrator user directory
+
+- Give **every authenticated user a dedicated Edit Profile page**, reachable through the top app-bar account menu. Users may view and update **their own first and last names**, with required-field validation. Their verified email is displayed but **not editable** in SDDW 004.
+- Provide an **administrator-only Users page** listing registered user accounts, with useful identifying columns (first name, last name, email) and basic search/filtering. This is an account directory, not an event-attendance list.
+- Administrators may open **an Edit User page for any registered user** from the directory and change that user's editable profile fields, including first and last name. Never treat the ability to edit a profile as permission to grant administrator status or modify the verified email.
+- Enforce ownership or administrator authorization server-side on every profile read/write. A normal user cannot view the full user directory, enumerate other users, or edit another user by manipulating a URL or API request.
+- Administrator account/profile management must preserve existing eligibility, verification, permissions, and account-deletion safeguards. Administration of roles, email changes, account creation on behalf of others, and cross-user deletion are **not authorized by this requirement**.
+- Page navigation must support direct links, browser back/forward, responsive layout, keyboard focus, save feedback, and unsaved-change protection.
+
+## 6. Separate Attendee and Administrator experiences
 
 - Provide **distinct Attendee and Administrator views**, not one public event page with scattered admin editing controls. Attendee is the normal/default experience for signed-in people.
 - **Attendee view:** Browse Upcoming and Past events, use personal account/profile controls, and access attendee-facing capabilities as those are introduced. Do not invent registration-for-events, RSVP, signup, or attendance features as part of SDDW 004; those remain future work.
@@ -66,24 +75,25 @@ Origin: successful SDDW 003 staging use and user feedback. Consolidates [#10](ht
 - When returning from admin to attendee, retain the attendee's normal browsing experience; define back/navigation and optional view persistence in design. Never leak admin-only information into the attendee view.
 - Browser tests must cover attendee-only accounts, administrators switching both directions, direct navigation to protected administrator views, logout and expired-session behavior, keyboard/mobile switching, and no accidental admin controls in attendee view.
 
-## 6. Acceptance and boundaries
+## 7. Acceptance and boundaries
 
-- Automated tests: automatic single-attempt magic-link sign-in/token scrubbing, code/login/logout regressions, registration/profile/deletion and staging eligibility checks, account-menu/mobile, attendee/admin view switching and keyboard behavior, modal focus/discard behavior, start/end synchronization and overrides, distinct date and clock input UX, live duration and DST edge cases, Edit prefill, no public-list regression.
+- Automated tests: automatic single-attempt magic-link sign-in/token scrubbing, code/login/logout regressions, registration/profile/deletion and staging eligibility checks, own-profile edit versus administrator editing of other users, protected user directory, dedicated event-create page, account-menu/mobile, attendee/admin view switching and keyboard behavior, page-navigation/discard behavior, start/end synchronization and overrides, distinct date and clock input UX, live duration and DST edge cases, Edit prefill, no public-list regression.
 - Verify changes on staging through normal `main` workflow after approval, fixing staging defects iteratively. **No production deployment without separate explicit authorization.**
 - Out of scope: new authentication providers, new event schema, event RSVP/signups, recurrence, organization permissions expansion, or production release.
 
-## 7. Confirmed requirements decisions
+## 8. Confirmed requirements decisions
 
 - **Existing administrators:** Mandatory first/last name completion at next sign-in (not invented or pre-seeded). Until complete, restrict to completion/sign-out while preserving their existing role assignment.
 - **Staging registration allowlist:** Email addresses only; registrants supply their own mandatory names.
 - **Profile editing:** Users may change their first/last names after registration; both fields must remain valid and nonblank. Email changes are not included in this phase.
 - **Administrator identity source:** `config/admins.yaml` remains an email-only authorization source; required names and verified email reside in D1 profiles, including administrators. No names in YAML.
 
-## 8. Items to settle in design review
+## 9. Items to settle in design review
 
 - Specific MUI date/time picker dependency, license constraints, and mobile clock UX.
 - Whether the duration should be shown directly beneath the equal-width time inputs or in an End time label area; the equal sizing and prominent date are required either way.
 - Exact loading/error presentation for automatic magic-link exchange.
+- Decide whether Edit Event should also be a dedicated page (recommended for consistency) and the exact URL patterns for Create Event, Users, Edit Profile, and Edit User.
 - Attendee/Admin view navigation model (route or mode switch), initial/default view and UI placement; do not imply attendee event signup is already implemented.
 - User table/profile migration and deletion semantics (including retention); staging email-only allowlist configuration and reconciliation. Administrator configuration/profile source-of-truth split is approved.
 - Production registration eligibility policy (explicitly deferred; no production registration is authorized).
