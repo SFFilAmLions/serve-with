@@ -177,6 +177,49 @@ export default {
       ).bind(now).all<{ id: string; title: string; location: string; timezone: string; start_at: number; end_at: number; version: number }>();
       return json({ view, events: events.results });
     }
+    // Canonical event details remain anonymously accessible.
+    if (path.startsWith('/api/events/')) {
+      if (request.method !== 'GET') return json({error:'Method not allowed'},405);
+      if (!env.AUTH_DB) return json({error:'Service unavailable'},503);
+      const id=path.slice('/api/events/'.length);
+      if (!/^[0-9a-f-]{36}$/.test(id)) return json({error:'Event not found'},404);
+      const event=await env.AUTH_DB.prepare('SELECT id,title,location,timezone,start_at,end_at,version FROM events WHERE id=? AND deleted_at IS NULL').bind(id).first();
+      return event ? json({event}) : json({error:'Event not found'},404);
+    }
+    if (path.startsWith('/api/users/')) {
+      if (!env.AUTH_DB || !env.AUTH_PEPPER) return json({error:'Service unavailable'},503);
+      const subject=await sessionSubject(request,env);
+      if (!subject) return json({error:'Authentication required'},401);
+      if (!privilegeReady(subject,env)) return json({error:'Profile or current agreement required',code:'account_completion_required'},403);
+      const id=path.slice('/api/users/'.length);
+      if (!/^[0-9a-f-]{36}$/.test(id)) return json({error:'Not found'},404);
+      if (!subject.admin && subject.user.id!==id) return json({error:'Not found'},404);
+      const target=await env.AUTH_DB.prepare('SELECT id,email,first_name,last_name,date_of_birth,email_verified_at,created_at,updated_at FROM users WHERE id=?').bind(id).first();
+      if (!target) return json({error:'Not found'},404);
+      if (request.method==='GET') return json({user:target,canCorrectDob:subject.admin});
+      if (request.method!=='PUT') return json({error:'Method not allowed'},405);
+      if (!originOk(request) || request.headers.get('sec-fetch-site')==='cross-site') return error();
+      try {
+        const body=await bodyOf(request);
+        if (!validName(body.firstName)||!validName(body.lastName)) return json({error:'Invalid name'},422);
+        if ('dateOfBirth' in body && (!subject.admin || !validDob(body.dateOfBirth))) return json({error:'Invalid or unauthorized DOB correction'},403);
+        const now=Date.now();
+        if ('dateOfBirth' in body) {
+          const old=target as {date_of_birth:string|null};
+          if (old.date_of_birth!==body.dateOfBirth) {
+            await env.AUTH_DB.batch([
+              env.AUTH_DB.prepare('UPDATE users SET first_name=?,last_name=?,date_of_birth=?,updated_at=? WHERE id=?').bind(body.firstName.trim(),body.lastName.trim(),body.dateOfBirth,now,id),
+              env.AUTH_DB.prepare('INSERT INTO user_dob_audit(id,subject_user_id,actor_user_id,changed_at) VALUES(?,?,?,?)').bind(crypto.randomUUID(),id,subject.user.id,now)
+            ]);
+          } else {
+            await env.AUTH_DB.prepare('UPDATE users SET first_name=?,last_name=?,updated_at=? WHERE id=?').bind(body.firstName.trim(),body.lastName.trim(),now,id).run();
+          }
+        } else {
+          await env.AUTH_DB.prepare('UPDATE users SET first_name=?,last_name=?,updated_at=? WHERE id=?').bind(body.firstName.trim(),body.lastName.trim(),now,id).run();
+        }
+        return json({saved:true});
+      } catch {return error();}
+    }
     if (path.startsWith('/api/admin/')) {
       if (!env.AUTH_DB || !env.AUTH_PEPPER) return json({ error: 'Service unavailable' }, 503);
       const subject = await sessionSubject(request, env);
@@ -184,6 +227,25 @@ export default {
       if (!subject.admin) return json({ error: 'Forbidden' }, 403);
       if (!privilegeReady(subject,env)) return json({ error: 'Profile or current agreement required', code: 'account_completion_required' }, 403);
       const email = subject.user.email;
+      if (path === '/api/admin/users') {
+        if (request.method!=='GET') return json({error:'Method not allowed'},405);
+        const sort=url.searchParams.get('sort')==='first'?'first_name':'last_name';
+        const direction=url.searchParams.get('direction')==='desc'?'DESC':'ASC';
+        const letter=(url.searchParams.get('letter')||'').trim().toUpperCase();
+        if (letter && !/^[A-Z]$/.test(letter)) return json({error:'Invalid letter'},400);
+        const query=(url.searchParams.get('q')||'').trim().toLowerCase().slice(0,100);
+        const offset=Number(url.searchParams.get('offset')||'0');
+        if (!Number.isSafeInteger(offset) || offset<0 || offset>100000) return json({error:'Invalid offset'},400);
+        const search='%'+query.replace(/[\\%_]/g,x=>'\\'+x)+'%';
+        const rows=await env.AUTH_DB.prepare(`SELECT id,first_name,last_name,email FROM users
+          WHERE (?='' OR lower(first_name) LIKE ? ESCAPE '\\' OR lower(last_name) LIKE ? ESCAPE '\\'
+            OR lower(trim(coalesce(first_name,'')||' '||coalesce(last_name,''))) LIKE ? ESCAPE '\\'
+            OR email LIKE ? ESCAPE '\\')
+            AND (?='' OR upper(substr(coalesce(${sort},''),1,1))=?)
+          ORDER BY ${sort} ${direction}, id ASC LIMIT 51 OFFSET ?`)
+          .bind(query,search,search,search,search,letter,letter,offset).all<{id:string;first_name:string|null;last_name:string|null;email:string}>();
+        return json({users:rows.results.slice(0,50),hasMore:rows.results.length>50,nextOffset:offset+Math.min(rows.results.length,50)});
+      }
       if (request.method === 'GET' && path === '/api/admin/dashboard') return json({ email, message: 'Admin dashboard ready' });
       if (path === '/api/admin/events') {
         if (request.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
