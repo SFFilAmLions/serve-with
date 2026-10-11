@@ -11,7 +11,7 @@ globalThis.__testEligibility = (await import('data:text/javascript;base64,' + Bu
 ).toString('base64'))).isStagingRegistrationEligible;
 
 const source = readFileSync('src/worker.ts', 'utf8')
-  .replace("import packageJson from '../package.json';", "const packageJson = {version:'0.1.0'};")
+  .replace("import policyMetadata from './generated/policy-versions.json';", "const policyMetadata = JSON.parse(readFileSync('src/generated/policy-versions.json','utf8'));")
   .replace("import { Temporal } from '@js-temporal/polyfill';", "const Temporal = globalThis.__testTemporal;")
   .replace("import { isStagingRegistrationEligible } from './registration-eligibility';", "const isStagingRegistrationEligible = globalThis.__testEligibility;")
   .replace("import admins from './generated/admins.json';", "const admins = [{email:'lionaugust@icloud.com',enabled:true},{email:'lsvalera58@gmail.com',enabled:true}];");
@@ -35,7 +35,7 @@ function harness() {
   const { sqlite, adapter } = database();
   const env = { AUTH_DB: adapter, AUTH_PEPPER: 'test-secret-not-for-production',
     RESEND_API_KEY:'fake',AUTH_FROM_EMAIL:'login@notify.sffilamlions.org',
-    REQUIRED_TERMS_VERSION:'0.1.0',REQUIRED_PRIVACY_VERSION:'0.1.0',ENVIRONMENT:'staging',STAGING_REGISTRATION_EMAILS:'guest@example.org',
+    REQUIRED_TERMS_VERSION:JSON.parse(readFileSync('src/generated/policy-versions.json','utf8')).terms.version,REQUIRED_PRIVACY_VERSION:JSON.parse(readFileSync('src/generated/policy-versions.json','utf8')).terms.version,ENVIRONMENT:'staging',STAGING_REGISTRATION_EMAILS:'guest@example.org',
     ASSETS:{fetch: async () => new Response('asset')} };
   const sent = [];
   const previousFetch = globalThis.fetch;
@@ -71,7 +71,7 @@ test('OTP signs in, creates secure session, protects dashboard and revokes on lo
     const profile=await h.req('/api/auth/profile',{firstName:'Example',lastName:'Admin',dateOfBirth:'1990-01-01'},{cookie});
     assert.equal(profile.status,200);
     assert.equal((await h.req('/api/admin/dashboard',undefined,{cookie})).status,403);
-    const agreement=await h.req('/api/auth/agreements',{accepted:true,termsVersion:'0.1.0',privacyVersion:'0.1.0'},{cookie});
+    const agreement=await h.req('/api/auth/agreements',{accepted:true,termsVersion:JSON.parse(readFileSync('src/generated/policy-versions.json','utf8')).terms.version,privacyVersion:JSON.parse(readFileSync('src/generated/policy-versions.json','utf8')).terms.version},{cookie});
     assert.equal(agreement.status,200);
     assert.equal((await h.req('/api/admin/dashboard',undefined,{cookie})).status,200);
     const me=await (await h.req('/api/auth/me',undefined,{cookie})).json();
@@ -190,13 +190,13 @@ test('agreement is rejected without profile and rejects mismatched or unchecked 
     const login=await h.req('/api/auth/verify',{email:'lionaugust@icloud.com',code:credentials(h.sent[0]).code});
     const cookie=login.headers.get('set-cookie');
     const accept=(body)=>h.req('/api/auth/agreements',body,{cookie});
-    assert.equal((await accept({accepted:true,termsVersion:'0.1.0',privacyVersion:'0.1.0'})).status,403);
+    assert.equal((await accept({accepted:true,termsVersion:JSON.parse(readFileSync('src/generated/policy-versions.json','utf8')).terms.version,privacyVersion:JSON.parse(readFileSync('src/generated/policy-versions.json','utf8')).terms.version})).status,403);
     assert.equal((await h.req('/api/auth/profile',{firstName:' ',lastName:'Valid',dateOfBirth:'2026-02-30'},{cookie})).status,422);
     assert.equal((await h.req('/api/auth/profile',{firstName:'Alice',lastName:'Example',dateOfBirth:'1990-05-02'},{cookie})).status,200);
     assert.equal((await h.req('/api/auth/profile',{firstName:'New',lastName:'Value',dateOfBirth:'1980-03-02'},{cookie})).status,409);
-    assert.equal((await accept({accepted:false,termsVersion:'0.1.0',privacyVersion:'0.1.0'})).status,409);
-    assert.equal((await accept({accepted:true,termsVersion:'old',privacyVersion:'0.1.0'})).status,409);
-    assert.equal((await accept({accepted:true,termsVersion:'0.1.0',privacyVersion:'0.1.0'})).status,200);
+    assert.equal((await accept({accepted:false,termsVersion:JSON.parse(readFileSync('src/generated/policy-versions.json','utf8')).terms.version,privacyVersion:JSON.parse(readFileSync('src/generated/policy-versions.json','utf8')).terms.version})).status,409);
+    assert.equal((await accept({accepted:true,termsVersion:'old',privacyVersion:JSON.parse(readFileSync('src/generated/policy-versions.json','utf8')).terms.version})).status,409);
+    assert.equal((await accept({accepted:true,termsVersion:JSON.parse(readFileSync('src/generated/policy-versions.json','utf8')).terms.version,privacyVersion:JSON.parse(readFileSync('src/generated/policy-versions.json','utf8')).terms.version})).status,200);
     assert.equal(h.sqlite.prepare('SELECT count(*) n FROM agreement_acceptances').get().n,1);
     assert.equal((await h.req('/api/admin/dashboard',undefined,{cookie})).status,200);
   }finally{h.close();}
@@ -209,7 +209,7 @@ async function complete(h,email,name){
   assert.equal(login.status,200);
   const cookie=login.headers.get('set-cookie');
   assert.equal((await h.req('/api/auth/profile',{firstName:name,lastName:'Example',dateOfBirth:'1990-01-01'},{cookie})).status,200);
-  assert.equal((await h.req('/api/auth/agreements',{accepted:true,termsVersion:'0.1.0',privacyVersion:'0.1.0'},{cookie})).status,200);
+  assert.equal((await h.req('/api/auth/agreements',{accepted:true,termsVersion:JSON.parse(readFileSync('src/generated/policy-versions.json','utf8')).terms.version,privacyVersion:JSON.parse(readFileSync('src/generated/policy-versions.json','utf8')).terms.version},{cookie})).status,200);
   const me=await (await h.req('/api/auth/me',undefined,{cookie})).json();
   return {cookie,id:me.userId};
 }
