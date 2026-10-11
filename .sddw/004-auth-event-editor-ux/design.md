@@ -1,21 +1,91 @@
-# SDDW 004 — Technical Design
+# SDDW 004 — Proposed Technical Design
 
-**Status: Not started — awaiting requirements approval.**
+**Status: Proposed for review. Requirements and design are not yet approved for implementation.**
+Source: [requirements.md](requirements.md). References: issues #10, #11, and #12.
 
-Prepare a design only after reviewing [requirements.md](requirements.md).
+## 1. Scope and architecture
 
-Design review must cover:
-- Dedicated email-first login page for existing and eligible new users, with eight-digit code or auto-exchanged magic link; single-attempt POST exchange and token scrubbing.
-- First successful verified login creates an eligible account if needed, and expands the post-verification login flow inline for missing first/last name before regular access; reuse validation with the later Edit Profile page.
-- Distinct attendee and administrator views; authorized administrator mode switching, route boundaries, app-bar affordances, and mobile behavior.
-- Material AppBar sign-in and account menu, with dialogs and mobile behavior.
-- Dedicated Create Event page (not a modal), shared event form/edit presentation, URL routing and unsaved-navigation guard; prominent date and equal-width clock pickers, expandable end date/time zone, end-date synchronization, DST-aware duration preview.
-- Administrator-only Users list with **Edit User** for existing accounts; **no Create User page**. Authenticated self-service and mandatory first-login Edit Profile reuse common fields and validation with separate ownership permissions. Include verification-time account creation, staging allowlist checks, search, and server-side field authorization.
-- Required first/last/email profile fields and user-editable names; secure mandatory profile completion for existing admins at next sign-in without role loss.
-- **Approved:** `config/admins.yaml` retains email-based authorization entries only; required user names and verified emails are held in D1 profiles. No duplication/synchronization of editable names into YAML. Design the profile-completion guard and server-owned registration/self-deletion flows.
-- Staging-only eligibility allowlist, distinct from the administrator role list; existing-account reconciliation, verification and non-enumerating errors.
-- Production registration policy deferred pending explicit decision; no production change.
-- Preservation of all security, API, versioning, and accessibility behaviors.
-- Browser-test strategy and staging deployment gate.
+Retain Vite, React, MUI, Cloudflare Worker, D1, Resend email verification, the current events API and migration history. This phase adds a registered-user model and a route-based app shell. Separate **account eligibility**, **email ownership**, **profile completeness**, and **administrator permission** in all server checks.
 
-References: GitHub issues #10, #11, and #12.
+- `config/admins.yaml`: existing email/enabled entries remain the sole role-assignment authority. Do not put names in YAML.
+- D1 `users`: verified, unique normalized email; required first/last names when profile is complete. User identity is not derived from YAML.
+- Staging eligibility: a distinct email-only allowlist, **not** the admin list. Only staging applies it. Production registration policy is explicitly undecided and not enabled by this design.
+- Both attendee and admin API calls require a valid session and completed profile where authentication is necessary. Admin APIs additionally check the authoritative admin list. Public events remain unauthenticated.
+
+## 2. Routes and access boundaries (proposed)
+
+| Route | Access | Responsibility |
+| --- | --- | --- |
+| `/` | Public | Upcoming/Past events, Attendee experience |
+| `/login` | Public | Email-first sign-in and inline first-login name completion |
+| `/profile` | Signed in | Edit own names, read-only verified email, delete own account |
+| `/admin` | Complete-profile admin | Administrative workspace |
+| `/admin/events/new` | Complete-profile admin | Create Event dedicated page |
+| `/admin/events/:id/edit` | Complete-profile admin | Edit Event dedicated page (proposed for consistency; pending approval) |
+| `/admin/users` | Complete-profile admin | Registered-user directory, search/filter |
+| `/admin/users/:id/edit` | Complete-profile admin | Edit existing user's first/last names only |
+
+Use an accessible routing solution that supports deep links, browser back/forward and refresh through the existing Worker static-asset fallback. Restore intended destination only if still authorized after login/profile completion; otherwise return to attendee home. No Create User route.
+
+A signed-in administrator defaults to Attendee view, with an explicit, compact mode switch to Administrator; the identity/account menu is independent. Users without admin authorization never see admin navigation. API authorization, not just hidden controls, prevents access.
+
+## 3. Email-first login and inline registration
+
+1. Visitor selects **Sign in** in the app bar and enters an email at `/login`.
+2. Server normalizes email; for staging, validates eligibility using the separate allowlist **before issuing a usable challenge or session**. Respond with a non-enumerating UI message for ineligible/nonexistent identities; do not disclose account existence.
+3. For eligible emails, use the existing provider to send an eight-digit one-time code **and** magic link. The user can enter the code or open the magic link.
+4. The magic link performs its existing one-time POST exchange automatically, without a confirmation button. Strip token from location/history before exchange; guard against duplicate requests from rerenders, StrictMode and navigation. Code and magic flows share a successful-verification result.
+5. After verified email ownership, look up account by normalized email, or create a minimal **pending-profile** user record atomically if eligible. Such an identity is not a complete active account: only limited session, profile completion and sign-out are allowed. Avoid duplicate records during simultaneous/replayed completions.
+6. If either required name is missing, expand the login page inline to show first/last name fields. Save them server-side, transition account to complete, then proceed to the intended authorized view. Existing administrators without names use exactly this flow and retain their YAML-defined role once complete.
+7. Complete-profile users proceed directly to Attendee view (or their allowed previously intended route). All users may later change first/last names at `/profile`; email is read-only.
+
+**Authentication-state contract:** anonymous → verification pending → verified but profile incomplete → verified profile complete. Never interpret an incomplete profile as full admin authorization.
+
+**Security:** Preserve one-time challenges, expiry, rate limits, secure HttpOnly session cookie, CSRF/origin checks, authentication failure behavior and generic anti-enumeration messaging. Avoid adding token/code/name content to logs or URLs; magic token is consumed via POST only. Add safe error/retry paths for provider failures. Keep existing session migration compatibility.
+
+## 4. Data storage and migration approach
+
+Introduce an additive `users` table in a new numbered D1 migration, with stable ID, normalized unique email, first_name, last_name, email verification timestamp, created/updated timestamps, and account-deleted state or equivalent. Design CHECK constraints so a pending-profile record can temporarily lack names, while **all fully active accounts have valid names and verified email**. Retain existing sessions and login challenges through a backward-compatible transition; link sessions to users safely after verification. Index normalized email and directory search fields.
+
+Do not prepopulate or guess administrator names. Previously authorized admin email accounts receive a secure first-login profile-completion path, without changing the role assignment list. Audit and reconcile legacy sessions so they cannot bypass the completion gate.
+
+Configure staging allowlist as a separate reviewed server-side email-only configuration and a build/deployment environment guard. Do not expose email lists in public frontend bundles. Keep staging existing-admin eligibility explicit; adding a new admin to YAML alone should not silently bypass staging allowlist. Deny by default when staging eligibility configuration is missing or malformed.
+
+## 5. User pages and authorization
+
+- **Profile:** signed-in user may read/edit own first/last name, view verified email, and initiate own-account deletion with explicit confirmation; prevent empty/invalid names. Never allow edit of email or role here.
+- **Admin Users:** list only completed registered accounts (plus an explicitly marked pending state if product review later chooses to expose it); search by name/email; paginate server-side, never dump every account to all clients. No Create User action.
+- **Admin Edit User:** use the same profile form fields as self-edit, but a different server-authorized endpoint allowing edits to the selected existing user's first/last name. Neither user ID nor client-provided role flags confer authority. Verified email and role remain read-only.
+- **Account deletion:** revoke sessions and pending challenges, stop access, remove/anonymize personal data to the defined retention policy; guard concurrent requests. Exact policy for re-registration and retained audit references remains an approval question. Admins cannot delete other accounts as part of this phase.
+- For all mutating endpoints, check session validity, account completeness, allowlist/eligibility as appropriate, origin, and object-level authorization on the server.
+
+## 6. Event form and responsive editor
+
+Create Event is a dedicated page. Prefer dedicated Edit Event using the same form component (requires user approval). Show a full-width, prominent **Start date** row; beneath it, equal-width **Start time** and **End time** clock-enabled inputs, with the live duration nearby but without changing input widths. MUI accessible date/time picker options and license impact to be reviewed; provide keyboard/manual input fallback.
+
+Collapse **End date** and **Time zone** under More options. Initial End date follows Start date; once explicitly overridden, don't reset it with later start-date changes. Open More options for edited multiday/nondefault-zone events, and summarize important nondefault values even when collapsed.
+
+Compute duration using event-local date+time and chosen IANA zone mapped to real instants with strict DST disambiguation, consistent with Worker Temporal validation. Support overnight/multiday; show a validation error instead of a duration for invalid/ambiguous times or end-before-start. Persist the current API shape and optimistic version guard.
+
+A page navigation guard replaces Create Event modal Cancel/X semantics; confirm on unsaved navigation, preserve data on failed saves, and handle browser back/forward where the platform permits. Existing delete confirmation remains a modal.
+
+## 7. Verification and rollout
+
+Tests:
+- Allowed/disallowed staging emails, challenge anti-enumeration and rate limits, case-insensitive uniqueness and email verification, link replay/expiry, code path, no double magic exchange.
+- First-login pending-profile gate; required names; existing admin transition; update own profile versus admin editing others; direct URL/API denial for attendee; role changes only through YAML.
+- Directory pagination/search; session invalidation on self-deletion; no admin creation path.
+- Attendee/admin view switching, app bar account menu, deep linking, accessibility, mobile and light/dark themes.
+- Date/time alignment, editable End date and timezone, duration and DST cases, unsaved-navigation guards, regression of CRUD/public event listings.
+
+Implementation requires separate review of task slices, then a PR with green CI and an approved merge to `main`. Staging runs through existing deployment pipeline; real email, D1 migration, CRUD and account acceptance tests happen there. Production registration/deployments are separately gated.
+
+## 8. Open product decisions (not silently approved)
+
+1. After self-deletion, can an email still eligible for staging immediately re-register? Suggested: yes as a new account, with fresh verification and no automatic restoration of sessions or elevated roles.
+2. What personal data or audit references must be retained after account deletion? Define before migration/deletion API.
+3. Shall Edit Event also be a dedicated page? Suggested: yes.
+4. Exact picker component and inline duration placement.
+5. Production registration eligibility remains **out of scope** and must be explicitly decided later.
+
+**Next step:** Review these technical design decisions and approve or modify them before converting to implementation tasks.
