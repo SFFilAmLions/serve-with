@@ -1,6 +1,6 @@
 # SDDW 003 — Basic Event Management: Technical Design
 
-Status: **Proposed for review only — implementation not authorized.**
+Status: **Proposed for review only — implementation not authorized.** Branding decision 1 approved; remaining design decisions pending.
 Requirements: [requirements.md](requirements.md). This design adopts **React + Material UI (MUI)** with a **Material Design 3-inspired custom theme**; it does not claim native/full Material 3 compliance.
 
 ## 1. Architectural overview
@@ -25,8 +25,8 @@ The current handbook uses Material for MkDocs, but its configured red/amber colo
 
 - **Components:** MUI `AppBar`, `Container`, `Tabs`, `Card`/`CardContent`, `Button`, `TextField`, `Dialog`, `DialogTitle`, `DialogContent`, `DialogActions`, `Snackbar`/`Alert`, `CircularProgress`. Choose accessible MUI primitives over custom widgets.
 - **Theme:** Define shared tokens in a single theme module: official club yellow `#F1C232` as a brand accent; derived tonal/surface colors with WCAG contrast checks; generous Material 3-like rounded corners; responsive typography. Do not automatically treat yellow as a suitable text or button color on all surfaces.
-- **Typography:** Club name in Ubuntu Bold, subtitle in Ubuntu Condensed, body in Alata, with explicit local/system fallbacks and a checked font licensing/distribution strategy. Avoid committing proprietary or uncertain-licensed font binaries.
-- **Identity:** Use approved club logo asset only once its source and use rights are verified; otherwise render a text-based club identity, not a fabricated logo.
+- **Typography (approved, decision 1):** Club name in Ubuntu Bold, subtitle in Ubuntu Condensed, body in Alata, with explicit local/system fallbacks and verified font licensing/distribution. Avoid committing uncertain-licensed font binaries.
+- **Identity (approved, decision 1):** Use the official club logo with verified source and usage rights, plus the official yellow accent `#F1C232`; do not substitute a fabricated logo. Asset sourcing/licensing is a prerequisite to implementation.
 - **Layout:** Mobile-first public landing page, compact branded top app bar with sign-in/user action; Upcoming/Past tabs; readable event cards containing all specified details; no drawer or event detail route.
 - **Admin affordances:** Authenticated admins see Add Event and per-card Edit/Delete. Unauthenticated users see the same public list without mutation controls.
 - **M3 limitations:** MUI's standard components are not full official Material 3 implementations. Customize theme/variants deliberately; document differences, rather than claiming strict specification compliance.
