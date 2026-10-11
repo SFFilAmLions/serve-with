@@ -95,3 +95,31 @@ test('soft delete requires authentication, checks version and retains record',as
     assert.deepEqual((await (await h.req('/api/events')).json()).events,[]);
   }finally{h.sqlite.close();}
 });
+
+test('admin event creation and edits validate Temporal, preserve versions, and reject stale updates',async()=>{
+ const h=harness(); try {
+   const now=Date.now(),session='b'.repeat(64);
+   const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode('test:'+session))),b=>b.toString(16).padStart(2,'0')).join('');
+   h.sqlite.prepare('INSERT INTO sessions(token_hash,email,expires_at,created_at) VALUES (?,?,?,?)').run(hash,'lionaugust@icloud.com',now+600000,now);
+   const cookie='__Host-sw_session='+session;
+   const value={title:'  Cleanup  ',location:' Park ',timezone:'America/Los_Angeles',start:'2026-11-14T09:00',end:'2026-11-14T12:00'};
+   assert.equal((await h.req('/api/admin/events','POST',value)).status,401);
+   const created=await h.req('/api/admin/events','POST',value,cookie);
+   assert.equal(created.status,201);
+   const body=await created.json();
+   assert.equal(body.event.title,'Cleanup');
+   assert.equal(body.event.version,1);
+   const id=body.event.id;
+   const invalid=await h.req('/api/admin/events','POST',{...value,start:'2026-03-08T02:30'},cookie);
+   assert.equal(invalid.status,422);
+   assert.ok((await invalid.json()).fields.start);
+   const ambiguous=await h.req('/api/admin/events','POST',{...value,start:'2026-11-01T01:30'},cookie);
+   assert.equal(ambiguous.status,422);
+   const edited=await h.req('/api/admin/events/'+id,'PUT',{...value,location:'New Park',version:1},cookie);
+   assert.equal(edited.status,200);
+   assert.equal((await edited.json()).event.version,2);
+   assert.equal((await h.req('/api/admin/events/'+id,'PUT',{...value,version:1},cookie)).status,409);
+   assert.equal((await h.req('/api/admin/events/'+id,'DELETE',{version:1},cookie)).status,409);
+   assert.equal((await h.req('/api/admin/events/'+id,'DELETE',{version:2},cookie)).status,204);
+ } finally {h.sqlite.close();}
+});
