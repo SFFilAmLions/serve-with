@@ -12,16 +12,11 @@
 
 ## Version identifiers
 
-Use an explicit date-based identifier after organizational approval, for example `2026-10-15`. If two approved revisions become effective on the same date, append a monotonically increasing revision suffix such as `2026-10-15.2`.
+Use the most recent Git commit timestamp for each policy source, followed by the abbreviated commit SHA, generated at build time. This ensures two edits on the same date remain distinct. Terms and Privacy have independent identifiers. Only commits that change a policy file advance that policy's required version; application release/version bumps do not.
 
 Version identifiers are immutable after publication. Correcting substantive text requires a new version; do not silently edit a version that users have accepted. Pure rendering/accessibility fixes that do not alter meaning may retain the version, but the source history still records the change.
 
-Maintain two independently configurable required versions:
-
-- `REQUIRED_TERMS_VERSION`
-- `REQUIRED_PRIVACY_VERSION`
-
-Changing either required version causes users who have not accepted that exact required pair to enter the reacceptance gate before privileged mutations.
+At build time `scripts/generate-policy-versions.mjs` derives independent Terms and Privacy revision identifiers from Git history and writes a server/client-consistent generated manifest. Build workflows check out full Git history. A change to either policy file triggers reacceptance of the resulting required pair; unrelated code or package-version changes do not. Do not configure conflicting manual required-version overrides.
 
 ## Source and archive
 
@@ -35,17 +30,17 @@ policies/
     2026-10-15.md
 ```
 
-Published historical versions remain immutable/readable at stable archival routes such as `/terms/2026-10-15` and `/privacy/2026-10-15`. The current routes point to the configured required versions. Do not delete a historical version while acceptance records or applicable retention requirements depend on it.
+Historical policy revisions are preserved by GitHub repository history, rather than separate archival website routes. Current `/terms` and `/privacy` are public, and acceptance evidence retains each accepted file-revision identifier.
 
 ## Approval/publication workflow
 
 1. Organization supplies/reviews the substantive document text.
 2. Approver explicitly confirms document type, final text, effective date/version identifier, and whether the change requires reacceptance.
-3. Add the immutable versioned source files and current required-version configuration in a reviewed PR.
-4. CI validates that configured required versions have corresponding source files and that version identifiers are well formed.
+3. Commit approved policy source files in the reviewed PR. Build-time Git history automatically determines each last-modified revision.
+4. CI regenerates metadata from full Git history, checks that both source files are present, and verifies policy identities are well formed.
 5. Deploy first to staging; verify public rendering, links, mobile/desktop accessibility, print/readability, and registration/reacceptance flow.
 6. Production publication/required-version change follows the normal separately approved release path.
-7. Never configure a version as required before that exact document is publicly retrievable in the same release.
+7. Do not release a policy change without the corresponding document being publicly retrievable in the same deployment.
 
 ## Acceptance semantics
 
@@ -63,7 +58,7 @@ A profile-complete user whose required versions are outdated sees only the agree
 
 **Default technical rule:** every change to either configured required version requires explicit reacceptance. This is deterministic and avoids attempting to infer legal materiality in application code.
 
-If the organization later wants non-material revisions that do not trigger reacceptance, model that as an explicit approved publication decision rather than silently replacing a required version. Historical acceptance must still identify the exact substantive version the user accepted.
+If the organization later wants non-material policy-file edits that do not trigger reacceptance, introduce an explicitly reviewed exception; under the current rule any policy-file change advances that policy's revision. Historical acceptance must still identify the exact substantive version the user accepted.
 
 ## Data minimization and audit
 
