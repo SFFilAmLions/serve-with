@@ -12,7 +12,7 @@ Retain React/Vite/MUI, Cloudflare Worker, D1, Resend and current events APIs. Re
 | --- | --- | --- |
 | `/` | Public | Upcoming/past events and attendee landing |
 | `/login` | Public / limited verified session | Code or magic-link login, inline profile and agreement completion |
-| `/events/:id` | Public | Canonical event detail route; detail-page expansion may be deferred |
+| `/events/:id` | Public | Canonical event detail page; administrators receive contextual Edit |
 | `/users/:id` | Owner or eligible administrator | Canonical user profile; public visibility is a future enhancement |
 | `/users/:id/edit` | Owner or eligible administrator | Canonical editor; fields vary by permission |
 | `/admin` | Eligible administrator | Redirect to `/admin/events` |
@@ -61,3 +61,20 @@ Do not design or implement email changes, account deactivation controls, deletio
 ## Responsive action convention
 
 Prefer persistent Material actions over mobile-only overflow menus. At sufficient width, render ordinary actions as icon + text (for example, pencil **Edit**, copy **Duplicate**, trash **Delete**, plus **Create event**). At constrained/mobile widths, preserve the same actions in place as icon-only buttons before considering overflow. Every icon-only action has an accessible name, tooltip where applicable, visible focus state and adequate touch target. X/check editor actions remain icon-only at all sizes.
+
+
+## Canonical event view and list presentation
+
+Use `/events/:id` as the canonical view after selecting an event or successfully creating/editing one. The page presents title, localized date/time and location without exposing the raw IANA zone when a concise local abbreviation is sufficient; overnight/multiday events explicitly show the date transition. Authorized administrators see a contextual pencil/Edit action leading to `/admin/events/:id/edit`. Duplicate/Delete stay on `/admin/events`; attendee signup controls are not introduced.
+
+Public `/` and administrator `/admin/events` share a list-oriented Material presentation with Upcoming/Past tabs and subtle horizontal row separators. The public list has no management controls. Administrator wide layouts show event/date/time and direct icon+text actions; constrained layouts stack secondary date/time/location information and use icon-only actions. The main row/event name opens `/events/:id`. Do not add an All tab, bulk selection or default card containers in this scope.
+
+Create/Edit X invokes discard protection when dirty; check validates and saves. A successful save navigates to the canonical event page. Duplicate immediately opens the prefilled Create editor without confirmation or persistence. Delete uses an explicit Material confirmation dialog with textual Cancel/Delete actions. Keep user-entered drafts on validation, network and optimistic-concurrency failures.
+
+## Loading, empty, error and accessibility states
+
+Keep global app bars, workspace tabs and other stable navigation mounted while content loads. Prefer shape-matched Material skeleton rows/details over full-page spinners. Empty states are concise and contextual: no upcoming events may expose Create event to administrators; an empty Users search suggests changing the name/email query. Failed content loads expose a local Retry action.
+
+Field validation is inline and programmatically associated with its field. Save/network failures preserve form contents and use an appropriate inline message or Material snackbar; important dynamic status is announced accessibly. Prevent duplicate submissions while saving without causing layout shifts.
+
+All icon-only controls have accessible names, visible focus treatment and adequate Material touch targets. All workflows are keyboard operable. Restore focus sensibly after dialogs; provide keyboard/screen-reader equivalents for the visual A–Z rail; respect reduced-motion preferences; and maintain sufficient contrast in all appearance modes. Do not use administrator color as the sole workspace signal. Protected-resource authorization failures must not disclose private user data. If a session expires during an editor workflow, preserve the draft where safely feasible through reauthentication.
