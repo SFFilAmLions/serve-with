@@ -7,8 +7,9 @@
 - [x] Record user decisions: existing administrators complete profile at next sign-in; staging whitelist is email-only; first and last names are editable.
 - [x] Confirm `config/admins.yaml` remains email-only for administrator authorization; first/last names, date of birth, and verified email belong to D1 profiles.
 - [x] Record revised account lifecycle: deactivation retains full PII but resets active Terms/Privacy acceptance; deletion clears profile PII with optional recovery key.
-- [ ] Design secure optional recovery key, email delivery before deletion, hash-only verifier, single use, and explicit transferable-key risk; no-key deletion must not be claimable.
-- [ ] Design Terms of Use/Privacy Policy checkbox at initial profile completion, versioned acceptance history, deactivation resetting current agreement, and verified login plus new acceptance for reactivation without reentering valid PII.
+- [ ] Defer full deletion, optional recovery key, and historical re-claim to later account-lifecycle scope; do not implement in simplified SDDW 004.
+- [ ] Implement/design a single required, unchecked Terms of Use and Privacy Policy checkbox on first registration and any reactivation, with versioned acceptance evidence.
+- [ ] Add user-level `is_active` boolean (default false); activate after verified email, full required profile, and affirmative checkbox; guard attendee/admin APIs and preserve PII on deactivation.
 - [ ] Define exact PII scrub scope (including data in signups), retained-email privacy/retention basis and any full-erasure request path; design no-lockout administrator transition.
 - [x] Approve administrator-only corrections to submitted date of birth; owner can view but not edit it.
 - [ ] Design audited admin date-of-birth correction, directory exclusion, privacy, retention and migration; validate a calendar date without inferring age limits.
