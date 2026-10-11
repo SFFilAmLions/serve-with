@@ -11,6 +11,7 @@
 - [ ] Design account schema, migrations, verification, self-deletion/session revocation, staging allowlist policy and tests, and how existing admins transition.
 - [ ] Review/approve the separate Attendee and Administrator view requirements and design accessible switching and route authorization.
 - [ ] Design authentication and account-menu interactions in [design.md](design.md); review and approve.
+- [ ] Design/test administrator-only Duplicate Event as prefilled Create Event, preserving the original event and generating a new ID on explicit Save.
 - [ ] Specify Create Event as a dedicated page and choose a consistent Edit Event page design, navigation, dirty-form safeguards, and tests.
 - [ ] Design dedicated email-first login page, eight-digit code/magic link verification, and eligible first-login account creation without a standalone Create User page.
 - [ ] Test attendee denial for direct Users page navigation and directory list/search APIs; admin-only directory access.
