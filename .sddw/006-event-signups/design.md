@@ -34,6 +34,12 @@ Run the proof before selecting or pinning versions: generate code from the YAML,
 
 If runtime validation conflicts with current handler-side trimming or lenient extra fields, document an explicit contract/migration choice instead of silently altering production semantics. Server operation bindings must be generated and drift-tested; a client-only generation demonstration is insufficient to mark T003 complete.
 
+### Confirmed schema compatibility issue (T003)
+
+The event creation Worker currently trims `title` and `location`, rejects values that become blank after trimming, and ignores unknown JSON request keys. The initial `EventCreateInput` YAML has `additionalProperties: false` and only `minLength: 1`; enabling direct AJV validation as an early gate would therefore **reject currently accepted payloads** with extra keys while **accepting whitespace-only strings** (which the Worker later rejects). The runtime spike now explicitly tests both mismatches.
+
+**Decision needed before production wiring:** Preserve legacy request semantics in a compatibility adapter/normalization step, with the OpenAPI schema documenting accepted raw input versus canonical normalized values, or explicitly approve a breaking validation change. Keep authorization and same-origin/CSRF checks before any write, and never allow schema coercion to bypass these checks. Do not label the schema-driven Worker boundary production-ready until real integration tests demonstrate parity for known edge cases.
+
 ### Contract migration and publication
 
 Inventory *all* existing API routes/methods, including authentication and profile gates, before writing schemas. Freeze observed payloads/status codes as characterization tests, then migrate route by route without changing behavior unexpectedly. Publish docs/schema publicly (staging then production through existing release process); API example data must be fictitious, and interactive “try” operations do not bypass auth/CSRF checks. Coordinate SPA fallback to avoid serving `index.html` at API docs/schema routes.
