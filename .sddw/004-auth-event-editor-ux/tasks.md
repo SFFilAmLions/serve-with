@@ -4,7 +4,8 @@
 
 - [ ] Approve [requirements.md](requirements.md).
 - [x] Record user decisions: existing administrators complete profile at next sign-in; staging whitelist is email-only; first and last names are editable.
-- [ ] Review/approve remaining registration and deletion requirements; design no-lockout admin profile transition and consistency with existing administrator YAML.
+- [x] Confirm `config/admins.yaml` remains email-only for administrator authorization; first/last names and verified email belong to D1 profiles.
+- [ ] Review/approve remaining registration and deletion requirements; design a no-lockout administrator profile-completion transition.
 - [ ] Design account schema, migrations, verification, self-deletion/session revocation, staging allowlist policy and tests, and how existing admins transition.
 - [ ] Review/approve the separate Attendee and Administrator view requirements and design accessible switching and route authorization.
 - [ ] Design authentication and account-menu interactions in [design.md](design.md); review and approve.
