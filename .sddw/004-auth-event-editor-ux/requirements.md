@@ -1,6 +1,6 @@
 # SDDW 004 — Authentication and Event Editor UX Refinements: Requirements
 
-**Status: Draft requirements for user review. No design, implementation, or deployment approval.**
+**Status: Scope defined by user; requirements ready for final review. Technical design and implementation not yet approved.**
 
 Origin: successful SDDW 003 staging use and user feedback. Consolidates [#10](https://github.com/SFFilAmLions/serve-with/issues/10), [#11](https://github.com/SFFilAmLions/serve-with/issues/11), and [#12](https://github.com/SFFilAmLions/serve-with/issues/12). This specification is the source of truth; issues remain pointers.
 
@@ -104,4 +104,4 @@ Origin: successful SDDW 003 staging use and user feedback. Consolidates [#10](ht
 - User table/profile migration and deletion semantics (including retention); staging email-only allowlist configuration and reconciliation. Administrator configuration/profile source-of-truth split is approved.
 - Production registration eligibility policy (explicitly deferred; no production registration is authorized).
 
-**Next gate:** Review and approve these requirements before completing the technical design and implementation task list.
+**Next gate:** Final requirements/design review and resolution of remaining account-deletion/retention and editor decisions, then implementation task approval. Scope is closed to additional features unless explicitly reopened.
