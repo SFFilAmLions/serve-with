@@ -1,45 +1,78 @@
 # Serve With — Terms of Use
 
-**Status:** Approved wording, not published
-**Effective date:** To be assigned at publication
-**Operator:** San Francisco Fil-Am Lions Club
+**Status:** Final Draft — Pending Approval  
+**Effective Date:** To be assigned upon approval  
+**Operated by:** San Francisco Fil-Am Lions Club
 
-## 1. Purpose
+### 1. Purpose
 
-Serve With is operated by the San Francisco Fil-Am Lions Club to organize volunteer activities, club events and community service. By registering and accepting these Terms, you agree to these rules.
+Serve With is operated by the San Francisco Fil-Am Lions Club to help organize volunteer activities, club events, and community service opportunities.
 
-## 2. Registration
+By registering and accepting these Terms, you agree to use Serve With in accordance with the rules below.
 
-You must be **at least 13 years old**. Provide accurate name, email address and date of birth, and keep supported account information reasonably up to date. Serve With uses email authentication; keep your email account secure and do not access anyone else's account without permission.
+### 2. Account Registration
 
-## 3. Age and Event Eligibility
+You must be at least **13 years old** to register.
 
-Activities may have higher minimum ages or additional conditions. Your date of birth may be used for age eligibility checks. An account does not guarantee admission to any particular activity. Organizers may require appropriate supervision or guardian permission for minors.
+You agree to provide accurate information, including your name, email address, and date of birth, and to keep supported account information reasonably up to date.
 
-## 4. Appropriate Use
+Serve With uses email-based authentication. You are responsible for maintaining the security of your email account and must not access another person's account without authorization.
 
-Use Serve With only for lawful volunteer, community service and club-related purposes. Do not provide knowingly false information, impersonate others, attempt unauthorized access, interfere with the site, misuse participant information, harass, threaten or discriminate against others.
+### 3. Age and Event Eligibility
 
-## 5. Volunteer Activities
+Some events and volunteer activities may have higher minimum age requirements or additional participation conditions.
 
-Event descriptions, schedules and requirements may change. Follow organizer instructions, applicable safety requirements and relevant club conduct policies. Additional participation conditions may apply.
+Serve With may use your date of birth to help determine age eligibility.
 
-## 6. Privacy and Information Sharing
+Having an account does not guarantee acceptance into or eligibility for any particular activity. Event organizers may impose additional requirements, including appropriate supervision or guardian permission for minors where applicable.
 
-Our Privacy Policy explains collection, use and sharing of personal information. Limited information needed for a particular event may be shared with its organizers, including organizers outside the club. Respect other participants' privacy and do not use their information for unrelated purposes.
+### 4. Appropriate Use
 
-## 7. Availability
+You agree to use Serve With for lawful, legitimate volunteer, community service, and club-related purposes.
 
-We work to keep the service reliable and accurate but do not guarantee uninterrupted access or error-free information. We may maintain, change, suspend or discontinue features when necessary.
+You may not:
 
-## 8. Account Assistance and Deletion
+- Provide intentionally false information or impersonate another person.
+- Attempt to access restricted accounts, systems, or information.
+- Disrupt the website or interfere with other users.
+- Misuse personal information obtained through Serve With.
+- Use the platform to harass, threaten, or discriminate against others.
 
-Contact **secretary@sffilamlions.org** for account assistance, correction or deletion requests. Requests are reviewed manually under the Privacy Policy and applicable obligations.
+### 5. Events and Volunteer Participation
 
-## 9. Changes
+Event descriptions, schedules, locations, and requirements are provided for coordination purposes and may change.
 
-We may revise these Terms. Each version will show its effective date; users may be required to accept an updated version before continuing account features.
+Participants are expected to follow event organizers' instructions, applicable safety requirements, and relevant club conduct policies.
 
-## 10. Contact
+Participation in an activity may be subject to additional conditions communicated by its organizers.
 
-San Francisco Fil-Am Lions Club — **secretary@sffilamlions.org**.
+### 6. Privacy and Information Sharing
+
+Our Privacy Policy describes how personal information is collected, used, and shared.
+
+Information necessary to coordinate a specific event may be shared with its organizers, including organizers outside the San Francisco Fil-Am Lions Club, as described in the Privacy Policy.
+
+You must respect the privacy of other participants and may not use their information for unrelated purposes.
+
+### 7. Website Availability
+
+We aim to keep Serve With reliable and accurate, but we cannot guarantee uninterrupted service or error-free information.
+
+We may maintain, modify, suspend, or discontinue website features when necessary.
+
+### 8. Account Assistance and Deletion
+
+You may request account assistance, correction, or deletion by contacting **secretary@sffilamlions.org**.
+
+Account deletion requests are reviewed manually by authorized administrators, subject to applicable recordkeeping and legal obligations.
+
+### 9. Changes to These Terms
+
+We may revise these Terms as the platform develops.
+
+Each version will identify its effective date. When required, users will be asked to accept revised Terms before continuing to use account features.
+
+### 10. Contact
+
+**San Francisco Fil-Am Lions Club**  
+Email: secretary@sffilamlions.org
