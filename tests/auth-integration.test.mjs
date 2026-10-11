@@ -24,6 +24,7 @@ function database() {
   sqlite.exec('PRAGMA foreign_keys=ON');
   const adapter = { prepare(sql) { const stmt = sqlite.prepare(sql); return {
     bind(...params) { return { first: async () => stmt.get(...params) || null,
+      all: async () => ({results:stmt.all(...params)}),
       run: async () => { const result = stmt.run(...params); return { meta: { changes: Number(result.changes) } }; }
     }; }
   }; }, batch: async (statements) => { sqlite.exec('BEGIN'); try { for(const statement of statements) await statement.run(); sqlite.exec('COMMIT'); } catch(e) {sqlite.exec('ROLLBACK');throw e;} } };
@@ -43,7 +44,7 @@ function harness() {
     return new Response('{}',{status:200});
   };
   const req = (path,body,opts={}) => worker.fetch(new Request('https://servewith-beta.sffilamlions.org'+path,{
-    method:body ? 'POST':'GET', headers: {'origin':'https://servewith-beta.sffilamlions.org',
+    method:opts.method || (body ? 'POST':'GET'), headers: {'origin':'https://servewith-beta.sffilamlions.org',
       'content-type':'application/json','CF-Connecting-IP':opts.ip || '192.0.2.1', ...(opts.cookie ? {cookie:opts.cookie}:{}) },
     ...(body ? {body:JSON.stringify(body)}:{}) }),env);
   const close = () => { globalThis.fetch=previousFetch;sqlite.close(); };
@@ -198,4 +199,50 @@ test('agreement is rejected without profile and rejects mismatched or unchecked 
     assert.equal(h.sqlite.prepare('SELECT count(*) n FROM agreement_acceptances').get().n,1);
     assert.equal((await h.req('/api/admin/dashboard',undefined,{cookie})).status,200);
   }finally{h.close();}
+});
+
+async function complete(h,email,name){
+  await h.req('/api/auth/request',{email});
+  const mail=h.sent.at(-1);
+  const login=await h.req('/api/auth/verify',{email,code:credentials(mail).code});
+  assert.equal(login.status,200);
+  const cookie=login.headers.get('set-cookie');
+  assert.equal((await h.req('/api/auth/profile',{firstName:name,lastName:'Example',dateOfBirth:'1990-01-01'},{cookie})).status,200);
+  assert.equal((await h.req('/api/auth/agreements',{accepted:true,termsVersion:'test-terms',privacyVersion:'test-privacy'},{cookie})).status,200);
+  const me=await (await h.req('/api/auth/me',undefined,{cookie})).json();
+  return {cookie,id:me.userId};
+}
+test('directory is admin-only and excludes DOB from every result',async()=>{
+  const h=harness();try{
+    const admin=await complete(h,'lionaugust@icloud.com','Lina');
+    const guest=await complete(h,'guest@example.org','Guest');
+    assert.equal((await h.req('/api/admin/users',undefined,{cookie:guest.cookie})).status,403);
+    const response=await h.req('/api/admin/users?sort=last&letter=E',undefined,{cookie:admin.cookie});
+    assert.equal(response.status,200);
+    const users=(await response.json()).users;
+    assert.equal(users.length,2);
+    assert.ok(users.every(u=>!Object.hasOwn(u,'date_of_birth')));
+    assert.equal((await h.req('/api/admin/users?sort=unknown&letter=ab',undefined,{cookie:admin.cookie})).status,400);
+  }finally{h.close()}
+});
+test('canonical user reads are owner/admin only, owner cannot correct DOB or edit email',async()=>{
+  const h=harness();try{
+    const admin=await complete(h,'lionaugust@icloud.com','Admin');
+    const guest=await complete(h,'guest@example.org','Guest');
+    const outsider=await complete(h,'lsvalera58@gmail.com','Other');
+    assert.equal((await h.req('/api/users/'+admin.id,undefined,{cookie:guest.cookie})).status,404);
+    assert.equal((await h.req('/api/users/'+guest.id,undefined,{cookie:admin.cookie})).status,200);
+    assert.equal((await h.req('/api/users/'+guest.id,undefined,{cookie:guest.cookie})).status,200);
+    assert.equal((await h.req('/api/users/'+guest.id,{firstName:'Updated',lastName:'Example',dateOfBirth:'1980-01-01'},{cookie:guest.cookie,method:'PUT'})).status,403);
+    assert.equal((await h.req('/api/users/'+guest.id,{firstName:'Updated',lastName:'Example',email:'stolen@example.org'},{cookie:guest.cookie,method:'PUT'})).status,200);
+    assert.equal(h.sqlite.prepare('SELECT email FROM users WHERE id=?').get(guest.id).email,'guest@example.org');
+    assert.equal((await h.req('/api/users/'+guest.id,{firstName:'Updated',lastName:'Example',dateOfBirth:'1980-01-01'},{cookie:admin.cookie,method:'PUT'})).status,200);
+    const audit=h.sqlite.prepare('SELECT actor_user_id,subject_user_id,changed_at FROM user_dob_audit').all();
+    assert.equal(audit.length,1);
+    assert.equal(audit[0].actor_user_id,admin.id);
+    assert.equal(audit[0].subject_user_id,guest.id);
+    assert.equal((await h.req('/api/users/'+guest.id,{firstName:'Updated',lastName:'Example',dateOfBirth:'1980-01-01'},{cookie:admin.cookie,method:'PUT'})).status,200);
+    assert.equal(h.sqlite.prepare('SELECT count(*) n FROM user_dob_audit').get().n,1);
+    assert.equal((await h.req('/api/users/'+guest.id,undefined,{cookie:outsider.cookie})).status,200);
+  }finally{h.close()}
 });
