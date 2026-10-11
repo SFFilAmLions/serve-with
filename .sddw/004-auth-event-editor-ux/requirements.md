@@ -79,20 +79,25 @@ Origin: successful SDDW 003 staging use and user feedback. Consolidates [#10](ht
 - When returning from admin to attendee, retain the attendee's normal browsing experience; define back/navigation and optional view persistence in design. Never leak admin-only information into the attendee view.
 - Browser tests must cover attendee-only accounts, administrators switching both directions, direct navigation to protected administrator views, logout and expired-session behavior, keyboard/mobile switching, and no accidental admin controls in attendee view.
 
-## 7. Acceptance and boundaries
+## 7. Project documentation
+
+- Update the root `README.md` as part of SDDW 004 to reflect features actually implemented versus planned, and to prominently link both environment URLs: staging `https://servewith-beta.sffilamlions.org/` and production `https://servewith.sffilamlions.org/`.
+- Describe the current deployment workflow and production release gate accurately. Keep the README up to date as SDDW 004 is implemented, reviewed, and eventually shipped; do not present planned features as already live.
+
+## 8. Acceptance and boundaries
 
 - Automated tests: automatic single-attempt magic-link sign-in/token scrubbing, code/login/logout regressions, registration/profile/deletion and staging eligibility checks, own-profile edit versus administrator editing of other users, protected user directory, dedicated event-create page and event duplication, admin Edit User and first-login profile completion, account-menu/mobile, attendee/admin view switching and keyboard behavior, page-navigation/discard behavior, start/end synchronization and overrides, distinct date and clock input UX, live duration and DST edge cases, Edit prefill, no public-list regression.
 - Verify changes on staging through normal `main` workflow after approval, fixing staging defects iteratively. **No production deployment without separate explicit authorization.**
 - Out of scope: new authentication providers, new event schema, event RSVP/signups, recurrence, organization permissions expansion, or production release.
 
-## 8. Confirmed requirements decisions
+## 9. Confirmed requirements decisions
 
 - **Existing administrators:** Mandatory first/last name completion at next sign-in (not invented or pre-seeded). Until complete, restrict to completion/sign-out while preserving their existing role assignment.
 - **Staging registration allowlist:** Email addresses only; registrants supply their own mandatory names.
 - **Profile editing:** Users may change their first/last names after registration; both fields must remain valid and nonblank. Date of birth is mandatory and read-only to the account owner after initial submission; only an authorized administrator may correct it. Email changes are not included in this phase.
 - **Administrator identity source:** `config/admins.yaml` remains an email-only authorization source; required names and verified email reside in D1 profiles, including administrators. No names in YAML.
 
-## 9. Items to settle in design review
+## 10. Items to settle in design review
 
 - Specific MUI date/time picker dependency, license constraints, and mobile clock UX.
 - Whether the duration should be shown directly beneath the equal-width time inputs or in an End time label area; the equal sizing and prominent date are required either way.
