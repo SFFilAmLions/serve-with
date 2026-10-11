@@ -1,6 +1,6 @@
 # SDDW 003 — Basic Event Management: Technical Design
 
-Status: **Proposed for review only — implementation not authorized.** Branding decision 1, time-zone decision 2, and concurrency decision 3 approved; decision 4 pending.
+Status: **Proposed for review only — implementation not authorized.** All four technical design decisions recorded; overall design awaits final approval.
 Requirements: [requirements.md](requirements.md). This design adopts **React + Material UI (MUI)** with a **Material Design 3-inspired custom theme**; it does not claim native/full Material 3 compliance.
 
 ## 1. Architectural overview
@@ -24,7 +24,7 @@ Keep the existing Vite + TypeScript + Cloudflare Worker + D1 deployment architec
 The current handbook uses Material for MkDocs, but its configured red/amber colors are **not** definitive club branding. Use Google Sites' documented club visual identity for the logo and typography; use Material 3 for surfaces, elevation, spacing, shapes, and interaction patterns.
 
 - **Components:** MUI `AppBar`, `Container`, `Tabs`, `Card`/`CardContent`, `Button`, `TextField`, `Dialog`, `DialogTitle`, `DialogContent`, `DialogActions`, `Snackbar`/`Alert`, `CircularProgress`. Choose accessible MUI primitives over custom widgets.
-- **Theme:** Define shared tokens in a single theme module: official club yellow `#F1C232` as a brand accent; derived tonal/surface colors with WCAG contrast checks; generous Material 3-like rounded corners; responsive typography. Do not automatically treat yellow as a suitable text or button color on all surfaces.
+- **Theme (approved, decision 4):** Define coordinated light and dark palettes in one MUI theme module. Follow the visitor's operating-system `prefers-color-scheme` preference automatically, including changes while the page is open; no manual appearance toggle in this milestone. Use official club yellow `#F1C232` as a brand accent, with appropriate distinct tonal/surface/on-color tokens for each mode and verified WCAG text/control contrast. Use generous Material 3-like rounded corners and responsive typography. Do not use raw yellow indiscriminately on backgrounds or text. Avoid a flash of the wrong theme on startup.
 - **Typography (approved, decision 1):** Club name in Ubuntu Bold, subtitle in Ubuntu Condensed, body in Alata, with explicit local/system fallbacks and verified font licensing/distribution. Avoid committing uncertain-licensed font binaries.
 - **Identity (approved, decision 1):** Use the official club logo with verified source and usage rights, plus the official yellow accent `#F1C232`; do not substitute a fabricated logo. Asset sourcing/licensing is a prerequisite to implementation.
 - **Layout:** Mobile-first public landing page, compact branded top app bar with sign-in/user action; Upcoming/Past tabs; readable event cards containing all specified details; no drawer or event detail route.
@@ -105,7 +105,7 @@ All JSON responses set `Cache-Control: no-store` initially to prevent stale publ
 
 ## 8. Verification and release constraints
 
-Tests cover anonymous list reads, authentication boundaries, CRUD, replay/soft deletion behavior, view classification at exact end instant, deterministic ties, DST nonexistent/ambiguous times, multi-zone formatting, overnight intervals, form guards, keyboard behavior, loading/errors and focus restoration.
+Tests cover anonymous list reads, authentication boundaries, CRUD, replay/soft deletion behavior, view classification at exact end instant, deterministic ties, DST nonexistent/ambiguous times, multi-zone formatting, overnight intervals, form guards, keyboard behavior, loading/errors and focus restoration. UI tests also verify light and dark palettes, system preference changes, and accessible contrast.
 
 Only after design approval: break work into small tasks and a separate implementation PR, pass CI, run D1 migration against staging, and verify mobile and desktop in staging. **Do not merge a production release PR or deploy production without explicit user approval.**
 
@@ -114,6 +114,6 @@ Only after design approval: break work into small tasks and a separate implement
 1. Verify approved club logo and brand-font asset sourcing and whether to load fonts remotely or bundle suitably licensed copies.
 2. **Resolved:** Temporal with a polyfill, explicit rejection of DST gaps/folds; Cloudflare Workers compatibility and bundle size remain implementation verification criteria.
 3. **Resolved:** Require optimistic concurrency with event versions and 409 stale-write conflicts, preserving unsaved form values.
-4. Review final MUI theme colors for accessibility on light/dark surfaces. Default to a light interface; defer dark-mode toggle unless required.
+4. **Resolved:** Automatically follow system light/dark preference with two contrast-checked Material 3-inspired palettes; no manual toggle. Final color token accessibility verification remains an implementation acceptance criterion.
 
 This document is a design proposal, not permission to implement.
