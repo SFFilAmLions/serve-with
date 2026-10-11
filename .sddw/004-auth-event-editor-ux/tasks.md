@@ -6,10 +6,11 @@
 - [ ] Approve [requirements.md](requirements.md) and resolve any remaining policy questions.
 - [x] Record user decisions: existing administrators complete profile at next sign-in; staging whitelist is email-only; first and last names are editable.
 - [x] Confirm `config/admins.yaml` remains email-only for administrator authorization; first/last names, date of birth, and verified email belong to D1 profiles.
-- [ ] Review/approve remaining registration and deletion requirements; design a no-lockout administrator profile-completion transition.
+- [x] Record user-requested verified email change and account deactivation/reactivation model: retain email and stable ID, scrub profile PII, preserve signup references, verify again and complete profile on reactivation.
+- [ ] Define exact PII scrub scope (including data in signups), retained-email privacy/retention basis and any full-erasure request path; design no-lockout administrator transition.
 - [x] Approve administrator-only corrections to submitted date of birth; owner can view but not edit it.
 - [ ] Design audited admin date-of-birth correction, directory exclusion, privacy, retention and migration; validate a calendar date without inferring age limits.
-- [ ] Design account schema, migrations, verification, self-deletion/session revocation, staging allowlist policy and tests, and how existing admins transition.
+- [ ] Design account schema, migrations, verification, email-change confirmation, deactivation PII scrub and session revocation, same-ID reactivation, staging allowlist and tests, and how existing admins transition.
 - [ ] Review/approve the separate Attendee and Administrator view requirements and design accessible switching and route authorization.
 - [ ] Design authentication and account-menu interactions in [design.md](design.md); review and approve.
 - [ ] Design/test administrator-only Duplicate Event as prefilled Create Event, preserving the original event and generating a new ID on explicit Save.
