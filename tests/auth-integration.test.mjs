@@ -163,9 +163,9 @@ test('verified login resolves stable user ID, while a legacy email session upgra
     assert.ok(first.user_id);
     assert.equal(first.email,'lionaugust@icloud.com');
     h.sqlite.prepare('UPDATE sessions SET user_id=NULL').run();
-    assert.equal((await h.req('/api/admin/dashboard',undefined,{cookie})).status,200);
+    assert.equal((await h.req('/api/admin/dashboard',undefined,{cookie})).status,403);
     assert.equal(h.sqlite.prepare('SELECT user_id FROM sessions').get().user_id,first.user_id);
-    assert.equal((await h.req('/api/admin/dashboard',undefined,{cookie})).status,200);
+    assert.equal((await h.req('/api/admin/dashboard',undefined,{cookie})).status,403);
     assert.equal(h.sqlite.prepare('SELECT count(*) n FROM users').get().n,1);
   } finally { h.close(); }
 });

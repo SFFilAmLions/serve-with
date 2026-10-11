@@ -121,7 +121,7 @@ type UserRow = {
 };
 type Subject = { user: UserRow; admin: boolean };
 const sessionTokenHash = async (request: Request, env: Env): Promise<string | null> => {
-  const match = request.headers.get('cookie')?.match(/(?:^|;\\s*)__Host-sw_session=([a-f0-9]{64})(?:;|$)/);
+  const match = request.headers.get('cookie')?.match(/(?:^|;\s*)__Host-sw_session=([a-f0-9]{64})(?:;|$)/);
   return match && env.AUTH_PEPPER ? digest(match[1], env.AUTH_PEPPER) : null;
 };
 async function sessionSubject(request: Request, env: Env): Promise<Subject | null> {
@@ -153,7 +153,7 @@ const privilegeReady = (subject: Subject, env: Env) => Boolean(subject.user.emai
 const registrationEligible = (email: string, env: Env) => allowed.has(email) || isStagingRegistrationEligible(email,env,allowed);
 const validName = (x: unknown): x is string => typeof x === 'string' && x.trim().length >= 1 && x.trim().length <= 100;
 const validDob = (x: unknown): x is string => {
-  if (typeof x !== 'string' || !/^\\d{4}-\\d{2}-\\d{2}$/.test(x)) return false;
+  if (typeof x !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(x)) return false;
   try { return Temporal.PlainDate.from(x).toString() === x && x < new Date().toISOString().slice(0,10); }
   catch { return false; }
 };
