@@ -9,7 +9,8 @@
 - [x] Record revised account lifecycle: deactivation retains full PII but resets active Terms/Privacy acceptance; deletion clears profile PII with optional recovery key.
 - [ ] Defer full deletion, optional recovery key, and historical re-claim to later account-lifecycle scope; do not implement in simplified SDDW 004.
 - [ ] Implement/design a single required, unchecked Terms of Use and Privacy Policy checkbox on first registration and any reactivation, with versioned acceptance evidence.
-- [ ] Add user-level `is_active` boolean (default false); activate after verified email, full required profile, and affirmative checkbox; guard attendee/admin APIs and preserve PII on deactivation.
+- [ ] Store `created_at` separately from nullable `terms_accepted_at` and accepted document versions; derive access from verified email, complete profile and current required versions (no activation boolean).
+- [ ] Require reacceptance on new terms/privacy versions and on deactivation, preserving historical acceptance evidence and profile PII.
 - [ ] Define exact PII scrub scope (including data in signups), retained-email privacy/retention basis and any full-erasure request path; design no-lockout administrator transition.
 - [x] Approve administrator-only corrections to submitted date of birth; owner can view but not edit it.
 - [ ] Design audited admin date-of-birth correction, directory exclusion, privacy, retention and migration; validate a calendar date without inferring age limits.
