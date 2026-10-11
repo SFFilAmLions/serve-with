@@ -19,13 +19,11 @@
 - Footer source/version controls styled as restrained Material Chips/links.
 - Overall responsive layout and action density inspired by Google Material apps.
 
-## Users directory — A-Z options
-Current narrow vertical 26-button rail is visually cramped and implies scroll, but the implementation uses server-side letter filtering. Preferred replacement:
-1. Search is primary.
-2. Compact **Filter by initial** Select (All, A–Z) beside sort controls, optionally using a single A–Z popover button on narrow viewports.
-3. Removable active-letter filter Chip and descriptive results-empty state.
-
-Alternatives to evaluate: a single popover with alphabet grid (touch-friendly); a horizontally wrapping letter strip (one-tap but occupies space); section headers with scroll-to-letter (not valid unless the directory is fully loaded, so not preferred with paginated queries).
+## Users directory — search only
+- Remove the vertical A–Z rail and any letter-picker/filter UI. No alphabetical jump navigation is needed.
+- Retain a prominent server-backed search field for name and email, with a clear action and accessible status for loading, no results and errors.
+- Retain name sorting and incremental pagination/Load more. Search should reset pagination, preserve a user's search when visiting a profile and returning, and handle stale responses safely.
+- Do not add letter filtering through a different control.
 
 ## Verification
 - Browser tests for menus, navigation, directory filters, pills, theme, Gravatar fallback, compact actions and no duplicate Save.
