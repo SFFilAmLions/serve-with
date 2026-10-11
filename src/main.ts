@@ -34,7 +34,7 @@ function renderForm() {
         <button type="submit">Verify code</button>
       </form>
       <form id="magic-form" ${magic ? '' : 'hidden'}>
-        <p>A sign-in link was opened. Confirm using the email address that received it.</p>
+        <p>A sign-in link was opened. Click below to sign in with this one-time link.</p>
         <button type="submit">Confirm magic-link sign-in</button>
       </form>
       <p id="message" role="status" aria-live="polite"></p>
@@ -56,7 +56,7 @@ function renderForm() {
   });
   app!.querySelector<HTMLFormElement>('#magic-form')!.addEventListener('submit',async e => {
     e.preventDefault();
-    try {await request('magic',{email:email.value,token:magic || ''}); history.replaceState(null,'',location.pathname); await render();}
+    try {await request('magic',{token:magic || ''}); history.replaceState(null,'',location.pathname); await render();}
     catch (error) { show(error instanceof Error ? error.message : 'Unable to sign in'); }
   });
 }

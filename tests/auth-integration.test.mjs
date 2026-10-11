@@ -67,7 +67,7 @@ test('magic link requires POST and is single-use, even after OTP is consumed',as
     await h.req('/api/auth/request',{email:'LSValera58@gmail.com'});
     const {token}=credentials(h.sent[0]);
     assert.equal((await h.req('/api/auth/magic')).status,400);
-    assert.equal((await h.req('/api/auth/magic',{email:'lsvalera58@gmail.com',token})).status,200);
+    assert.equal((await h.req('/api/auth/magic',{token})).status,200);
     assert.equal((await h.req('/api/auth/magic',{email:'lsvalera58@gmail.com',token})).status,400);
   }finally{h.close();}
 });
@@ -77,7 +77,7 @@ test('unauthorized accounts get indistinguishable response and no email',async (
     const result=await h.req('/api/auth/request',{email:'notadmin@example.com'});
     assert.equal(result.status,200);
     assert.equal(h.sent.length,0);
-    assert.equal((await h.req('/api/auth/magic',{email:'notadmin@example.com',token:'a'.repeat(64)})).status,400);
+    assert.equal((await h.req('/api/auth/magic',{token:'a'.repeat(64)})).status,400);
   }finally{h.close();}
 });
 test('expired token fails; repeated incorrect guesses exhaust challenge',async () => {
@@ -90,8 +90,8 @@ test('expired token fails; repeated incorrect guesses exhaust challenge',async (
     await h.req('/api/auth/request',{email:'lionaugust@icloud.com'});
     const fresh=credentials(h.sent.at(-1));
     for(let i=0;i<5;i++) assert.equal((await h.req('/api/auth/verify',{email:'lionaugust@icloud.com',code:'00000000'})).status,400);
-    assert.equal((await h.req('/api/auth/magic',{email:'lionaugust@icloud.com',token:fresh.token})).status,400);
-    assert.equal((await h.req('/api/auth/magic',{email:'lionaugust@icloud.com',token})).status,400);
+    assert.equal((await h.req('/api/auth/magic',{token:fresh.token})).status,400);
+    assert.equal((await h.req('/api/auth/magic',{token})).status,400);
   }finally{h.close();}
 });
 test('per-IP and per-account throttling prevents email floods',async () => {

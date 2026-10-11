@@ -127,17 +127,27 @@ export default {
         return generic;
       }
       if (path === '/api/auth/verify' || path === '/api/auth/magic') {
-        const email = normalize(body.email);
+        const isMagic = path === '/api/auth/magic';
+        const submittedEmail = normalize(body.email);
         const code = typeof body.code === 'string' ? body.code : '';
         const token = typeof body.token === 'string' ? body.token : '';
-        if (!allowed.has(email) || (path.endsWith('/verify') ? !/^\d{8}$/.test(code) : !/^[a-f0-9]{64}$/.test(token))) return error();
+        if (isMagic ? !/^[a-f0-9]{64}$/.test(token) : (!allowed.has(submittedEmail) || !/^\\d{8}$/.test(code))) return error();
         const now = Date.now();
-        const hashed = await digest(path.endsWith('/verify') ? email + ':' + code : token, env.AUTH_PEPPER);
-        const field = path.endsWith('/verify') ? 'code_hash' : 'link_hash';
-        const latest = await db.prepare('SELECT id,attempts FROM login_challenges WHERE email=? AND consumed_at IS NULL AND expires_at>? ORDER BY created_at DESC LIMIT 1').bind(email,now).first<{id: string; attempts: number}>();
-        if (!latest || latest.attempts >= 5) return error();
-        // Count failed guesses against the latest outstanding challenge, regardless of token validity.
-        const row = await db.prepare(`SELECT id,attempts FROM login_challenges WHERE id=? AND ${field}=? AND consumed_at IS NULL AND expires_at>?`).bind(latest.id,hashed,now).first<{ id: string; attempts: number }>();
+        const hashed = await digest(isMagic ? token : submittedEmail + ':' + code, env.AUTH_PEPPER);
+        // A magic link is a bearer credential: find the account by its token hash,
+        // not by an email typed in the receiving browser.
+        const latest = isMagic
+          ? await db.prepare('SELECT id,email,attempts FROM login_challenges WHERE link_hash=? AND consumed_at IS NULL AND expires_at>? ORDER BY created_at DESC LIMIT 1')
+              .bind(hashed,now).first<{ id: string; email: string; attempts: number }>()
+          : await db.prepare('SELECT id,email,attempts FROM login_challenges WHERE email=? AND consumed_at IS NULL AND expires_at>? ORDER BY created_at DESC LIMIT 1')
+              .bind(submittedEmail,now).first<{ id: string; email: string; attempts: number }>();
+        const email = latest?.email || submittedEmail;
+        if (!await withinLimits(request, db, env.AUTH_PEPPER, email || 'invalid', 'verify', now)) return error();
+        if (!latest || !allowed.has(email) || latest.attempts >= 5) return error();
+        const row = isMagic
+          ? latest
+          : await db.prepare('SELECT id FROM login_challenges WHERE id=? AND code_hash=? AND consumed_at IS NULL AND expires_at>?')
+              .bind(latest.id,hashed,now).first<{ id: string }>();
         if (!row) {
           await db.prepare('UPDATE login_challenges SET attempts=attempts+1 WHERE id=? AND attempts<5 AND consumed_at IS NULL').bind(latest.id).run();
           return error();
