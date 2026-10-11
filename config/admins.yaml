@@ -1,0 +1,6 @@
+# Explicitly approved administrator email addresses.
+admins:
+  - email: LionAugust@icloud.com
+    enabled: true
+  - email: LSValera58@gmail.com
+    enabled: true

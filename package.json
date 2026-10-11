@@ -5,8 +5,14 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build",
-    "preview": "vite preview"
+    "build": "npm run generate:admins && tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "validate:admins": "node scripts/validate-admins.mjs",
+    "generate:admins": "node scripts/generate-admins.mjs",
+    "test": "node --test tests/*.test.mjs"
+  },
+  "dependencies": {
+    "yaml": "^2.8.1"
   },
   "devDependencies": {
     "typescript": "^5.9.0",

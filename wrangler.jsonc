@@ -1,7 +1,21 @@
 {
   "name": "serve-with",
+  "main": "src/worker.ts",
   "compatibility_date": "2026-10-01",
   "assets": {
-    "directory": "./dist"
+    "directory": "./dist",
+    "binding": "ASSETS"
+  },
+  "env": {
+    "staging": {
+      "name": "serve-with-staging",
+      "d1_databases": [
+        {
+          "binding": "AUTH_DB",
+          "database_name": "serve-with-staging-db",
+          "database_id": "97a54923-d1b5-4f55-bc33-0787c63cd1a1"
+        }
+      ]
+    }
   }
 }

@@ -6,7 +6,7 @@
 - Release Please maintains a pending release PR; merging it publishes the GitHub tag and release.
 - Production `deploy-production.yml` is an explicit manual promotion: input a stable published release tag, validate it against GitHub Releases, check out that tag, build and deploy `serve-with`.
 - Production is not deployed on arbitrary merges. GitHub Actions `production` environment may additionally require reviewer approval.
-- Stage URL: `staging.servewith.sffilamlions.org`; production URL: `servewith.sffilamlions.org`. Bind domains in Cloudflare Dashboard after Workers exist.
+- Beta URL: `servewith-beta.sffilamlions.org`; production URL: `servewith.sffilamlions.org`. Bind via Cloudflare Workers Custom Domains, not manual CNAME records. Production binding remains pending until the production Worker exists.
 - Two Workers are persistent; avoid orphaned per-PR Workers going forward. Existing `serve-with-pr-1` remains until manually cleaned up.
 - GitHub repository secrets: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`; never commit credentials.
 - Authentication via YAML admin allowlist, email OTP **and** magic links belongs to feature 002.
@@ -22,6 +22,6 @@
 ## Risks
 
 - Cloudflare account-level Worker script write access and two GitHub Actions secrets required.
-- Configure staging/production Worker custom domains after initial deployments.
+- Configure beta/production Worker custom domains after initial deployments.
 - A production release exists only after Release Please's release PR is merged.
 - Use a stable published release tag (not a draft or prerelease) for production.
