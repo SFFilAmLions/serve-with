@@ -14,7 +14,7 @@ Origin: successful SDDW 003 staging use and user feedback. Consolidates [#10](ht
 ## 2. Conventional Material app-bar account controls
 
 - Place account access in the **top right of the existing branded AppBar**, not at the bottom of the page.
-- Signed out: provide a compact **Sign in** action opening an accessible sign-in experience without hiding public events.
+- Signed out: provide a compact **Sign in** action opening an accessible login page or home-page login modal, without hiding public events. The choice of page versus modal is a design decision.
 - Signed in: provide an account/avatar menu exposing the user's email and **Sign out**; the menu must work with keyboard and small/mobile viewports.
 - Public event browsing must remain accessible regardless of login or auth-service errors. Admin mutation controls appear only with confirmed authorization, backed by existing server authorization.
 - Remove the old bottom-of-page auth/account panel while retaining the GitHub repository and deployment-identification footer.
@@ -33,7 +33,7 @@ Origin: successful SDDW 003 staging use and user feedback. Consolidates [#10](ht
 
 ## 4. User registration, profiles, and account deletion
 
-- Allow individuals to **register their own user account** using a verified email address. Every active user, including every administrator, must have a **nonblank first name, nonblank last name, and unique verified email address**. Apply appropriate validation and normalization server-side; public event browsing remains anonymous.
+- **No standalone registration or Create User page.** A person begins with the **same email-first login flow** whether their account already exists or is being created: enter email, request an eight-digit security code and magic link, then authenticate with either method. After successful verification, create an eligible first-time user's account (or resume an existing account). Every active user, including every administrator, must have a **nonblank first name, nonblank last name, and unique verified email address**. Apply appropriate validation and normalization server-side; public event browsing remains anonymous.
 - Allow authenticated users to view their profile and **edit their first and last names** (both remain required) and **delete their own account** through an explicit, deliberate confirmation. Revoke sessions and login challenges, stop future authentication for deleted/unauthorized identities, and define safe handling of retained event/audit references, if any, before implementation.
 - Do not grant administrator privileges through registration or profile changes. **Decision: existing administrators complete their first and last names through a secure required profile-completion step at their next sign-in.** Until completed, permit only the limited profile-completion and sign-out experience, not administrative operations; preserve the administrator role assignment after completion. Never invent names. Reconcile the authoritative administrator list and persisted user profiles without locking out existing admins during the transition.
 - **Approved authority split:** keep `config/admins.yaml` as the email-based administrator authorization list (email and enabled status), not a storage location for first/last names. Store each administrator's required, editable first name and last name, alongside their verified email, **only in their D1 user profile**. Administrator access is based on the configured email plus a completed, verified user profile. Do not synchronize editable names into YAML.
@@ -42,7 +42,7 @@ Origin: successful SDDW 003 staging use and user feedback. Consolidates [#10](ht
 ### Staging-only registration allowlist
 
 - **Decision: the staging whitelist contains email addresses only, not names.** In the **staging environment only**, permit account creation **only when the email matches an explicitly approved staging user allowlist**. Whitelist eligibility must be checked on the server before creating or activating an account and before sending registration credentials; never rely solely on UI validation.
-- A visitor may access the registration flow, but an unlisted email must **not** result in account creation. Use safe, non-enumerating public error/acknowledgment messaging to avoid exposing the whitelist.
+- Visitors may enter any email on the login screen, but an unlisted email must **not** result in a staging account, session, or usable login challenge. Use safe, non-enumerating public error/acknowledgment messaging to avoid exposing the whitelist.
 - Staging administrators must be covered explicitly by the same staging account-eligibility policy; administrator authorization remains a separate check.
 - Existing staging users/admins need a reviewed migration/activation policy so mandatory profile fields and eligibility are enforced without silently losing access. Treat profile completion or approved seed-data migration as a deliberate step.
 - Maintain the staging allowlist through a reviewed, environment-specific configuration/source of truth, not an open-registration switch or a client-side list. Never accidentally apply the staging restriction to production.
@@ -56,14 +56,13 @@ Origin: successful SDDW 003 staging use and user feedback. Consolidates [#10](ht
 
 ## 5. Profile editor and administrator user directory
 
-- Give **every authenticated user a dedicated Edit Profile page**, reachable through the top app-bar account menu. Users may view and update **their own first and last names**, with required-field validation. Their verified email is displayed but **not editable** in SDDW 004.
-- Provide an **administrator-only Users page** listing registered user accounts, with useful identifying columns (first name, last name, email) and basic search/filtering. This is an account directory, not an event-attendance list. Include a visible **Create User** action.
-- **Create User and Edit User must be two modes of one dedicated, reusable user form/page**, not separate divergent implementations. From the Users directory, administrators may create a user or select an existing user to edit. Create mode requires first name, last name, and email; Edit mode prefills the account and allows changing first and last name, not its verified email.
-- Administrator-created users are subject to the same registration eligibility rules, **including the staging email whitelist**, and must not be considered email-verified until they actually verify ownership. Design must specify invitation/verification or pending-account activation, prevent duplicates, and avoid sending unsolicited sign-in links. Creating a user must never grant admin privileges.
-- The authenticated **Edit Profile** page should reuse compatible form fields and validation while enforcing self-only editing and hiding administrative controls. Public self-registration may reuse the same components, but cannot access administrator create/edit routes.
+- Give **every authenticated user a dedicated Edit Profile page**, reachable through the top app-bar account menu. **Immediately after first successful email verification/login, redirect users missing required first/last name to this page and require completion before ordinary attendee or administrator features become available.** Reuse this same page for later edits; there is no independent user-registration form. Users may view and update **their own first and last names**, with required-field validation. Their verified email is displayed but **not editable** in SDDW 004.
+- Provide an **administrator-only Users page** listing registered user accounts, with useful identifying columns (first name, last name, email) and basic search/filtering. This is an account directory, not an event-attendance list. Do not provide a Create User action; eligible new users create their own accounts via the login/verification flow.
+- From the Users directory, administrators may open an **Edit User page** for an existing account, prefilled with its profile information. Reuse the profile-edit form fields and validation, but enforce administrator-only cross-user editing on the server. Administrators may edit first and last names, not verified email or administrator privileges. There is **no administrator Create User page** in this phase.
+- Self-service login and required profile completion handle first-time account creation; the admin Edit User page does not register accounts or bypass staging eligibility.
 - Never treat the ability to edit a profile as permission to grant administrator status or modify the verified email.
 - Enforce ownership or administrator authorization server-side on every profile read/write. A normal user cannot view the full user directory, enumerate other users, or edit another user by manipulating a URL or API request.
-- Administrator account/profile management must preserve existing eligibility, verification, permissions, and account-deletion safeguards. Administration of roles, email changes, and cross-user deletion are **not authorized by this requirement**. Administrator creation of ordinary user accounts is expressly in scope.
+- Administrator account/profile management must preserve existing eligibility, verification, permissions, and account-deletion safeguards. Administration of roles, email changes, and cross-user deletion are **not authorized by this requirement**. Administrator creation of ordinary user accounts is not in scope; first-time account creation occurs through verified email login.
 - Page navigation must support direct links, browser back/forward, responsive layout, keyboard focus, save feedback, and unsaved-change protection.
 
 ## 6. Separate Attendee and Administrator experiences
@@ -80,7 +79,7 @@ Origin: successful SDDW 003 staging use and user feedback. Consolidates [#10](ht
 
 ## 7. Acceptance and boundaries
 
-- Automated tests: automatic single-attempt magic-link sign-in/token scrubbing, code/login/logout regressions, registration/profile/deletion and staging eligibility checks, own-profile edit versus administrator editing of other users, protected user directory, dedicated event-create page, shared admin Create/Edit User form, account-menu/mobile, attendee/admin view switching and keyboard behavior, page-navigation/discard behavior, start/end synchronization and overrides, distinct date and clock input UX, live duration and DST edge cases, Edit prefill, no public-list regression.
+- Automated tests: automatic single-attempt magic-link sign-in/token scrubbing, code/login/logout regressions, registration/profile/deletion and staging eligibility checks, own-profile edit versus administrator editing of other users, protected user directory, dedicated event-create page, admin Edit User and first-login profile completion, account-menu/mobile, attendee/admin view switching and keyboard behavior, page-navigation/discard behavior, start/end synchronization and overrides, distinct date and clock input UX, live duration and DST edge cases, Edit prefill, no public-list regression.
 - Verify changes on staging through normal `main` workflow after approval, fixing staging defects iteratively. **No production deployment without separate explicit authorization.**
 - Out of scope: new authentication providers, new event schema, event RSVP/signups, recurrence, organization permissions expansion, or production release.
 
@@ -96,8 +95,8 @@ Origin: successful SDDW 003 staging use and user feedback. Consolidates [#10](ht
 - Specific MUI date/time picker dependency, license constraints, and mobile clock UX.
 - Whether the duration should be shown directly beneath the equal-width time inputs or in an End time label area; the equal sizing and prominent date are required either way.
 - Exact loading/error presentation for automatic magic-link exchange.
-- Decide whether Edit Event should also be a dedicated page (recommended for consistency) and the exact URL patterns for Create Event, Users, Create/Edit User, and Edit Profile.
-- Define the administrator-created user invitation/verification lifecycle, duplicate protection, and how the staging whitelist applies before and after activation.
+- Decide whether Edit Event should also be a dedicated page (recommended for consistency) and the exact URL patterns for Create Event, Users, Edit User, and Edit Profile.
+- Choose login page versus home-page modal; define code/link login state, first-login account creation timing, profile-completion redirect, duplicate prevention, and eligibility checks before challenge issuance and activation.
 - Attendee/Admin view navigation model (route or mode switch), initial/default view and UI placement; do not imply attendee event signup is already implemented.
 - User table/profile migration and deletion semantics (including retention); staging email-only allowlist configuration and reconciliation. Administrator configuration/profile source-of-truth split is approved.
 - Production registration eligibility policy (explicitly deferred; no production registration is authorized).
