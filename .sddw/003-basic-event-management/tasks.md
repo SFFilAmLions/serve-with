@@ -50,11 +50,11 @@ References: [requirements.md](requirements.md) (approved); [design.md](design.md
 
 ## Slice 4 — Administrator event dialogs
 
-- [ ] Show Add Event to authenticated admins including on an empty list; show Edit/Delete on all events, including past events. Hide admin controls from anonymous visitors but keep enforcement server-side.
-- [ ] Build accessible MUI Add/Edit dialog with title, start/end date and time, IANA time-zone selector (Pacific default), and free-text location; prefill fields on edit and preserve form values on API errors.
+- [x] Implement initial Add Event, Edit, and Delete controls for authenticated admins, including empty states and past events; backend retains authorization enforcement (CI/UI verification pending).
+- [ ] Complete accessible Add/Edit dialog: initial fields, edit prefill, and preserved server errors implemented; IANA time-zone picker, keyboard and focus checks pending.
 - [ ] Disable duplicate saves; display field-level client/server validation errors, progress, and success status; close and refresh correct view only after confirmed success.
 - [ ] Guard Cancel, close icon, Escape, and backdrop: if values changed, ask **Discard unsaved changes?**; otherwise close immediately. Ensure keyboard navigation, trapping/restoring focus, and screen-reader labels.
-- [ ] Build a separate Delete confirmation dialog naming the event; on success use soft delete and refresh list, on failure leave event visible.
+- [x] Implement a separate Delete confirmation naming the event, refreshing on soft-delete and preserving the event on error (CI/UI verification pending).
 - [ ] Handle HTTP 409 version conflicts by keeping unsaved edits and explaining that another administrator changed the record; offer a deliberate reload/current-version action that asks before discarding edits.
 - [ ] Add UI tests for Add/Edit/Delete, past event management, unsaved-change guards, duplicate submission, concurrency conflict preservation, focus restoration, error states, and authorization visibility.
 
