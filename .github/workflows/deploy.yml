@@ -25,4 +25,7 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           test -n "$CLOUDFLARE_API_TOKEN" && test -n "$CLOUDFLARE_ACCOUNT_ID" || { echo "::error::Missing Cloudflare secrets"; exit 1; }
+          # Record and apply unapplied versioned schema changes before deploying new code.
+          # 0001_auth.sql uses IF NOT EXISTS and can safely baseline the existing staging schema.
+          npx wrangler d1 migrations apply serve-with-staging-db --env staging --remote
           npx wrangler deploy --env staging
