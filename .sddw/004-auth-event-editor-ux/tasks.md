@@ -18,6 +18,8 @@
 - [ ] Test attendee denial for direct Users page navigation and directory list/search APIs; admin-only directory access.
 - [ ] Design inline, post-verification first-login required name/date-of-birth completion, subsequent own-profile edits, and admin-only Users directory/Edit User page for existing users, including ownership checks, eligibility, duplicate prevention, search, and regression tests.
 - [ ] Design date/time picker choice, progressive disclosure, duration algorithm, and accessibility; review and approve.
+- [x] Refresh README on the SDDW 004 draft branch with current staging status and staging/production URLs.
+- [ ] Recheck README accuracy after SDDW 004 is implemented or deployed.
 - [ ] Break approved design into small implementation/test slices.
 - [ ] Implement on a separate branch or PR, run automated tests, and merge to `main` only after review.
 - [ ] Validate on staging after `main` deployment; resolve defects.
