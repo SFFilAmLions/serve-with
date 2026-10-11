@@ -1,6 +1,6 @@
 # Tasks — SDDW 003 Basic Event Management
 
-**Status: Event APIs, React public/admin UI and core browser tests implemented in PR #6. Expanded failure-path testing and CI hardening ongoing; branding/theme review and staging deployment are not authorized in this batch.**
+**Status: Event APIs, React public/admin UI and core browser tests implemented in PR #6. Branding/theme development is now authorized and underway; staging deployment and merging remain unapproved.**
 
 References: [requirements.md](requirements.md) (approved); [design.md](design.md) (approved by user on 2026-10-10). Target is **Serve With SF Fil-Am Lions**. Retain the existing Vite / Cloudflare Workers / D1 architecture, with React + MUI and a Material 3-inspired theme.
 
@@ -8,7 +8,7 @@ References: [requirements.md](requirements.md) (approved); [design.md](design.md
 
 - [x] Review and approve this task breakdown before any code changes, migrations, dependency installation, or deployments.
 - [x] Check current `main` and outstanding PRs before implementation; working in PR #6 alongside its existing magic-link fix.
-- [ ] Verify official club logo provenance/permission, Ubuntu and Alata web-font licenses/distribution, and official `#F1C232` brand color; record accessible fallback if an asset cannot be verified.
+- [ ] Verify official club logo provenance/permission and official `#F1C232` color from club-owned source. Ubuntu uses Canonical's Ubuntu Font Licence 1.0; Alata and Ubuntu fonts loaded from Google Fonts with system fallbacks, avoiding bundled font binaries. Confirm precise Alata licensing and logo before checking this task.
 - [ ] Verify maintained Temporal polyfill compatibility with Cloudflare Workers, strict `disambiguation: 'reject'` behavior, and build/bundle impact; pin an appropriate dependency.
 - [ ] Validate the planned light/dark MUI color tokens for WCAG contrast, including focus states and interaction states.
 
@@ -37,8 +37,8 @@ References: [requirements.md](requirements.md) (approved); [design.md](design.md
 ## Slice 3 — React shell, club identity, and public event list
 
 - [x] Migrate vanilla frontend entry to React + React DOM with Vite, Worker asset serving, existing auth flows and build footer (CI verification pending).
-- [ ] Add a centralized MUI theme approximating Material Design 3 (rounded/tonal cards, app bar, accessible controls), adopting official brand colors, approved logo, and Ubuntu/Alata typography.
-- [ ] Follow `prefers-color-scheme` automatically, including changes at runtime, without a manual toggle or startup theme flash. Test contrast and reduced-motion/focus behavior in both themes.
+- [ ] Complete centralized MUI brand theme: `src/theme.ts` now provides contrast-oriented light/dark tokens, MUI shapes and Ubuntu/Alata typography; official club logo provenance and visual approval are still pending (CI pending).
+- [ ] Follow `prefers-color-scheme` automatically, including changes at runtime, without a manual toggle or startup theme flash. Added Chromium system-switching test and explicit focus outlines in `a957b4e` (CI pending); contrast audit and flash check remain.
 - [x] Set visible header and browser title/description to **Serve With SF Fil-Am Lions**; keep URLs unchanged (CI/UI verification pending).
 - [x] Implement initial responsive Upcoming/Past tabs with event cards showing event-local start/end instants, time zone, and location (CI/UI verification pending).
 - [x] Implement friendly public empty states, loading indicators, retries, and failure feedback independently of login (UI verification pending).
