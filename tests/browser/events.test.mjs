@@ -1,9 +1,9 @@
-import test from 'node:test';
+import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { chromium } from 'playwright';
 
-const server=spawn('npm',['run','dev','--','--host','127.0.0.1','--port','4179','--strictPort'],{stdio:'ignore'});
+const server=spawn('npm',['run','dev','--','--host','127.0.0.1','--port','4179','--strictPort'],{stdio:'ignore',detached:true});
 const base='http://127.0.0.1:4179';
 async function ready(){for(let i=0;i<80;i++){try{if((await fetch(base)).ok)return;}catch{}await new Promise(r=>setTimeout(r,250));}throw Error('Vite test server did not start')}
 test('anonymous visitor browses empty upcoming and past views',async()=>{
@@ -43,7 +43,9 @@ test('authenticated admin can open editor and receives unsaved changes guard',as
   assert.equal(await page.getByRole('dialog').count(),0);
  }finally{await browser.close()}
 });
-process.on('exit',()=>server.kill());
+after(()=>{
+  if(server.pid){try{process.kill(-server.pid,'SIGTERM')}catch{server.kill()}}
+});
 
 test('administrator creates an event, then sees its event-local time and repository footer',async()=>{
  await ready();
@@ -68,7 +70,12 @@ test('administrator creates an event, then sees its event-local time and reposit
   await page.getByLabel('Start date and time').fill('2026-11-15T09:00');
   await page.getByLabel('End date and time').fill('2026-11-15T11:00');
   await page.getByRole('button',{name:'Save'}).click();
-  await page.getByRole('heading',{name:'Beach clean-up'}).waitFor();
+  try { await page.getByRole('heading',{name:'Beach clean-up'}).waitFor({timeout:8000}); }
+  catch (error) {
+   const dialogText=await page.getByRole('dialog').allTextContents();
+   const statusText=await page.locator('[role="alert"],[role="status"]').allTextContents();
+   throw new Error('Event did not appear after save. Dialogs: '+JSON.stringify(dialogText)+'; statuses: '+JSON.stringify(statusText)+'; error: '+String(error));
+  }
   await page.getByText('Ocean Beach',{exact:false}).waitFor();
   await page.getByText('Pacific Standard Time',{exact:false}).count();
   const repoLink=page.getByRole('link',{name:'Serve With GitHub repository'});
