@@ -14,6 +14,8 @@ function database() {
   const sqlite = new DatabaseSync(':memory:');
   sqlite.exec(readFileSync('migrations/0001_auth.sql','utf8'));
   sqlite.exec(readFileSync('migrations/0002_auth_rate_limits.sql','utf8'));
+  sqlite.exec(readFileSync('migrations/0004_users_and_agreements.sql','utf8'));
+  sqlite.exec('PRAGMA foreign_keys=ON');
   const adapter = { prepare(sql) { const stmt = sqlite.prepare(sql); return {
     bind(...params) { return { first: async () => stmt.get(...params) || null,
       run: async () => { const result = stmt.run(...params); return { meta: { changes: Number(result.changes) } }; }
@@ -132,4 +134,22 @@ test('cross-origin POST is rejected without sending an email',async () => {
     assert.equal(response.status,400);
     assert.equal(h.sent.length,0);
   }finally{h.close();}
+});
+
+test('verified login resolves stable user ID, while a legacy email session upgrades without logout', async () => {
+  const h=harness();
+  try {
+    await h.req('/api/auth/request',{email:'lionaugust@icloud.com'});
+    const {code}=credentials(h.sent[0]);
+    const login=await h.req('/api/auth/verify',{email:'lionaugust@icloud.com',code});
+    const cookie=login.headers.get('set-cookie');
+    const first=h.sqlite.prepare('SELECT user_id,email FROM sessions').get();
+    assert.ok(first.user_id);
+    assert.equal(first.email,'lionaugust@icloud.com');
+    h.sqlite.prepare('UPDATE sessions SET user_id=NULL').run();
+    assert.equal((await h.req('/api/admin/dashboard',undefined,{cookie})).status,200);
+    assert.equal(h.sqlite.prepare('SELECT user_id FROM sessions').get().user_id,first.user_id);
+    assert.equal((await h.req('/api/admin/dashboard',undefined,{cookie})).status,200);
+    assert.equal(h.sqlite.prepare('SELECT count(*) n FROM users').get().n,1);
+  } finally { h.close(); }
 });

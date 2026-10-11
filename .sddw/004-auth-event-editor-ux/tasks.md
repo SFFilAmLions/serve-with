@@ -1,6 +1,6 @@
 # SDDW 004 — Core-Flow Tasks
 
-**Status: Specification/design ready for implementation approval; implementation and deployment require separate approval.**
+**Status: Batch 1 foundation implemented in the PR branch; later slices and all deployment remain unapproved/pending. GitHub CI verification is tracked separately from code completion.**
 
 ## Specification cleanup
 
@@ -19,12 +19,22 @@
 - [x] Resolve concrete D1 migration shape and DOB audit retention: additive `0004`, stable user IDs, active-session transition, append-only agreements, and actor/subject/time-only DOB correction audit (see [migration-plan.md](migration-plan.md)).
 - [ ] During authorized implementation, verify deployed staging migration state and configure the separate server-side staging registration allowlist before enabling attendee registration.
 
-## Implementation slices (not yet authorized)
+## Implementation slices
 
-- [ ] **A — Login and registration:** D1 profile/acceptance history, staging allowlist, existing-admin transition, email-first code/magic login, automatic one-time link exchange, inline profile completion and version-aware acknowledgment.
+- [ ] **A — Login and registration (Batch 2 outstanding):** D1 profile/acceptance history, staging allowlist, existing-admin transition, email-first code/magic login, automatic one-time link exchange, inline profile completion and version-aware acknowledgment.
 - [ ] **B — Account navigation and management:** top-right account menu with Attendee/Administrator switch; visually distinct, explicitly labeled Administrator app bar with light/dark variants; persistent Light/Dark/System appearance controls including signed-out access; Administrator Events/Users tabs; canonical `/users/:id` and `/users/:id/edit` pages with pencil/X/check Material actions and no `/profile` or admin-specific user editor; Google Contacts/Gmail-style Users list with desktop First/Last/Email columns, intermediate First/Last columns and mobile full-Name display, horizontal row separators, sortable names, server-backed search, sticky accessible A–Z navigation with letter-targeted/incremental retrieval, preserved directory position, audited DOB correction and server-side access gates.
 - [ ] **C — Event UX:** `/admin/events` management list with pencil/Edit, copy/Duplicate and trash/Delete actions; dedicated Create/Edit pages with X/check actions; MUI X date/time controls and duration; collapsed end date/zone; duplicate via navigation state to `/admin/events/new` with source notice and new-ID save; list-level confirmed destructive Delete; responsive icon+text to icon-only action collapse; existing CRUD/concurrency protections.
 - [ ] **D — Verification:** automated auth/replay/eligibility/terms/profile tests; attendee-denied Users APIs; audit; canonical event navigation; public/admin list behavior; loading/empty/error states; draft preservation; keyboard/focus/icon-label/touch-target/A–Z/theme/reduced-motion accessibility; duplicate, delete-confirmation, concurrency and DST regression; green CI.
+
+## Batch 1 — Foundation & Database (implementation on this branch)
+
+- [x] Add additive `0004_users_and_agreements.sql` including normalized-unique users, immutable creation timestamps, append-only agreement acceptances, DOB-minimized audit and nullable session user references.
+- [x] Resolve verified-email sign-ins and existing valid administrator email sessions idempotently to stable IDs without replacing their cookies; keep challenge and rate limits unchanged.
+- [x] Add private staging registration eligibility helper independent of administrator role, with enabled admins eligible in staging; do not activate attendee registration.
+- [x] Add database, existing-session resolution and staging-eligibility tests.
+- [ ] Confirm green CI test/build results for the implementation commit.
+- [ ] Confirm remote staging D1 migration state, configure staging secret, and validate staged migration before any deployment.
+- [ ] Implement Batch 2 login/registration experience, profile/current-policy gates, acceptance transaction writes and policy publication after approvals.
 
 ## Release gates
 

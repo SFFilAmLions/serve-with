@@ -12,6 +12,20 @@ interface Env {
 }
 
 const allowed = new Set(admins.filter(a => a.enabled).map(a => a.email));
+// SDDW-004 Batch 1: resolve identities only after an existing valid session or
+// a consumed verification challenge; do not make profile/consent a gate yet.
+async function resolveUser(db: D1Database, email: string, now: number): Promise<string> {
+  const normalized = normalize(email);
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized) || normalized.length > 254) throw new Error('Invalid verified email');
+  // SQLite/D1 applies the unique-email constraint atomically. Concurrent callers
+  // can generate different UUIDs; exactly one INSERT OR IGNORE wins.
+  await db.prepare('INSERT OR IGNORE INTO users (id,email,email_verified_at,created_at,updated_at) VALUES (?,?,?,?,?)')
+    .bind(crypto.randomUUID(), normalized, now, now, now).run();
+  const user = await db.prepare('SELECT id FROM users WHERE email=?').bind(normalized).first<{ id: string }>();
+  if (!user) throw new Error('Unable to resolve verified identity');
+  return user.id;
+}
+
 const encoder = new TextEncoder();
 const json = (body: unknown, status = 200, headers?: HeadersInit) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', 'referrer-policy': 'no-referrer', 'x-content-type-options': 'nosniff', ...headers } });
 const normalize = (email: unknown) => typeof email === 'string' ? email.trim().toLowerCase() : '';
@@ -99,8 +113,17 @@ async function sessionEmail(request: Request, env: Env): Promise<string | null> 
   const match = request.headers.get('cookie')?.match(/(?:^|;\s*)__Host-sw_session=([a-f0-9]{64})(?:;|$)/);
   if (!match || !env.AUTH_DB || !env.AUTH_PEPPER) return null;
   const hash = await digest(match[1], env.AUTH_PEPPER);
-  const row = await env.AUTH_DB.prepare('SELECT email FROM sessions WHERE token_hash=? AND expires_at>?').bind(hash, Date.now()).first<{ email: string }>();
-  return row && allowed.has(row.email) ? row.email : null;
+  const now = Date.now();
+  const row = await env.AUTH_DB.prepare('SELECT email,user_id FROM sessions WHERE token_hash=? AND expires_at>?')
+    .bind(hash, now).first<{ email: string; user_id: string | null }>();
+  if (!row || !allowed.has(normalize(row.email))) return null;
+  if (!row.user_id) {
+    // A valid legacy session keeps the same cookie, expiry and email.
+    const id = await resolveUser(env.AUTH_DB, row.email, now);
+    await env.AUTH_DB.prepare('UPDATE sessions SET user_id=? WHERE token_hash=? AND user_id IS NULL AND expires_at>?')
+      .bind(id, hash, now).run();
+  }
+  return normalize(row.email);
 }
 
 export default {
@@ -240,8 +263,10 @@ export default {
         }
         const consumed = await db.prepare('UPDATE login_challenges SET consumed_at=? WHERE id=? AND consumed_at IS NULL').bind(now,row.id).run();
         if (consumed.meta.changes !== 1) return error();
+        const userId = await resolveUser(db, email, now);
         const session = random();
-        await db.prepare('INSERT INTO sessions(token_hash,email,expires_at,created_at) VALUES(?,?,?,?)').bind(await digest(session, env.AUTH_PEPPER),email,now+604800000,now).run();
+        await db.prepare('INSERT INTO sessions(token_hash,email,user_id,expires_at,created_at) VALUES(?,?,?,?,?)')
+          .bind(await digest(session, env.AUTH_PEPPER),email,userId,now+604800000,now).run();
         return json({ authenticated: true },200,{'set-cookie':cookie(session,604800)});
       }
       if (path === '/api/auth/logout') {
