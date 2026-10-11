@@ -205,3 +205,21 @@ test('failed delete keeps event visible and confirmation open for retry',async()
   assert.equal(attempts,1);
  }finally{await browser.close()}
 });
+
+test('system dark appearance changes theme without a manual toggle',async()=>{
+ await ready();
+ const browser=await chromium.launch({headless:true});
+ try{
+  const page=await browser.newPage({colorScheme:'light'});
+  await page.route('**/api/auth/me',r=>r.fulfill({json:{authenticated:false}}));
+  await page.route('**/api/events?view=*',r=>r.fulfill({json:{events:[]}}));
+  await page.goto(base);
+  await page.getByText('No upcoming events',{exact:true}).waitFor();
+  const light=await page.locator('body').evaluate(el=>getComputedStyle(el).backgroundColor);
+  await page.emulateMedia({colorScheme:'dark'});
+  await page.waitForFunction(previous=>getComputedStyle(document.body).backgroundColor!==previous,light);
+  const dark=await page.locator('body').evaluate(el=>getComputedStyle(el).backgroundColor);
+  assert.notEqual(light,dark);
+  assert.equal(await page.getByRole('button',{name:/dark mode|light mode/i}).count(),0);
+ }finally{await browser.close()}
+});
