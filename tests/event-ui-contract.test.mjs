@@ -39,3 +39,23 @@ test('dialog accessibility descriptions and close guards are retained',()=>{
  }
  assert.match(source,/if\(saving\|\|discard\|\|reloadConfirm\)return/);
 });
+
+test('SDDW-005 Material controls preserve the approved UI choices',()=>{
+ assert.match(source,/<ToggleButtonGroup exclusive/);
+ assert.match(source,/<Card variant="outlined"/);
+ assert.match(source,/gridTemplateColumns:\{xs:'1fr',md:'repeat\(2,minmax\(0,1fr\)\)'\}/);
+ assert.match(source,/aria-label="Appearance"/);
+ assert.match(source,/AccountAvatar/);
+ assert.match(source,/https:\/\/www\.gravatar\.com\/avatar\//);
+ assert.match(source,/timeZoneOffsetMinutes\(event\.start_at,event\.timezone\)/);
+ assert.match(source,/timeZoneOffsetMinutes\(event\.start_at,Intl\.DateTimeFormat\(\)\.resolvedOptions\(\)\.timeZone\)/);
+ assert.doesNotMatch(source,/Alphabetical directory navigation/);
+ assert.equal((source.match(/>Save event<\/Button>/g)||[]).length,1);
+});
+test('Turnstile UI requests a fresh token for each login email',()=>{
+ assert.match(source,/action:'request-login'/);
+ assert.match(source,/siteKey=\{turnstileKey\}/);
+ assert.match(source,/turnstileToken:captchaToken/);
+ assert.match(source,/setCaptchaRound\(n=>n\+1\)/);
+ assert.match(source,/captchaReady/);
+});

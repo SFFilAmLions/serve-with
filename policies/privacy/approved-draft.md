@@ -37,6 +37,10 @@ For a particular volunteer activity, we may share limited information, such as y
 
 We also use service providers for website hosting, data storage, and account-related email delivery. These providers may process information necessary to perform those services.
 
+**Profile pictures:** When you use Serve With while signed in, we automatically request a profile picture from Gravatar using a cryptographic hash derived from your email address. This request shares the hash and standard request information, such as your IP address, with Gravatar. If a Gravatar image is unavailable, the website displays your initials instead. Gravatar operates independently and handles requests according to its own privacy practices.
+
+**Login protection:** We use Cloudflare Turnstile to help prevent automated or abusive sign-in email requests. When enabled, Cloudflare may process technical information about your browser, device, and connection to evaluate the request. Turnstile verification is required before we send a login email.
+
 We do not sell your personal information.
 
 ### 4. Minimum Age

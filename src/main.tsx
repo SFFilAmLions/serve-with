@@ -5,7 +5,7 @@ import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { TimePicker } from '@mui/x-date-pickers/TimePicker';
-import { AppBar, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Alert, Autocomplete, Snackbar, Checkbox, FormControlLabel, Container, CssBaseline, Stack, Tab, Tabs, TextField, ThemeProvider, Typography, useMediaQuery, IconButton, Menu, MenuItem, ListItemButton, Divider, Tooltip, Skeleton } from '@mui/material';
+import { AppBar, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Alert, Autocomplete, Snackbar, Checkbox, FormControlLabel, Container, CssBaseline, Stack, Tab, Tabs, TextField, ThemeProvider, Typography, useMediaQuery, IconButton, Menu, MenuItem, ListItemButton, Divider, Tooltip, Skeleton, Card, CardContent, CardActions, Chip, SvgIcon, Avatar, ToggleButtonGroup, ToggleButton } from '@mui/material';
 import './style.css';
 import policyMetadata from './generated/policy-versions.json';
 import privacyPolicy from '../policies/privacy/approved-draft.md?raw';
@@ -15,6 +15,51 @@ import { type Draft, timeZones, validateDraft, emptyDraft, localInput } from './
 
 type EventRecord = { id:string; title:string; location:string; timezone:string; start_at:number; end_at:number; version:number };
 type View = 'upcoming'|'past';
+function Glyph({type}:{type:'sun'|'moon'|'system'|'person'|'swap'|'logout'|'login'|'pin'|'back'|'save'|'edit'|'copy'|'trash'|'github'}) {
+ const paths:{[key:string]:string}={
+ sun:'M12 3v2m0 14v2M3 12h2m14 0h2M5.6 5.6 7 7m10 10 1.4 1.4M5.6 18.4 7 17m10-10 1.4-1.4M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8',
+ moon:'M20 15.5A8 8 0 0 1 8.5 4a8.2 8.2 0 1 0 11.5 11.5',
+ system:'M3 4h18v13H3zM8 21h8m-4-4v4M12 6v9a4 4 0 0 0 0-9',
+ person:'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8M4 21a8 8 0 0 1 16 0',
+ swap:'M4 7h16m-4-4 4 4-4 4M20 17H4m4-4-4 4 4 4',
+ logout:'M4 4h8v16H4M10 12h11m-4-4 4 4-4 4',
+ login:'M4 4h8v16H4M10 12h11m-4-4 4 4-4 4',
+ pin:'M12 22s7-7 7-13a7 7 0 0 0-14 0c0 6 7 13 7 13Zm0-10a3 3 0 1 0 0-6 3 3 0 0 0 0 6',
+ back:'M20 12H4m7-7-7 7 7 7',
+ save:'M5 12l5 5L20 7',
+ edit:'M4 20h4l11-11-4-4L4 16v4',
+ copy:'M8 4h12v14H8zM4 8v12h12',
+ trash:'M4 7h16M10 4h4M7 7l1 14h8l1-14M10 11v6m4-6v6',
+ github:'M9 19c-4 1-4-2-6-2m13 2v-3a4 4 0 0 0-1-3c3 0 6-1 6-6a5 5 0 0 0-1-3 4 4 0 0 0 0-3s-2 0-4 2a15 15 0 0 0-8 0C6 1 4 1 4 1v3a5 5 0 0 0-1 3c0 5 3 6 6 6a4 4 0 0 0-1 3v3'
+ };
+ return <SvgIcon fontSize="small"><path d={paths[type]} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></SvgIcon>;
+}
+function AccountAvatar({email,name}:{email?:string;name?:string}) {
+ const [src,setSrc]=useState('');
+ useEffect(()=>{
+  let active=true;
+  if(!email){setSrc('');return;}
+  void crypto.subtle.digest('SHA-256',new TextEncoder().encode(email.trim().toLowerCase()))
+   .then(buf=>{if(active)setSrc('https://www.gravatar.com/avatar/'+Array.from(new Uint8Array(buf)).map(x=>x.toString(16).padStart(2,'0')).join('')+'?d=404&s=64')})
+   .catch(()=>setSrc(''));
+  return()=>{active=false};
+ },[email]);
+ const initials=(name||email?.split('@')[0]||'').split(/[\s._-]+/).filter(Boolean).slice(0,2).map(word=>word[0].toUpperCase()).join('')||'?';
+ return <Avatar src={src||undefined} alt="" sx={{width:28,height:28,fontSize:12}}>{initials}</Avatar>;
+}
+function timeZoneOffsetMinutes(instant:number,zone:string) {
+ const part=new Intl.DateTimeFormat('en-US',{timeZone:zone,timeZoneName:'longOffset'}).formatToParts(new Date(instant)).find(p=>p.type==='timeZoneName')?.value;
+ const match=/^GMT([+-])(\d{2}):(\d{2})$/.exec(part||'');
+ return part==='GMT'?0:match?(match[1]==='-'?-1:1)*(Number(match[2])*60+Number(match[3])):null;
+}
+function EventWhen({event}:{event:EventRecord}){
+ const date=(v:number)=>new Intl.DateTimeFormat('en-US',{weekday:'short',month:'short',day:'numeric',year:'numeric',timeZone:event.timezone}).format(v);
+ const time=(v:number)=>new Intl.DateTimeFormat('en-US',{hour:'numeric',minute:'2-digit',timeZone:event.timezone}).format(v);
+ const start=date(event.start_at),end=date(event.end_at);
+ const abbreviated=new Intl.DateTimeFormat('en-US',{timeZone:event.timezone,timeZoneName:'short'}).formatToParts(event.start_at).find(p=>p.type==='timeZoneName')?.value||event.timezone;
+ return <Stack spacing={1}><Typography>{start===end?start:start+' – '+end}</Typography><Typography variant="body2" color="text.secondary">{time(event.start_at)} – {time(event.end_at)}</Typography><Stack direction="row" gap={1} flexWrap="wrap"><Chip icon={<Glyph type="pin"/>} size="small" label={event.location} variant="outlined"/>{timeZoneOffsetMinutes(event.start_at,event.timezone)!==timeZoneOffsetMinutes(event.start_at,Intl.DateTimeFormat().resolvedOptions().timeZone)&&<Tooltip title={event.timezone}><Chip size="small" variant="outlined" label={abbreviated}/></Tooltip>}</Stack></Stack>;
+}
+
 const repositoryUrl = 'https://github.com/SFFilAmLions/serve-with';
 const buildEnvironment = import.meta.env.VITE_DEPLOY_ENV;
 const buildSha = import.meta.env.VITE_COMMIT_SHA || '';
@@ -25,9 +70,7 @@ function BuildFooter() {
  const label = staged ? 'Commit ' + buildSha.slice(0,12) : released ? 'Version ' + releaseTag : 'Development build';
  const href = staged ? repositoryUrl + '/commit/' + buildSha : released ? repositoryUrl + '/releases/tag/' + releaseTag : undefined;
  return <Box component="footer" sx={{my:5,color:'text.secondary',fontSize:12,display:'flex',flexWrap:'wrap',gap:1,alignItems:'center'}}>
-  <a href={repositoryUrl} target="_blank" rel="noopener noreferrer" aria-label="Serve With GitHub repository">GitHub repository</a>
-  <span aria-hidden="true">·</span>
-  {href ? <a href={href} target="_blank" rel="noopener noreferrer">{label}</a> : <span>{label}</span>}
+  <Chip component="a" clickable icon={<Glyph type="github"/>} label="GitHub" href={repositoryUrl} target="_blank" rel="noopener noreferrer" aria-label="Serve With GitHub repository" size="small" variant="outlined"/>{href?<Chip component="a" clickable label={label} href={href} target="_blank" rel="noopener noreferrer" size="small" variant="outlined"/>:<Chip label={label} size="small" variant="outlined"/>}
  </Box>;
 }
 const magic = new URL(location.href).searchParams.get('magic');
@@ -89,12 +132,11 @@ function EventList({admin}:{admin:boolean}){
   }catch{setDeleteError('Could not reach the server')}finally{setDeleting(false)}
  };
  useEffect(()=>{let active=true;setLoading(true);setError('');fetch('/api/events?view='+view,{cache:'no-store'}).then(async r=>{if(!r.ok)throw Error('Unable to load events');return r.json()}).then(d=>{if(active)setEvents(d.events)}).catch(e=>{if(active)setError(String(e.message))}).finally(()=>{if(active)setLoading(false)});return()=>{active=false}},[view,revision]);
- const local=(instant:number,timezone:string)=>new Intl.DateTimeFormat('en-US',{weekday:'long',year:'numeric',month:'long',day:'numeric',hour:'numeric',minute:'2-digit',timeZone:timezone,timeZoneName:'short'}).format(new Date(instant));
  return <Box component="section" aria-label="Events" sx={{my:5}}>
   {admin&&<Box sx={{display:'flex',justifyContent:'flex-end',mb:2}}><Button variant="contained" onClick={e=>{editorTrigger.current=e.currentTarget;go('/admin/events/new')}}>Add Event</Button></Box>}
-  <Tabs value={view} onChange={(_,v:View)=>setView(v)} aria-label="Event timeline"><Tab label="Upcoming Events" value="upcoming"/><Tab label="Past Events" value="past"/></Tabs>
+  <ToggleButtonGroup exclusive color="primary" size="small" value={view} onChange={(_,v:View|null)=>{if(v)setView(v)}} aria-label="Event timeline" sx={{gap:1,'& .MuiToggleButton-root':{borderRadius:'24px !important',px:2,border:'1px solid',borderColor:'divider'}}}><ToggleButton value="upcoming">Upcoming</ToggleButton><ToggleButton value="past">Past</ToggleButton></ToggleButtonGroup>
   {loading?<Box sx={{p:4}} role="status"><CircularProgress aria-label="Loading events"/></Box>:error?<Stack sx={{p:3}} spacing={2}><Typography role="alert">{error}</Typography><Button onClick={()=>reload(n=>n+1)}>Retry</Button></Stack>:events.length===0?<Box sx={{p:4}}><Typography variant="h6">{view==='upcoming'?'No upcoming events':'No past events yet.'}</Typography>{view==='upcoming'&&<Typography>Check back soon for new opportunities to serve.</Typography>}</Box>:
-  <Stack spacing={0} sx={{pt:3}}>{events.map(e=><Box key={e.id} sx={{py:2,borderBottom:1,borderColor:"divider"}}><Button onClick={()=>go("/events/"+e.id)}>{e.title}</Button><Typography sx={{mt:1}}>{local(e.start_at,e.timezone)} – {local(e.end_at,e.timezone)}</Typography><Typography color="text.secondary">{e.timezone}</Typography><Typography sx={{mt:1}}>Location: {e.location}</Typography>{admin&&<Stack direction="row" spacing={1} sx={{mt:2}}><Button onClick={event=>{editorTrigger.current=event.currentTarget;go('/admin/events/'+e.id+'/edit')}}>Edit</Button><Button onClick={()=>go("/admin/events/new",{duplicate:e})}>Duplicate</Button><Button color="error" onClick={event=>{deleteTrigger.current=event.currentTarget;setToDelete(e);setDeleteError('')}}>Delete</Button></Stack>}</Box>)}</Stack>}
+  <Box sx={{display:'grid',gridTemplateColumns:{xs:'1fr',md:'repeat(2,minmax(0,1fr))'},gap:2,pt:3}}>{events.map(e=><Card variant="outlined" key={e.id} sx={{display:'flex',flexDirection:'column'}}><CardContent sx={{flexGrow:1}}><Typography variant="h6" component="h3"><Button sx={{p:0,textAlign:'left',fontSize:'inherit'}} onClick={()=>go('/events/'+e.id)}>{e.title}</Button></Typography><EventWhen event={e}/></CardContent><CardActions sx={{justifyContent:'flex-end',px:2,pb:2}}>{admin?<><Button size="small" startIcon={<Glyph type="edit"/>} onClick={()=>go('/admin/events/'+e.id+'/edit')}>Edit</Button><IconButton size="small" aria-label={'Duplicate '+e.title} onClick={()=>go('/admin/events/new',{duplicate:e})}><Glyph type="copy"/></IconButton><IconButton size="small" color="error" aria-label={'Delete '+e.title} onClick={event=>{deleteTrigger.current=event.currentTarget;setToDelete(e);setDeleteError('')}}><Glyph type="trash"/></IconButton></>:<Button size="small" onClick={()=>go('/events/'+e.id)}>Details</Button>}</CardActions></Card>)}</Box>}
  {editor.open&&<Editor key={editor.event?.id||'new'} event={editor.event} onClose={closeEditor} onSaved={()=>{setNotice(editor.event?'Event updated':'Event created');closeEditor();reload(n=>n+1)}} onReload={()=>{closeEditor();reload(n=>n+1)}}/>}
  <Snackbar open={!!notice} autoHideDuration={4500} onClose={()=>setNotice('')} anchorOrigin={{vertical:'bottom',horizontal:'center'}}><Alert severity="success" onClose={()=>setNotice('')}>{notice}</Alert></Snackbar>
  <Dialog open={!!toDelete} onClose={()=>{if(!deleting)closeDelete()}} aria-labelledby="delete-event-title" aria-describedby="delete-event-description"><DialogTitle id="delete-event-title">Delete {toDelete?.title}?</DialogTitle><DialogContent id="delete-event-description">{deleteError&&<Alert severity="error">{deleteError}</Alert>}This removes the event from public listings.</DialogContent><DialogActions><Button disabled={deleting} onClick={closeDelete}>Cancel</Button><Button color="error" loading={deleting} onClick={()=>void remove()}>Delete event</Button></DialogActions></Dialog>
@@ -124,7 +166,7 @@ export function App(){
  const [admin,setAdmin]=useState(false);
  const dark=useMediaQuery('(prefers-color-scheme: dark)');
  const theme=React.useMemo(()=>createClubTheme(dark?'dark':'light'),[dark]);
- return <ThemeProvider theme={theme}><CssBaseline/><AppBar position="static" color="default" elevation={0}><Container><Box sx={{py:1.5,display:"flex",alignItems:"center",gap:1.5}}><Box component="img" src="/club-logo.png" alt="San Francisco Fil-Am Lions Club logo" sx={{width:48,height:48,objectFit:"contain"}}/><Typography variant="h6">Serve With SF Fil-Am Lions</Typography></Box></Container></AppBar><Container maxWidth="md" component="main"><Typography variant="h3" component="h1" sx={{mt:5}}>Serve With SF Fil-Am Lions</Typography><Typography color="text.secondary">Making it easier to serve together.</Typography><EventList admin={admin}/><SignIn onAuthChange={setAdmin}/><Box sx={{mt:3,display:'flex',gap:2}}><a href="/terms">Terms of Use</a><a href="/privacy">Privacy Policy</a></Box><BuildFooter/></Container></ThemeProvider>
+ return <ThemeProvider theme={theme}><CssBaseline/><AppBar position="static" color="default" elevation={0}><Container><Box sx={{py:1.5,display:"flex",alignItems:"center",gap:1.5}}><Box component="img" src="/club-logo.png" alt="San Francisco Fil-Am Lions Club logo" sx={{width:48,height:48,objectFit:"contain"}}/><Typography variant="h6">Serve With Lions</Typography></Box></Container></AppBar><Container maxWidth="md" component="main"><Typography variant="h3" component="h1" sx={{mt:5}}>Serve With SF Fil-Am Lions</Typography><Typography color="text.secondary">Making it easier to serve together.</Typography><EventList admin={admin}/><SignIn onAuthChange={setAdmin}/><Box sx={{mt:3,display:'flex',gap:2}}><a href="/terms">Terms of Use</a><a href="/privacy">Privacy Policy</a></Box><BuildFooter/></Container></ThemeProvider>
 }
 
 type Me = {requiredVersions?:{terms:string;privacy:string}|null;authenticated:boolean;email?:string;userId?:string;firstName?:string|null;lastName?:string|null;profileComplete?:boolean;agreementCurrent?:boolean;administratorEligible?:boolean;privileged?:boolean};
@@ -138,9 +180,28 @@ const submitJson=(path:string,body:Record<string,unknown>,method='POST')=>reques
 const go=(path:string,state?:unknown)=>{history.pushState(state,'',path);window.dispatchEvent(new PopStateEvent('popstate'))};
 const formatTime=(value:number,zone:string)=>new Intl.DateTimeFormat('en-US',{weekday:'short',month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit',timeZone:zone,timeZoneName:'short'}).format(new Date(value));
 
+type TurnstileApi={render:(element:HTMLElement,options:{sitekey:string;action:string;callback:(token:string)=>void;'expired-callback':()=>void;'error-callback':()=>void})=>string;remove:(id:string)=>void};
+function LoginChallenge({siteKey,onToken}:{siteKey:string;onToken:(token:string)=>void}){
+ const host=useRef<HTMLDivElement|null>(null);
+ useEffect(()=>{
+  let active=true,widget:string|undefined;
+  const win=window as Window & {turnstile?:TurnstileApi};
+  const render=()=>{if(!active||!host.current||!win.turnstile||widget)return;widget=win.turnstile.render(host.current,{sitekey:siteKey,action:'request-login',callback:onToken,'expired-callback':()=>onToken(''),'error-callback':()=>onToken('')})};
+  const scriptId='servewith-turnstile-script';
+  let script=document.getElementById(scriptId) as HTMLScriptElement|null;
+  if(!script){script=document.createElement('script');script.id=scriptId;script.src='https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';script.async=true;document.head.appendChild(script)}
+  script.addEventListener('load',render);render();
+  return()=>{active=false;script?.removeEventListener('load',render);if(widget&&win.turnstile)win.turnstile.remove(widget);onToken('')};
+ },[siteKey]);
+ return <Box ref={host} aria-label="Security verification"/>;
+}
+
 function AuthScreen({me,refresh}:{me:Me;refresh:()=>Promise<void>}){
  const [email,setEmail]=useState(''),[code,setCode]=useState(''),[stage,setStage]=useState<'email'|'code'>('email'),[busy,setBusy]=useState(false);
  const [message,setMessage]=useState(''),[first,setFirst]=useState(''),[last,setLast]=useState(''),[dob,setDob]=useState('');
+ const [turnstileKey,setTurnstileKey]=useState<string|null>(null),[captchaReady,setCaptchaReady]=useState(false),[captchaToken,setCaptchaToken]=useState(''),[captchaRound,setCaptchaRound]=useState(0);
+ useEffect(()=>{void requestJson('/api/auth/turnstile-config').then(r=>{setTurnstileKey(r.siteKey||null);setCaptchaReady(true)}).catch(()=>setCaptchaReady(false))},[]);
+ const requestCode=async()=>{if(!captchaReady||(turnstileKey&&!captchaToken))throw Error('Complete the security check first');try{return await submitJson('/api/auth/request',{email,turnstileToken:captchaToken})}finally{setCaptchaToken('');setCaptchaRound(n=>n+1)}};
 
  const token=magic;
  const exchanging=useRef(false);
@@ -148,8 +209,9 @@ function AuthScreen({me,refresh}:{me:Me;refresh:()=>Promise<void>}){
  useEffect(()=>{if(!token||exchanging.current)return;exchanging.current=true;history.replaceState(null,'','/login');void work(async()=>{await submitJson('/api/auth/magic',{token});await refresh()})},[token]);
  return <Stack spacing={2} sx={{mt:4,maxWidth:560}}>
  <Typography variant="h4">Sign in</Typography>
- {!me.authenticated&&(stage==='email'?<Box component="form" onSubmit={e=>{e.preventDefault();void work(async()=>{const r=await submitJson('/api/auth/request',{email});setMessage(r.message);setStage('code')})}}><Stack spacing={2}><TextField required type="email" label="Email" value={email} onChange={e=>setEmail(e.target.value)} autoComplete="email"/><Button variant="contained" type="submit" disabled={busy}>Continue</Button></Stack></Box>:
- <Stack spacing={2}><Typography>Check your email at {email}</Typography><Box component="form" onSubmit={e=>{e.preventDefault();void work(async()=>{await submitJson('/api/auth/verify',{email,code});await refresh()})}}><Stack spacing={2}><TextField required label="Eight-digit code" value={code} inputProps={{inputMode:'numeric',maxLength:8,pattern:'[0-9]{8}'}} onChange={e=>setCode(e.target.value)}/><Button type="submit" disabled={busy}>Continue</Button></Stack></Box><Button disabled={busy} onClick={()=>void work(async()=>{await submitJson('/api/auth/request',{email});setMessage('If eligible, a new code will arrive shortly.')})}>Resend code</Button><Button onClick={()=>{setStage('email');setCode('');setMessage('')}}>Use a different email</Button></Stack>)}
+ {!me.authenticated&&turnstileKey&&<LoginChallenge key={captchaRound} siteKey={turnstileKey} onToken={setCaptchaToken}/>}
+ {!me.authenticated&&(stage==='email'?<Box component="form" onSubmit={e=>{e.preventDefault();void work(async()=>{const r=await requestCode();setMessage(r.message);setStage('code')})}}><Stack spacing={2}><TextField required type="email" label="Email" value={email} onChange={e=>setEmail(e.target.value)} autoComplete="email"/><Button variant="contained" type="submit" disabled={busy||!captchaReady||Boolean(turnstileKey&&!captchaToken)}>Continue</Button></Stack></Box>:
+ <Stack spacing={2}><Typography>Check your email at {email}</Typography><Box component="form" onSubmit={e=>{e.preventDefault();void work(async()=>{await submitJson('/api/auth/verify',{email,code});await refresh()})}}><Stack spacing={2}><TextField required label="Eight-digit code" value={code} inputProps={{inputMode:'numeric',maxLength:8,pattern:'[0-9]{8}'}} onChange={e=>setCode(e.target.value)}/><Button type="submit" disabled={busy}>Continue</Button></Stack></Box><Button disabled={busy||!captchaReady||Boolean(turnstileKey&&!captchaToken)} onClick={()=>void work(async()=>{await requestCode();setMessage('If eligible, a new code will arrive shortly.')})}>Resend code</Button><Button onClick={()=>{setStage('email');setCode('');setMessage('')}}>Use a different email</Button></Stack>)}
  {me.authenticated&&!me.profileComplete&&<Stack spacing={2} component="form" onSubmit={e=>{e.preventDefault();void work(async()=>{await submitJson('/api/auth/profile',{firstName:first,lastName:last,dateOfBirth:dob});await refresh()})}}><Typography variant="h6">Complete your profile</Typography><TextField required label="First name" value={first} onChange={e=>setFirst(e.target.value)}/><TextField required label="Last name" value={last} onChange={e=>setLast(e.target.value)}/><TextField required label="Date of birth" type="date" slotProps={{inputLabel:{shrink:true}}} value={dob} onChange={e=>setDob(e.target.value)}/><Button disabled={busy} type="submit" variant="contained">Save profile</Button></Stack>}
  {me.authenticated&&me.profileComplete&&!me.agreementCurrent&&<AgreementCompletion me={me} refresh={refresh}/>}
  {me.authenticated&&me.profileComplete&&me.agreementCurrent&&<Button onClick={()=>go('/')}>Continue to events</Button>}
@@ -162,14 +224,14 @@ function UserView({id,edit}:{id:string;edit:boolean}){
  if(message&&!user)return <Alert severity="error">{message}</Alert>;
  if(!user)return <Skeleton height={240}/>;
  const u=user.user;
- return <Stack spacing={2} sx={{my:4}}><Stack direction="row" justifyContent="space-between"><Typography variant="h4">{u.first_name} {u.last_name}</Typography><Tooltip title={edit?'Close':'Edit'}><IconButton aria-label={edit?'Close editor':'Edit profile'} onClick={()=>{if(edit&&dirty&&!confirm('Discard changes?'))return;go('/users/'+id+(edit?'':'/edit'))}}>{edit?'✕':'✎'}</IconButton></Tooltip></Stack>
+ return <Stack spacing={2} sx={{my:4}}><Button size="small" startIcon={<Glyph type="back"/>} sx={{alignSelf:"flex-start"}} onClick={()=>go("/admin/users")}>Back to users</Button><Stack direction="row" justifyContent="space-between"><Typography variant="h4">{u.first_name} {u.last_name}</Typography><Tooltip title={edit?'Close':'Edit'}><IconButton aria-label={edit?'Close editor':'Edit profile'} onClick={()=>{if(edit&&dirty&&!confirm('Discard changes?'))return;go('/users/'+id+(edit?'':'/edit'))}}>{edit?'✕':'✎'}</IconButton></Tooltip></Stack>
  {edit?<Stack spacing={2} component="form" onSubmit={ev=>{ev.preventDefault();void submitJson('/api/users/'+id,{firstName:first,lastName:last,...(user.canCorrectDob?{dateOfBirth:dob}:{})},'PUT').then(()=>go('/users/'+id)).catch(e=>setMessage(e.message))}}><TextField label="First name" value={first} onChange={e=>{setFirst(e.target.value);setDirty(true)}}/><TextField label="Last name" value={last} onChange={e=>{setLast(e.target.value);setDirty(true)}}/><TextField label="Email" value={u.email} disabled/>{user.canCorrectDob?<TextField label="Date of birth" type="date" slotProps={{inputLabel:{shrink:true}}} value={dob} onChange={e=>{setDob(e.target.value);setDirty(true)}}/>:<TextField label="Date of birth" value={dob} disabled/>}<Button type="submit" variant="contained">✓ Save</Button></Stack>:<><Typography>Email: {u.email}</Typography><Typography>Date of birth: {u.date_of_birth}</Typography></>}
  {message&&<Alert severity="error">{message}</Alert>}</Stack>;
 }
 function UsersDirectory(){
- const [people,setPeople]=useState<any[]>([]),[query,setQuery]=useState(()=>sessionStorage.getItem('sw-users-q')||''),[sort,setSort]=useState<'first'|'last'>(()=>sessionStorage.getItem('sw-users-sort')==='first'?'first':'last'),[direction,setDirection]=useState<'asc'|'desc'>(()=>sessionStorage.getItem('sw-users-direction')==='desc'?'desc':'asc'),[letter,setLetter]=useState(()=>sessionStorage.getItem('sw-users-letter')||''),[offset,setOffset]=useState(0),[more,setMore]=useState(false),[error,setError]=useState('');
- const load=async(next=0)=>{try{const params=new URLSearchParams({q:query,sort,direction,letter,offset:String(next)});const data=await requestJson('/api/admin/users?'+params);setPeople(old=>next?[...old,...data.users]:data.users);setMore(data.hasMore);setOffset(data.nextOffset);setError('')}catch(e){setError(String(e))}};
- useEffect(()=>{sessionStorage.setItem('sw-users-q',query);sessionStorage.setItem('sw-users-sort',sort);sessionStorage.setItem('sw-users-direction',direction);sessionStorage.setItem('sw-users-letter',letter);void load(0)},[query,sort,direction,letter]);
+ const [people,setPeople]=useState<any[]>([]),[query,setQuery]=useState(()=>sessionStorage.getItem('sw-users-q')||''),[sort,setSort]=useState<'first'|'last'>(()=>sessionStorage.getItem('sw-users-sort')==='first'?'first':'last'),[direction,setDirection]=useState<'asc'|'desc'>(()=>sessionStorage.getItem('sw-users-direction')==='desc'?'desc':'asc'),[offset,setOffset]=useState(0),[more,setMore]=useState(false),[error,setError]=useState('');
+ const load=async(next=0)=>{try{const params=new URLSearchParams({q:query,sort,direction,offset:String(next)});const data=await requestJson('/api/admin/users?'+params);setPeople(old=>next?[...old,...data.users]:data.users);setMore(data.hasMore);setOffset(data.nextOffset);setError('')}catch(e){setError(String(e))}};
+ useEffect(()=>{sessionStorage.setItem('sw-users-q',query);sessionStorage.setItem('sw-users-sort',sort);sessionStorage.setItem('sw-users-direction',direction);void load(0)},[query,sort,direction]);
  const sortBy=(v:'first'|'last')=>{if(sort===v)setDirection(d=>d==='asc'?'desc':'asc');else{setSort(v);setDirection('asc')}};
  const gridColumns={xs:'minmax(0,1fr)',sm:'minmax(0,1fr) minmax(0,1fr)',lg:'minmax(0,1fr) minmax(0,1fr) minmax(0,2fr)'};
  return <Stack sx={{my:4}} spacing={2}><Typography variant="h4">Users</Typography><TextField label="Search name or email" value={query} onChange={e=>setQuery(e.target.value)}/><Box sx={{display:{xs:'none',sm:'grid'},gridTemplateColumns:gridColumns,gap:1}}>
@@ -183,7 +245,7 @@ function UsersDirectory(){
  <Typography sx={{display:{xs:'block',sm:'none'}}}>{[p.first_name,p.last_name].filter(Boolean).join(' ')||p.email}</Typography>
  <Typography color="text.secondary" sx={{display:{xs:'none',lg:'block'},overflow:'hidden',textOverflow:'ellipsis'}}>{p.email}</Typography>
  </ListItemButton><Divider/></React.Fragment>)}{!people.length&&<Typography sx={{p:2}}>No matching users. Try a different name or email.</Typography>}{more&&<Button onClick={()=>void load(offset)}>Load more</Button>}</Box>
- <Stack aria-label="Alphabetical directory navigation" sx={{position:'sticky',top:16,alignSelf:'flex-start',maxHeight:'70vh',overflowY:'auto',width:42}}>{'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map(x=><Button key={x} sx={{minWidth:36,minHeight:26,p:0}} aria-label={'Jump to '+x} onClick={()=>setLetter(x)} variant={letter===x?'contained':'text'}>{x}</Button>)}<Button size="small" onClick={()=>setLetter('')}>All</Button></Stack></Box>{error&&<Alert severity="error">{error}</Alert>}</Stack>;
+ </Box>{error&&<Alert severity="error">{error}</Alert>}</Stack>;
 }
 
 function EventDetail({id,admin}:{id:string;admin:boolean}){
@@ -191,7 +253,7 @@ function EventDetail({id,admin}:{id:string;admin:boolean}){
  useEffect(()=>{void requestJson('/api/events/'+id).then(r=>setEvent(r.event)).catch(e=>setError(e.message))},[id]);
  if(error)return <Alert severity="error">{error}</Alert>;
  if(!event)return <Skeleton height={200}/>;
- return <Stack spacing={2} sx={{my:4}}><Typography variant="h4">{event.title}</Typography><Typography>{formatTime(event.start_at,event.timezone)} – {formatTime(event.end_at,event.timezone)}</Typography><Typography>{event.location}</Typography>{admin&&<Button onClick={()=>go('/admin/events/'+id+'/edit')}>✎ Edit</Button>}</Stack>;
+ return <Stack spacing={2} sx={{my:4}}><Button size="small" startIcon={<Glyph type="back"/>} sx={{alignSelf:"flex-start"}} onClick={()=>go(admin?"/admin/events":"/")}>Back to events</Button><Typography variant="h4">{event.title}</Typography><Typography>{formatTime(event.start_at,event.timezone)} – {formatTime(event.end_at,event.timezone)}</Typography><Typography>{event.location}</Typography>{admin&&<Button onClick={()=>go('/admin/events/'+id+'/edit')}>✎ Edit</Button>}</Stack>;
 }
 
 function EventPageEditor({id}:{id?:string}){
@@ -211,7 +273,7 @@ function EventPageEditor({id}:{id?:string}){
  const save=async()=>{const errors=validateDraft(draft);if(Object.keys(errors).length){setMessage(Object.values(errors).join('; '));return}setBusy(true);setMessage('');try{const r=await submitJson(id?'/api/admin/events/'+id:'/api/admin/events',{...draft,...(id?{version}:{})},id?'PUT':'POST');go('/events/'+r.event.id)}catch(e){setMessage(e instanceof Error?e.message:'Save failed; draft retained')}finally{setBusy(false)}};
  const duration=draft.start&&draft.end?dayjs(draft.end).diff(dayjs(draft.start),'minute'):0;
  return <LocalizationProvider dateAdapter={AdapterDayjs}><Stack spacing={2} sx={{my:4,maxWidth:750}}>
- <Stack direction="row" alignItems="center" spacing={1}><Tooltip title="Close"><IconButton aria-label="Close editor" onClick={close}>✕</IconButton></Tooltip><Typography variant="h4" sx={{flex:1}}>{id?'Edit event':'Create event'}</Typography><Tooltip title="Save"><span><IconButton aria-label="Save event" disabled={busy} onClick={()=>void save()}>✓</IconButton></span></Tooltip></Stack>
+ <Stack direction="row" alignItems="center" spacing={1}><Tooltip title="Back"><IconButton aria-label="Back" onClick={close}><Glyph type="back"/></IconButton></Tooltip><Typography variant="h4" sx={{flex:1}}>{id?'Edit event':'Create event'}</Typography></Stack>
  {duplication&&!id&&<Alert severity="info">Duplicating {duplication.title}; saving creates a different event.</Alert>}
  {message&&<Alert severity="error">{message}</Alert>}
  <TextField required label="Event title" value={draft.title} onChange={e=>update('title',e.target.value)}/>
@@ -221,7 +283,7 @@ function EventPageEditor({id}:{id?:string}){
  {duration>0&&<Typography>Duration: {Math.floor(duration/60)}h {duration%60}m</Typography>}
  <Button onClick={()=>setMore(v=>!v)} aria-expanded={more}>More options</Button>
  {more&&<><DatePicker label="End date" value={date('end')} onChange={v=>setDate('end',v)} slotProps={{textField:{fullWidth:true}}}/><Autocomplete options={timeZones} value={draft.timezone} onChange={(_,v)=>update('timezone',v||'America/Los_Angeles')} renderInput={p=><TextField {...p} label="Time zone"/>}/></>}
- <Button variant="contained" disabled={busy} onClick={()=>void save()}>Save event</Button>
+ <Stack direction="row" spacing={1} justifyContent="flex-end"><Button size="small" onClick={close}>Cancel</Button><Button size="small" variant="contained" startIcon={<Glyph type="save"/>} disabled={busy} onClick={()=>void save()}>Save event</Button></Stack>
  <Dialog open={confirmClose} onClose={()=>setConfirmClose(false)}><DialogTitle>Discard unsaved changes?</DialogTitle><DialogActions><Button onClick={()=>setConfirmClose(false)}>Keep editing</Button><Button color="error" onClick={()=>go(id?'/events/'+id:'/admin/events')}>Discard changes</Button></DialogActions></Dialog>
  </Stack></LocalizationProvider>;
 }
@@ -267,7 +329,7 @@ function AgreementCompletion({me,refresh}:{me:Me;refresh:()=>Promise<void>}) {
 }
 
 function RoutedApp(){
- const [path,setPath]=useState(location.pathname),[me,setMe]=useState<Me>({authenticated:false}),[appearance,setAppearance]=useState<'light'|'dark'|'system'>(()=>(localStorage.getItem('servewith-appearance') as 'light'|'dark'|'system')||'system'),[anchor,setAnchor]=useState<HTMLElement|null>(null);
+ const [path,setPath]=useState(location.pathname),[me,setMe]=useState<Me>({authenticated:false}),[appearance,setAppearance]=useState<'light'|'dark'|'system'>(()=>(localStorage.getItem('servewith-appearance') as 'light'|'dark'|'system')||'system'),[anchor,setAnchor]=useState<HTMLElement|null>(null),[appearanceAnchor,setAppearanceAnchor]=useState<HTMLElement|null>(null);
  const systemDark=useMediaQuery('(prefers-color-scheme: dark)');
  const theme=React.useMemo(()=>createClubTheme(appearance==='system'?(systemDark?'dark':'light'):appearance),[appearance,systemDark]);
  const refresh=async()=>{try{setMe(await api('me'))}catch{setMe({authenticated:false})}};
@@ -277,7 +339,7 @@ function RoutedApp(){
  const eventRoute=path.match(/^\/events\/([0-9a-f-]{36})$/);
  const editRoute=path.match(/^\/admin\/events\/([0-9a-f-]{36})\/edit$/);
 
- return <ThemeProvider theme={theme}><CssBaseline/><AppBar position="static" color={admin?'primary':'default'} elevation={0}><Container maxWidth="lg"><Stack direction="row" alignItems="center" spacing={2} sx={{py:1}}><Box component="img" src="/club-logo.png" alt="SF Fil-Am Lions logo" sx={{width:42,height:42}}/><Button color="inherit" onClick={()=>go('/')}>Serve With</Button>{admin&&<Typography>Administrator</Typography>}<Box sx={{flexGrow:1}}/><Button color="inherit" onClick={e=>setAnchor(e.currentTarget)} aria-label="Account and appearance menu">{me.authenticated?(me.firstName||me.email||'Account'):'Sign in / Appearance'}</Button><Menu anchorEl={anchor} open={!!anchor} onClose={()=>setAnchor(null)}>{me.authenticated&&<MenuItem onClick={()=>{setAnchor(null);go('/users/'+me.userId)}}>My Profile</MenuItem>}{canAdmin&&<MenuItem onClick={()=>{setAnchor(null);go(admin?'/':'/admin/events')}}>{admin?'Attendee workspace':'Administrator workspace'}</MenuItem>}{(['light','dark','system'] as const).map(mode=><MenuItem key={mode} selected={appearance===mode} onClick={()=>{setAppearance(mode);localStorage.setItem('servewith-appearance',mode);setAnchor(null)}}>{mode[0].toUpperCase()+mode.slice(1)} appearance</MenuItem>)}{me.authenticated?<MenuItem onClick={()=>{setAnchor(null);void api('logout',{}).then(refresh).then(()=>go('/'))}}>Sign out</MenuItem>:<MenuItem onClick={()=>{setAnchor(null);go('/login')}}>Sign in</MenuItem>}</Menu></Stack>{admin&&canAdmin&&<Tabs value={path.startsWith('/admin/users')?'users':'events'} onChange={(_,v)=>go(v==='users'?'/admin/users':'/admin/events')} textColor="inherit" indicatorColor="secondary"><Tab label="Events" value="events"/><Tab label="Users" value="users"/></Tabs>}</Container></AppBar>
+ return <ThemeProvider theme={theme}><CssBaseline/><AppBar position="static" color="default" elevation={0} sx={{borderBottom:1,borderColor:'divider'}}><Container maxWidth="lg"><Stack direction="row" alignItems="center" spacing={1} sx={{py:1}}><Box component="img" src="/club-logo.png" alt="SF Fil-Am Lions logo" sx={{width:40,height:40}}/><Button color="inherit" onClick={()=>go('/')} sx={{fontWeight:700}}>Serve With Lions</Button>{admin&&<Chip size="small" color="primary" variant="outlined" label="Administrator"/>}<Box sx={{flexGrow:1}}/>{canAdmin&&<Button size="small" color="inherit" startIcon={<Glyph type="swap"/>} sx={{display:{xs:'none',md:'inline-flex'}}} onClick={()=>go(admin?'/':'/admin/events')}>{admin?'Attendee':'Admin'} view</Button>}<Tooltip title="Appearance"><IconButton color="inherit" aria-label="Appearance" onClick={e=>setAppearanceAnchor(e.currentTarget)}><Glyph type={appearance==='dark'?'moon':appearance==='light'?'sun':'system'}/></IconButton></Tooltip><Menu anchorEl={appearanceAnchor} open={!!appearanceAnchor} onClose={()=>setAppearanceAnchor(null)}>{(['light','dark','system'] as const).map(mode=><MenuItem key={mode} selected={appearance===mode} onClick={()=>{setAppearance(mode);localStorage.setItem('servewith-appearance',mode);setAppearanceAnchor(null)}}><Box sx={{mr:1.5}}><Glyph type={mode==='light'?'sun':mode==='dark'?'moon':'system'}/></Box>{mode[0].toUpperCase()+mode.slice(1)}</MenuItem>)}</Menu><Button size="small" color="inherit" onClick={e=>setAnchor(e.currentTarget)} aria-label="Account menu" startIcon={<AccountAvatar email={me.authenticated?me.email:undefined} name={me.firstName||undefined}/>}>{me.authenticated?<Box sx={{display:{xs:'none',sm:'block'}}}>{me.firstName||'Account'}</Box>:<Box sx={{display:{xs:'none',sm:'block'}}}>Sign in</Box>}</Button><Menu anchorEl={anchor} open={!!anchor} onClose={()=>setAnchor(null)}>{me.authenticated&&<MenuItem onClick={()=>{setAnchor(null);go('/users/'+me.userId)}}><Box sx={{mr:1.5}}><Glyph type="person"/></Box>My Profile</MenuItem>}{canAdmin&&<Box sx={{display:{xs:'block',md:'none'}}}><MenuItem onClick={()=>{setAnchor(null);go(admin?'/':'/admin/events')}}><Box sx={{mr:1.5}}><Glyph type="swap"/></Box>{admin?'Attendee workspace':'Administrator workspace'}</MenuItem></Box>}{me.authenticated?<MenuItem onClick={()=>{setAnchor(null);void api('logout',{}).then(refresh).then(()=>go('/'))}}><Box sx={{mr:1.5}}><Glyph type="logout"/></Box>Sign out</MenuItem>:<MenuItem onClick={()=>{setAnchor(null);go('/login')}}><Box sx={{mr:1.5}}><Glyph type="login"/></Box>Sign in</MenuItem>}</Menu></Stack>{admin&&canAdmin&&<Tabs value={path.startsWith('/admin/users')?'users':'events'} onChange={(_,v)=>go(v==='users'?'/admin/users':'/admin/events')} indicatorColor="primary"><Tab label="Events" value="events"/><Tab label="Users" value="users"/></Tabs>}</Container></AppBar>
  <Container maxWidth="lg" component="main">{path==='/terms'?<PolicyPage kind="terms"/>:path==='/privacy'?<PolicyPage kind="privacy"/>:path==='/login'?<AuthScreen me={me} refresh={refresh}/>:path==='/admin/events/new'&&canAdmin?<EventPageEditor/>:editRoute&&canAdmin?<EventPageEditor id={editRoute[1]}/>:userRoute?<UserView key={path} id={userRoute[1]} edit={!!userRoute[2]}/>:eventRoute?<EventDetail id={eventRoute[1]} admin={canAdmin}/>:path==='/admin/users'&&canAdmin?<UsersDirectory/>:path.startsWith('/admin')&&!canAdmin?<Alert severity="warning" sx={{mt:3}}>Complete your profile and current agreement to access administrator tools. <Button onClick={()=>go('/login')}>Account setup</Button></Alert>:<><Typography variant="h4" sx={{mt:4}}>{admin?'Manage events':'Serve With SF Fil-Am Lions'}</Typography><EventList admin={canAdmin&&admin}/></>}<BuildFooter/></Container></ThemeProvider>;
 }
 

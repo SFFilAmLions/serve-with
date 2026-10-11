@@ -15,8 +15,24 @@ interface Env {
   STAGING_REGISTRATION_EMAILS?: string;
   REQUIRED_TERMS_VERSION?: string;
   REQUIRED_PRIVACY_VERSION?: string;
+  TURNSTILE_SITE_KEY?: string;
+  TURNSTILE_SECRET_KEY?: string;
 }
 
+async function verifyTurnstile(request:Request,env:Env,token:unknown):Promise<boolean>{
+  // The public site key enables Turnstile; missing secret is a hard failure, not a bypass.
+  if (!env.TURNSTILE_SITE_KEY) return true; // Legacy environments remain unchanged until rollout.
+  if (!env.TURNSTILE_SECRET_KEY || typeof token!=='string' || !token || token.length>2048) return false;
+  try {
+    const form=new URLSearchParams({secret:env.TURNSTILE_SECRET_KEY,response:token});
+    const ip=request.headers.get('CF-Connecting-IP');
+    if(ip)form.set('remoteip',ip);
+    const response=await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify',{method:'POST',body:form});
+    if(!response.ok)return false;
+    const result=await response.json() as {success?:boolean;hostname?:string;action?:string};
+    return result.success===true&&result.hostname===new URL(request.url).hostname&&result.action==='request-login';
+  }catch{return false;}
+}
 const allowed = new Set(admins.filter(a => a.enabled).map(a => a.email));
 // SDDW-004 Batch 1: resolve identities only after an existing valid session or
 // a consumed verification challenge; do not make profile/consent a gate yet.
@@ -307,6 +323,7 @@ export default {
       headers.set('X-Content-Type-Options', 'nosniff');
       return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
     }
+    if (request.method === 'GET' && path === '/api/auth/turnstile-config') return json({siteKey:env.TURNSTILE_SITE_KEY||null});
     if (!env.AUTH_DB || !env.AUTH_PEPPER) return json({ error: 'Sign-in is not configured' }, 503);
     const db = env.AUTH_DB;
     if (request.method === 'GET' && path === '/api/auth/me') {
@@ -352,6 +369,7 @@ export default {
         return json({agreementCurrent:true});
       }
       if (path === '/api/auth/request') {
+        if (!await verifyTurnstile(request,env,body.turnstileToken)) return json({error:'Verification required. Please retry the security check.'},403);
         const email = normalize(body.email);
         const generic = json({ message: 'If this account is authorized, a sign-in email will arrive shortly.' });
         const now = Date.now();
