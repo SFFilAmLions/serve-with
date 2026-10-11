@@ -223,3 +223,50 @@ test('Temporal rejects gaps and ambiguous overlaps in distinct time zones',async
   assert.equal(summer.timeZoneId,zone);
  }
 });
+
+test('OpenAPI-generated route table reaches real Worker event handlers with auth and origin parity', async () => {
+  const {mkdtempSync,rmSync,readFileSync:read} = await import('node:fs');
+  const {tmpdir} = await import('node:os');
+  const {join} = await import('node:path');
+  const {spawnSync} = await import('node:child_process');
+  const folder=mkdtempSync(join(tmpdir(),'serve-with-real-worker-'));
+  let routes;
+  try {
+    const output=join(folder,'server-contract.ts');
+    const generated=spawnSync(process.execPath,['scripts/generate-server-contract.mjs','openapi/openapi.yaml',output],{encoding:'utf8'});
+    assert.equal(generated.status,0,generated.stderr||generated.stdout);
+    const js=ts.transpileModule(read(output,'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText;
+    routes=(await import('data:text/javascript;base64,'+Buffer.from(js).toString('base64'))).operationRoutes;
+  } finally {rmSync(folder,{recursive:true,force:true});}
+  const dispatch=(request,env)=>{
+    const url=new URL(request.url);
+    const matched=routes.some(route=>route.method===request.method &&
+      new RegExp('^'+route.path.replace(/\{[^}]+\}/g,'[^/]+')+'$').test(url.pathname));
+    return matched ? worker.fetch(request,env) : new Response(null,{status:404});
+  };
+  const h=harness();
+  try {
+    const origin='https://servewith-beta.sffilamlions.org';
+    const eventUrl=origin+'/api/events';
+    const publicResponse=await dispatch(new Request(eventUrl),{AUTH_DB:h.adapter});
+    assert.equal(publicResponse.status,200);
+    assert.deepEqual((await publicResponse.json()).events,[]);
+    const value={title:'Generated contract integration',location:'Park',timezone:'America/Los_Angeles',start:'2026-11-14T09:00',end:'2026-11-14T12:00'};
+    const req=(headers)=>new Request(origin+'/api/admin/events',{method:'POST',headers:{'content-type':'application/json',...headers},body:JSON.stringify(value)});
+    const env={AUTH_DB:h.adapter,AUTH_PEPPER:'test',ASSETS:{fetch:async()=>new Response('asset')}};
+    assert.equal((await dispatch(req({origin}),env)).status,401);
+    const session='f'.repeat(64),now=Date.now();
+    const digest=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode('test:'+session))),b=>b.toString(16).padStart(2,'0')).join('');
+    h.sqlite.prepare('INSERT INTO sessions(token_hash,email,expires_at,created_at) VALUES (?,?,?,?)').run(digest,'lionaugust@icloud.com',now+600000,now);
+    const cookie='__Host-sw_session='+session;
+    assert.equal((await dispatch(req({origin:'https://attacker.example',cookie}),env)).status,400);
+    assert.equal((await dispatch(req({origin,cookie,'sec-fetch-site':'cross-site'}),env)).status,400);
+    const created=await dispatch(req({origin,cookie}),env);
+    assert.equal(created.status,201);
+    const event=(await created.json()).event;
+    assert.equal(event.title,value.title);
+    const detail=await dispatch(new Request(origin+'/api/events/'+event.id),env);
+    assert.equal(detail.status,200);
+    assert.equal((await detail.json()).event.id,event.id);
+  } finally {h.sqlite.close();}
+});
