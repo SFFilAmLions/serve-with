@@ -11,6 +11,7 @@ globalThis.__testEligibility = (await import('data:text/javascript;base64,' + Bu
 ).toString('base64'))).isStagingRegistrationEligible;
 
 const source = readFileSync('src/worker.ts','utf8')
+  .replace("import packageJson from '../package.json';", "const packageJson = {version:'0.1.0'};")
   .replace("import { Temporal } from '@js-temporal/polyfill';", "const Temporal = globalThis.__testTemporal;")
   .replace("import { isStagingRegistrationEligible } from './registration-eligibility';", "const isStagingRegistrationEligible = globalThis.__testEligibility;")
   .replace("import admins from './generated/admins.json';", "const admins = [{email:'lionaugust@icloud.com',enabled:true}];");

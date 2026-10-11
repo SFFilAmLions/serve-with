@@ -5,8 +5,11 @@ import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { TimePicker } from '@mui/x-date-pickers/TimePicker';
-import { AppBar, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Alert, Autocomplete, Snackbar, Container, CssBaseline, Stack, Tab, Tabs, TextField, ThemeProvider, Typography, useMediaQuery, IconButton, Menu, MenuItem, ListItemButton, Divider, Tooltip, Skeleton } from '@mui/material';
+import { AppBar, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Alert, Autocomplete, Snackbar, Checkbox, FormControlLabel, Container, CssBaseline, Stack, Tab, Tabs, TextField, ThemeProvider, Typography, useMediaQuery, IconButton, Menu, MenuItem, ListItemButton, Divider, Tooltip, Skeleton } from '@mui/material';
 import './style.css';
+import packageJson from '../package.json';
+import privacyPolicy from '../policies/privacy/approved-draft.md?raw';
+import termsPolicy from '../policies/terms/approved-draft.md?raw';
 import { createClubTheme } from './theme';
 import { type Draft, timeZones, validateDraft, emptyDraft, localInput } from './event-form';
 
@@ -121,10 +124,10 @@ export function App(){
  const [admin,setAdmin]=useState(false);
  const dark=useMediaQuery('(prefers-color-scheme: dark)');
  const theme=React.useMemo(()=>createClubTheme(dark?'dark':'light'),[dark]);
- return <ThemeProvider theme={theme}><CssBaseline/><AppBar position="static" color="default" elevation={0}><Container><Box sx={{py:1.5,display:"flex",alignItems:"center",gap:1.5}}><Box component="img" src="/club-logo.png" alt="San Francisco Fil-Am Lions Club logo" sx={{width:48,height:48,objectFit:"contain"}}/><Typography variant="h6">Serve With SF Fil-Am Lions</Typography></Box></Container></AppBar><Container maxWidth="md" component="main"><Typography variant="h3" component="h1" sx={{mt:5}}>Serve With SF Fil-Am Lions</Typography><Typography color="text.secondary">Making it easier to serve together.</Typography><EventList admin={admin}/><SignIn onAuthChange={setAdmin}/><BuildFooter/></Container></ThemeProvider>
+ return <ThemeProvider theme={theme}><CssBaseline/><AppBar position="static" color="default" elevation={0}><Container><Box sx={{py:1.5,display:"flex",alignItems:"center",gap:1.5}}><Box component="img" src="/club-logo.png" alt="San Francisco Fil-Am Lions Club logo" sx={{width:48,height:48,objectFit:"contain"}}/><Typography variant="h6">Serve With SF Fil-Am Lions</Typography></Box></Container></AppBar><Container maxWidth="md" component="main"><Typography variant="h3" component="h1" sx={{mt:5}}>Serve With SF Fil-Am Lions</Typography><Typography color="text.secondary">Making it easier to serve together.</Typography><EventList admin={admin}/><SignIn onAuthChange={setAdmin}/><Box sx={{mt:3,display:'flex',gap:2}}><a href="/terms">Terms of Use</a><a href="/privacy">Privacy Policy</a></Box><BuildFooter/></Container></ThemeProvider>
 }
 
-type Me = {authenticated:boolean;email?:string;userId?:string;firstName?:string|null;lastName?:string|null;profileComplete?:boolean;agreementCurrent?:boolean;administratorEligible?:boolean;privileged?:boolean};
+type Me = {requiredVersions?:{terms:string;privacy:string}|null;authenticated:boolean;email?:string;userId?:string;firstName?:string|null;lastName?:string|null;profileComplete?:boolean;agreementCurrent?:boolean;administratorEligible?:boolean;privileged?:boolean};
 const requestJson=async(path:string, options?:RequestInit)=>{
  const response=await fetch(path,{credentials:'same-origin',cache:'no-store',...options});
  const data=await response.json();
@@ -148,7 +151,7 @@ function AuthScreen({me,refresh}:{me:Me;refresh:()=>Promise<void>}){
  {!me.authenticated&&(stage==='email'?<Box component="form" onSubmit={e=>{e.preventDefault();void work(async()=>{const r=await submitJson('/api/auth/request',{email});setMessage(r.message);setStage('code')})}}><Stack spacing={2}><TextField required type="email" label="Email" value={email} onChange={e=>setEmail(e.target.value)} autoComplete="email"/><Button variant="contained" type="submit" disabled={busy}>Continue</Button></Stack></Box>:
  <Stack spacing={2}><Typography>Check your email at {email}</Typography><Box component="form" onSubmit={e=>{e.preventDefault();void work(async()=>{await submitJson('/api/auth/verify',{email,code});await refresh()})}}><Stack spacing={2}><TextField required label="Eight-digit code" value={code} inputProps={{inputMode:'numeric',maxLength:8,pattern:'[0-9]{8}'}} onChange={e=>setCode(e.target.value)}/><Button type="submit" disabled={busy}>Continue</Button></Stack></Box><Button disabled={busy} onClick={()=>void work(async()=>{await submitJson('/api/auth/request',{email});setMessage('If eligible, a new code will arrive shortly.')})}>Resend code</Button><Button onClick={()=>{setStage('email');setCode('');setMessage('')}}>Use a different email</Button></Stack>)}
  {me.authenticated&&!me.profileComplete&&<Stack spacing={2} component="form" onSubmit={e=>{e.preventDefault();void work(async()=>{await submitJson('/api/auth/profile',{firstName:first,lastName:last,dateOfBirth:dob});await refresh()})}}><Typography variant="h6">Complete your profile</Typography><TextField required label="First name" value={first} onChange={e=>setFirst(e.target.value)}/><TextField required label="Last name" value={last} onChange={e=>setLast(e.target.value)}/><TextField required label="Date of birth" type="date" slotProps={{inputLabel:{shrink:true}}} value={dob} onChange={e=>setDob(e.target.value)}/><Button disabled={busy} type="submit" variant="contained">Save profile</Button></Stack>}
- {me.authenticated&&me.profileComplete&&!me.agreementCurrent&&<Alert severity="info">Your account requires acceptance of the current Terms of Use and Privacy Policy before privileged access. These documents must be approved and published before acceptance can be enabled.</Alert>}
+ {me.authenticated&&me.profileComplete&&!me.agreementCurrent&&<AgreementCompletion me={me} refresh={refresh}/>}
  {me.authenticated&&me.profileComplete&&me.agreementCurrent&&<Button onClick={()=>go('/')}>Continue to events</Button>}
  {message&&<Alert role="status" severity="info">{message}</Alert>}
  </Stack>;
@@ -223,6 +226,46 @@ function EventPageEditor({id}:{id?:string}){
  </Stack></LocalizationProvider>;
 }
 
+
+const policyVersion = packageJson.version;
+function PolicyPage({kind}:{kind:'terms'|'privacy'}) {
+ const source=kind==='terms'?termsPolicy:privacyPolicy;
+ const title=kind==='terms'?'Terms of Use':'Privacy Policy';
+ const renderInline=(line:string)=>line.split(/(\\*\\*[^*]+\\*\\*)/g).map((part,i)=>part.startsWith('**')&&part.endsWith('**')?<strong key={i}>{part.slice(2,-2)}</strong>:part);
+ return <Box component="article" sx={{my:4,maxWidth:850}}>
+  <Typography variant="h4" component="h1" gutterBottom>{title}</Typography>
+  <Typography color="text.secondary" sx={{mb:3}}>Version {policyVersion} · Effective October 11, 2026</Typography>
+  {source.split('\\n').map((line,i)=>{
+    if(!line.trim()||line.startsWith('# '))return null;
+    if(line.startsWith('### '))return <Typography key={i} variant="h6" component="h2" sx={{mt:3,mb:1}}>{renderInline(line.slice(4))}</Typography>;
+    if(line.startsWith('- '))return <Typography key={i} component="p" sx={{pl:3,mb:0.75}}>• {renderInline(line.slice(2))}</Typography>;
+    return <Typography key={i} component="p" sx={{mb:1.5}}>{renderInline(line)}</Typography>;
+  })}
+  <Typography sx={{mt:3}}><a href={kind==='terms'?'/privacy':'/terms'}>Read the {kind==='terms'?'Privacy Policy':'Terms of Use'}</a></Typography>
+ </Box>;
+}
+function AgreementCompletion({me,refresh}:{me:Me;refresh:()=>Promise<void>}) {
+ const [checked,setChecked]=useState(false),[saving,setSaving]=useState(false),[error,setError]=useState('');
+ const versions=me.requiredVersions;
+ const submit=async()=>{
+  if(!checked||!versions)return;
+  setSaving(true);setError('');
+  try {
+   await submitJson('/api/auth/agreements',{accepted:true,termsVersion:versions.terms,privacyVersion:versions.privacy});
+   await refresh();
+  } catch(e) {setError(e instanceof Error?e.message:'Could not save acceptance');setChecked(false)}
+  finally {setSaving(false)}
+ };
+ return <Stack spacing={2} sx={{mt:3,maxWidth:650}}>
+  <Typography variant="h6">Review and accept current policies</Typography>
+  <Typography>Read the <a href="/terms" target="_blank" rel="noopener noreferrer">Terms of Use</a> and <a href="/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a> (version {versions?.terms||policyVersion}).</Typography>
+  <FormControlLabel control={<Checkbox checked={checked} onChange={e=>setChecked(e.target.checked)}/>} label="I have read and agree to the Terms of Use and acknowledge the Privacy Policy."/>
+  {!versions&&<Alert severity="warning">Required policy versions are unavailable. Acceptance is disabled.</Alert>}
+  {error&&<Alert severity="error" role="alert">{error}</Alert>}
+  <Button variant="contained" disabled={!checked||!versions||saving} onClick={()=>void submit()}>Accept and continue</Button>
+ </Stack>;
+}
+
 function RoutedApp(){
  const [path,setPath]=useState(location.pathname),[me,setMe]=useState<Me>({authenticated:false}),[appearance,setAppearance]=useState<'light'|'dark'|'system'>(()=>(localStorage.getItem('servewith-appearance') as 'light'|'dark'|'system')||'system'),[anchor,setAnchor]=useState<HTMLElement|null>(null);
  const systemDark=useMediaQuery('(prefers-color-scheme: dark)');
@@ -235,7 +278,7 @@ function RoutedApp(){
  const editRoute=path.match(/^\/admin\/events\/([0-9a-f-]{36})\/edit$/);
 
  return <ThemeProvider theme={theme}><CssBaseline/><AppBar position="static" color={admin?'primary':'default'} elevation={0}><Container maxWidth="lg"><Stack direction="row" alignItems="center" spacing={2} sx={{py:1}}><Box component="img" src="/club-logo.png" alt="SF Fil-Am Lions logo" sx={{width:42,height:42}}/><Button color="inherit" onClick={()=>go('/')}>Serve With</Button>{admin&&<Typography>Administrator</Typography>}<Box sx={{flexGrow:1}}/><Button color="inherit" onClick={e=>setAnchor(e.currentTarget)} aria-label="Account and appearance menu">{me.authenticated?(me.firstName||me.email||'Account'):'Sign in / Appearance'}</Button><Menu anchorEl={anchor} open={!!anchor} onClose={()=>setAnchor(null)}>{me.authenticated&&<MenuItem onClick={()=>{setAnchor(null);go('/users/'+me.userId)}}>My Profile</MenuItem>}{canAdmin&&<MenuItem onClick={()=>{setAnchor(null);go(admin?'/':'/admin/events')}}>{admin?'Attendee workspace':'Administrator workspace'}</MenuItem>}{(['light','dark','system'] as const).map(mode=><MenuItem key={mode} selected={appearance===mode} onClick={()=>{setAppearance(mode);localStorage.setItem('servewith-appearance',mode);setAnchor(null)}}>{mode[0].toUpperCase()+mode.slice(1)} appearance</MenuItem>)}{me.authenticated?<MenuItem onClick={()=>{setAnchor(null);void api('logout',{}).then(refresh).then(()=>go('/'))}}>Sign out</MenuItem>:<MenuItem onClick={()=>{setAnchor(null);go('/login')}}>Sign in</MenuItem>}</Menu></Stack>{admin&&canAdmin&&<Tabs value={path.startsWith('/admin/users')?'users':'events'} onChange={(_,v)=>go(v==='users'?'/admin/users':'/admin/events')} textColor="inherit" indicatorColor="secondary"><Tab label="Events" value="events"/><Tab label="Users" value="users"/></Tabs>}</Container></AppBar>
- <Container maxWidth="lg" component="main">{path==='/login'?<AuthScreen me={me} refresh={refresh}/>:path==='/admin/events/new'&&canAdmin?<EventPageEditor/>:editRoute&&canAdmin?<EventPageEditor id={editRoute[1]}/>:userRoute?<UserView key={path} id={userRoute[1]} edit={!!userRoute[2]}/>:eventRoute?<EventDetail id={eventRoute[1]} admin={canAdmin}/>:path==='/admin/users'&&canAdmin?<UsersDirectory/>:path.startsWith('/admin')&&!canAdmin?<Alert severity="warning" sx={{mt:3}}>Complete your profile and current agreement to access administrator tools. <Button onClick={()=>go('/login')}>Account setup</Button></Alert>:<><Typography variant="h4" sx={{mt:4}}>{admin?'Manage events':'Serve With SF Fil-Am Lions'}</Typography><EventList admin={canAdmin&&admin}/></>}<BuildFooter/></Container></ThemeProvider>;
+ <Container maxWidth="lg" component="main">{path==='/terms'?<PolicyPage kind="terms"/>:path==='/privacy'?<PolicyPage kind="privacy"/>:path==='/login'?<AuthScreen me={me} refresh={refresh}/>:path==='/admin/events/new'&&canAdmin?<EventPageEditor/>:editRoute&&canAdmin?<EventPageEditor id={editRoute[1]}/>:userRoute?<UserView key={path} id={userRoute[1]} edit={!!userRoute[2]}/>:eventRoute?<EventDetail id={eventRoute[1]} admin={canAdmin}/>:path==='/admin/users'&&canAdmin?<UsersDirectory/>:path.startsWith('/admin')&&!canAdmin?<Alert severity="warning" sx={{mt:3}}>Complete your profile and current agreement to access administrator tools. <Button onClick={()=>go('/login')}>Account setup</Button></Alert>:<><Typography variant="h4" sx={{mt:4}}>{admin?'Manage events':'Serve With SF Fil-Am Lions'}</Typography><EventList admin={canAdmin&&admin}/></>}<BuildFooter/></Container></ThemeProvider>;
 }
 
 createRoot(document.getElementById('app')!).render(<RoutedApp/>);

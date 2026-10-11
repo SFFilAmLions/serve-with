@@ -1,6 +1,7 @@
 interface D1Statement { bind(...values: unknown[]): D1Statement; first<T>(): Promise<T | null>; all<T>(): Promise<{ results: T[] }>; run(): Promise<{ meta: { changes: number } }> }
 interface D1Database { prepare(query: string): D1Statement; batch(statements: D1Statement[]): Promise<unknown> }
 import admins from './generated/admins.json';
+import packageJson from '../package.json';
 import { Temporal } from '@js-temporal/polyfill';
 import { isStagingRegistrationEligible } from './registration-eligibility';
 
@@ -144,7 +145,8 @@ async function sessionSubject(request: Request, env: Env): Promise<Subject | nul
 const policyVersions = (env: Env) => {
   const terms = env.REQUIRED_TERMS_VERSION?.trim() || '';
   const privacy = env.REQUIRED_PRIVACY_VERSION?.trim() || '';
-  return terms && privacy && terms.length <= 100 && privacy.length <= 100 ? {terms,privacy} : null;
+  if (!terms && !privacy) return {terms:packageJson.version,privacy:packageJson.version};
+  return terms && privacy && terms === packageJson.version && privacy === packageJson.version ? {terms,privacy} : null;
 };
 const profileReady = (u: UserRow) => Boolean(u.first_name && u.last_name && validDob(u.date_of_birth));
 const agreementReady = (u: UserRow, versions: {terms:string;privacy:string}|null) =>
@@ -298,7 +300,7 @@ export default {
     if (!path.startsWith('/api/auth/')) {
       // Render the SPA for canonical deep links; retain ordinary asset handling.
       const spaRoute = request.method === 'GET' && (
-        path === '/login' || path === '/admin' || path === '/admin/events' || path === '/admin/users' ||
+        path === '/terms' || path === '/privacy' || path === '/login' || path === '/admin' || path === '/admin/events' || path === '/admin/users' ||
         path === '/admin/events/new' || /^\/admin\/events\/[0-9a-f-]{36}\/edit$/.test(path) ||
         /^\/users\/[0-9a-f-]{36}(?:\/edit)?$/.test(path) ||
         /^\/events\/[0-9a-f-]{36}$/.test(path)
@@ -319,7 +321,7 @@ export default {
       return json({ authenticated:true, email:user.email, userId:user.id,
         firstName:user.first_name, lastName:user.last_name, emailVerified:Boolean(user.email_verified_at),
         profileComplete:profileReady(user), agreementCurrent:agreementReady(user,policyVersions(env)),
-        administratorEligible:admin, privileged:privilegeReady(subject,env) });
+        administratorEligible:admin, privileged:privilegeReady(subject,env), requiredVersions:policyVersions(env) });
     }
     if (request.method !== 'POST' || !originOk(request) || request.headers.get('sec-fetch-site') === 'cross-site') return error();
     try {

@@ -85,3 +85,10 @@
 - [ ] Complete public current/archive policy routes, versioned immutable sources and unchecked acknowledgment UI when publication identifiers are approved.
 - [ ] Review age eligibility at initial email verification and cleanup/minimization of rejected incomplete identities.
 - [ ] Perform real-device accessibility and staging verification after separately approved deployment.
+
+## Repo-versioned public policies (approved Oct 11, 2026)
+
+- [x] Assign both policy documents version 0.1.0, aligned with package.json, effective October 11, 2026.
+- [x] Implement anonymous public /terms and /privacy SPA routes using the approved policy sources; GitHub history is the archive (no in-app archival pages).
+- [x] Add initially unchecked version-aware combined acknowledgment UI with server-persisted acceptance and failure handling.
+- [ ] Verify CI and review the current policy presentation in a browser; no staging deployment until approved merge.
