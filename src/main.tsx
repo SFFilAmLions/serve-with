@@ -5,7 +5,21 @@ import './style.css';
 
 type EventRecord = { id:string; title:string; location:string; timezone:string; start_at:number; end_at:number; version:number };
 type View = 'upcoming'|'past';
-const build = import.meta.env.VITE_COMMIT_SHA || 'local';
+const repositoryUrl = 'https://github.com/SFFilAmLions/serve-with';
+const buildEnvironment = import.meta.env.VITE_DEPLOY_ENV;
+const buildSha = import.meta.env.VITE_COMMIT_SHA || '';
+const releaseTag = import.meta.env.VITE_RELEASE_TAG || '';
+function BuildFooter() {
+ const staged = buildEnvironment === 'staging' && /^[a-f0-9]{40}$/.test(buildSha);
+ const released = buildEnvironment === 'production' && /^v\\d+\\.\\d+\\.\\d+$/.test(releaseTag);
+ const label = staged ? 'Commit ' + buildSha.slice(0,12) : released ? 'Version ' + releaseTag : 'Development build';
+ const href = staged ? repositoryUrl + '/commit/' + buildSha : released ? repositoryUrl + '/releases/tag/' + releaseTag : undefined;
+ return <Box component="footer" sx={{my:5,color:'text.secondary',fontSize:12,display:'flex',flexWrap:'wrap',gap:1,alignItems:'center'}}>
+  <a href={repositoryUrl} target="_blank" rel="noopener noreferrer" aria-label="Serve With GitHub repository">GitHub repository</a>
+  <span aria-hidden="true">·</span>
+  {href ? <a href={href} target="_blank" rel="noopener noreferrer">{label}</a> : <span>{label}</span>}
+ </Box>;
+}
 const magic = new URL(location.href).searchParams.get('magic');
 if (magic) history.replaceState(null,'',location.pathname);
 const api = async (path:string,body?:Record<string,string>) => {
@@ -45,6 +59,6 @@ function SignIn(){
 function App(){
  const dark=useMediaQuery('(prefers-color-scheme: dark)');
  const theme=React.useMemo(()=>createTheme({palette:{mode:dark?'dark':'light',primary:{main:dark?'#f1c232':'#705400'}},shape:{borderRadius:16}}),[dark]);
- return <ThemeProvider theme={theme}><CssBaseline/><AppBar position="static" color="default" elevation={0}><Container><Typography variant="h6" sx={{py:2}}>Serve With SF Fil-Am Lions</Typography></Container></AppBar><Container maxWidth="md" component="main"><Typography variant="h3" component="h1" sx={{mt:5}}>Serve With SF Fil-Am Lions</Typography><Typography color="text.secondary">Making it easier to serve together.</Typography><EventList/><SignIn/><Box component="footer" sx={{my:5,color:'text.secondary',fontSize:12}}>Build: <code>{build.slice(0,12)}</code></Box></Container></ThemeProvider>
+ return <ThemeProvider theme={theme}><CssBaseline/><AppBar position="static" color="default" elevation={0}><Container><Typography variant="h6" sx={{py:2}}>Serve With SF Fil-Am Lions</Typography></Container></AppBar><Container maxWidth="md" component="main"><Typography variant="h3" component="h1" sx={{mt:5}}>Serve With SF Fil-Am Lions</Typography><Typography color="text.secondary">Making it easier to serve together.</Typography><EventList/><SignIn/><BuildFooter/></Container></ThemeProvider>
 }
 createRoot(document.getElementById('app')!).render(<App/>);
