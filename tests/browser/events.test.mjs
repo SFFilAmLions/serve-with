@@ -30,9 +30,9 @@ test('anonymous event lists are public, account controls live in the app bar',as
   const logo=page.getByRole('img',{name:'SF Fil-Am Lions logo'});
   assert.equal(await logo.getAttribute('src'),'/club-logo.png');
   assert.equal(await page.getByRole('button',{name:'Add Event'}).count(),0);
-  await page.getByRole('tab',{name:'Past Events'}).click();
+  await page.getByRole('button',{name:'Past'}).click();
   await page.getByText('No past events yet.').waitFor();
-  await page.getByRole('button',{name:'Account and appearance menu'}).click();
+  await page.getByRole('button',{name:'Account menu'}).click();
   await page.getByRole('menuitem',{name:'Sign in',exact:true}).click();
   assert.match(page.url(),/\/login$/);
   await page.getByRole('heading',{name:'Sign in'}).waitFor();
@@ -43,6 +43,7 @@ test('email-first login supports resend, alternative email, eight-digit verifica
  let me=anonymous,requests=0,verified=0;
  const {browser,page}=await context(()=>me);
  try{
+  await page.route('**/api/auth/turnstile-config',r=>r.fulfill({json:{siteKey:null}}));
   await page.route('**/api/auth/request',r=>{requests++;return r.fulfill({json:{message:'If eligible, a sign-in email will arrive shortly.'}})});
   await page.route('**/api/auth/verify',r=>{assert.equal(r.request().postDataJSON().code,'12345678');verified++;me=admin;return r.fulfill({json:{authenticated:true}})});
   await page.goto(base+'/login');
@@ -93,16 +94,14 @@ test('administrator workspace has Events and Users tabs and separate appearance 
  const {browser,page}=await context(admin);
  try{
   await page.goto(base);
-  await page.getByRole('button',{name:'Account and appearance menu'}).click();
-  await page.getByRole('menuitem',{name:'Administrator workspace'}).click();
+  await page.getByRole('button',{name:'Admin view'}).click();
   await page.getByText('Administrator',{exact:true}).first().waitFor();
   await page.getByRole('tab',{name:'Events',exact:true}).waitFor();
   await page.getByRole('tab',{name:'Users',exact:true}).waitFor();
-  await page.getByRole('button',{name:'Account and appearance menu'}).click();
-  await page.getByRole('menuitem',{name:'Dark appearance'}).click();
+  await page.getByRole('button',{name:'Appearance'}).click();
+  await page.getByRole('menuitem',{name:'Dark'}).click();
   assert.equal(await page.evaluate(()=>localStorage.getItem('servewith-appearance')),'dark');
-  await page.getByRole('button',{name:'Account and appearance menu'}).click();
-  await page.getByRole('menuitem',{name:'Attendee workspace'}).click();
+  await page.getByRole('button',{name:'Attendee view'}).click();
   assert.equal(new URL(page.url()).pathname,'/');
  }finally{await browser.close()}
 });
@@ -125,7 +124,7 @@ test('administrator event editor uses date/time pickers and protects dirty draft
   await page.goto(base+'/admin/events/new');
   await page.getByRole('heading',{name:'Create event'}).waitFor();
   await page.getByRole('textbox',{name:'Event title'}).fill('Draft event');
-  await page.getByRole('button',{name:'Close editor'}).click();
+  await page.getByRole('button',{name:'Back'}).click();
   await page.getByText('Discard unsaved changes?').waitFor();
   await page.getByRole('button',{name:'Keep editing'}).click();
   assert.equal(await page.getByRole('textbox',{name:'Event title'}).inputValue(),'Draft event');
@@ -140,7 +139,7 @@ test('duplicate event prepopulates creation and saving requests a new event',asy
   await page.route('**/api/admin/events',r=>{const body=r.request().postDataJSON();assert.equal(r.request().method(),'POST');assert.equal(body.title,'Service day');assert.equal(body.start,'2026-11-15T09:00');return r.fulfill({status:201,json:{event:{...example,id:newEventId}}})});
   await page.route('**/api/events/'+newEventId,r=>r.fulfill({json:{event:{...example,id:newEventId}}}));
   await page.goto(base+'/admin/events');
-  await page.getByRole('button',{name:'Duplicate'}).click();
+  await page.getByRole('button',{name:'Duplicate Service day'}).click();
   await page.getByText(/Duplicating Service day/).waitFor();
   await page.getByRole('button',{name:'Save event'}).last().click();
   await page.getByRole('heading',{name:'Service day'}).waitFor();
@@ -156,10 +155,8 @@ test('directory is paginated, searchable, sortable, and links to canonical profi
   await page.route('**/api/users/'+adminId,r=>r.fulfill({json:{user:{id:adminId,first_name:'Admin',last_name:'Example',email:'admin@example.org',date_of_birth:'1990-01-01'},canCorrectDob:true}}));
   await page.goto(base+'/admin/users');
   await page.getByRole('heading',{name:'Users'}).waitFor();
-  const alphabetRequest=page.waitForResponse(r=>r.url().includes('letter=A'));
-  await page.getByRole('button',{name:'Jump to A'}).click();
-  await alphabetRequest;
-  assert.ok(last.includes('letter=A'));
+  assert.equal(await page.getByRole('button',{name:'Jump to A'}).count(),0);
+  assert.ok(!last.includes('letter='));
   await page.getByRole('textbox',{name:'Search name or email'}).fill('Admin');
   await page.getByText('admin@example.org').first().click();
   assert.equal(new URL(page.url()).pathname,'/users/'+adminId);
