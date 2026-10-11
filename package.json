@@ -5,7 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "npm run generate:admins && tsc --noEmit && vite build",
+    "build": "npm run generate:admins && npm run generate:policies && tsc --noEmit && vite build",
+    "pretest": "npm run generate:policies",
+    "predev": "npm run generate:policies",
+    "generate:policies": "node scripts/generate-policy-versions.mjs",
     "preview": "vite preview",
     "validate:admins": "node scripts/validate-admins.mjs",
     "generate:admins": "node scripts/generate-admins.mjs",
