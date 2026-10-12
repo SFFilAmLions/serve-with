@@ -32,6 +32,7 @@ function database() {
   sqlite.exec(readFileSync('migrations/0001_auth.sql','utf8'));
   sqlite.exec(readFileSync('migrations/0002_auth_rate_limits.sql','utf8'));
   sqlite.exec(readFileSync('migrations/0004_users_and_agreements.sql','utf8'));
+  sqlite.exec('BEGIN;'+readFileSync('migrations/0006_unclaimed_users.sql','utf8')+'COMMIT;');
   sqlite.exec('PRAGMA foreign_keys=ON');
   const adapter = { prepare(sql) { const stmt = sqlite.prepare(sql); return {
     bind(...params) { return { first: async () => stmt.get(...params) || null,
