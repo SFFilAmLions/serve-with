@@ -187,9 +187,9 @@ test('existing attendee on full event is not signed up twice',async()=>{
  let posts=0;
  try{
   await page.route('**/api/events/'+eventId,r=>r.fulfill({json:{event}}));
-  await page.route('**/api/events/'+eventId+'/my-signup',r=>r.fulfill({json:{signup:{id:'existing'}}}));
+  await page.route('**/api/events/'+eventId+'/signups',r=>{if(r.request().method()==='GET')return r.fulfill({json:{signup:{id:'existing'}}});posts++;return r.fulfill({status:500,json:{error:'Unexpected duplicate'}})});
   await page.route('**/api/events/'+eventId+'/participants',r=>r.fulfill({json:{participants:[]}}));
-  await page.route('**/api/events/'+eventId+'/signup',r=>{posts++;return r.fulfill({status:500,json:{error:'Unexpected duplicate'}})});
+  
   await page.addInitScript(id=>localStorage.setItem('servewith-pending-signup',JSON.stringify({id,expiresAt:Date.now()+60000})),eventId);
   await page.goto(base+'/events/'+eventId);
   await page.getByText('You are already signed up for this event.').waitFor();
