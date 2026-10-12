@@ -329,7 +329,10 @@ test('Turnstile blocks email issuance unless Siteverify confirms hostname and ac
 test('email-verified stub claim reuses ID and requires full profile and personal agreements',async()=>{
  const h=harness();try{
   const id='44444444-4444-4444-8444-444444444444';
-  h.sqlite.prepare('INSERT INTO users(id,email,first_name,last_name,created_at,updated_at,is_stub) VALUES(?,?,?,?,?,?,1)')
+  h.sqlite.exec(readFileSync('migrations/0003_events.sql','utf8'));
+  h.sqlite.exec(readFileSync('migrations/0005_event_signups.sql','utf8'));
+  h.sqlite.prepare('INSERT INTO participation_identities(id) VALUES(?)').run(id);
+  h.sqlite.prepare('INSERT INTO user_stubs(id,email,first_name,last_name,created_at,updated_at) VALUES(?,?,?,?,?,?)')
    .run(id,'unclaimed@example.org','Admin','Entered',1,1);
   assert.equal((await h.req('/api/auth/request',{email:'unclaimed@example.org'})).status,200);
   assert.equal(h.sent.length,1);
@@ -349,8 +352,9 @@ test('email-verified stub claim reuses ID and requires full profile and personal
    accepted:true,termsVersion:versions.terms.version,privacyVersion:versions.privacy.version
   },{cookie:session});
   assert.equal(accepted.status,200);
-  const claimed=h.sqlite.prepare('SELECT id,is_stub,email_verified_at,first_name,last_name,terms_accepted_at FROM users WHERE id=?').get(id);
-  assert.equal(claimed.id,id);assert.equal(claimed.is_stub,0);
+  const claimed=h.sqlite.prepare('SELECT id,email_verified_at,first_name,last_name,terms_accepted_at FROM users WHERE id=?').get(id);
+  assert.equal(claimed.id,id);
+  assert.ok(h.sqlite.prepare('SELECT claimed_at FROM user_stubs WHERE id=?').get(id).claimed_at);
   assert.ok(claimed.email_verified_at);assert.ok(claimed.terms_accepted_at);
   assert.equal(claimed.first_name,'Actual');
   const completed=await (await h.req('/api/auth/me',undefined,{cookie:session})).json();
