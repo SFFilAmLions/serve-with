@@ -34,6 +34,7 @@ function harness() {
   sqlite.exec(readFileSync('migrations/0003_events.sql','utf8'));
   sqlite.exec(readFileSync('migrations/0004_users_and_agreements.sql','utf8'));
   sqlite.exec(readFileSync('migrations/0005_event_signups.sql','utf8'));
+  sqlite.exec('BEGIN;'+readFileSync('migrations/0006_unclaimed_users.sql','utf8')+'COMMIT;');
   const versionTerms=JSON.parse(readFileSync('src/generated/policy-versions.json','utf8')).terms.version, versionPrivacy=JSON.parse(readFileSync('src/generated/policy-versions.json','utf8')).privacy.version;
   // Event regressions retain an already-completed authorized administrator session.
   sqlite.prepare('INSERT INTO users(id,email,first_name,last_name,date_of_birth,email_verified_at,created_at,updated_at,terms_accepted_at,accepted_terms_version,accepted_privacy_version) VALUES(?,?,?,?,?,?,?,?,?,?,?)')
@@ -425,5 +426,28 @@ test('usage endpoint hides provider credentials and never fabricates limits',asy
   assert.equal(data.providers.length,4);
   assert.ok(data.providers.every(p=>p.status==='unavailable'&&p.used===null&&p.limit===null&&p.remaining===null));
   assert.equal(JSON.stringify(data).includes('fake'),false);
+ }finally{h.sqlite.close();}
+});
+
+test('admin creates email-optional unverified user without consent or login',async()=>{
+ const h=harness();try{
+  const path='/api/admin/users';
+  assert.equal((await h.req(path,'POST',{firstName:'Alex',lastName:'Volunteer'})).status,401);
+  const now=Date.now(),token='c'.repeat(64);
+  const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode('test:'+token))),b=>b.toString(16).padStart(2,'0')).join('');
+  h.sqlite.prepare('INSERT INTO sessions(token_hash,email,expires_at,created_at) VALUES(?,?,?,?)')
+   .run(hash,'lionaugust@icloud.com',now+600000,now);
+  const cookie='__Host-sw_session='+token;
+  assert.equal((await h.req(path,'POST',{firstName:'',lastName:'Volunteer'},cookie)).status,422);
+  const response=await h.req(path,'POST',{firstName:'Alex',lastName:'Volunteer'},cookie);
+  assert.equal(response.status,201);
+  const created=(await response.json()).user;
+  assert.equal(created.email,null);assert.equal(created.isStub,true);
+  const saved=h.sqlite.prepare('SELECT is_stub,email,email_verified_at,terms_accepted_at,accepted_terms_version,accepted_privacy_version FROM users WHERE id=?').get(created.id);
+  assert.equal(saved.is_stub,1);assert.equal(saved.email,null);assert.equal(saved.email_verified_at,null);
+  assert.equal(saved.terms_accepted_at,null);assert.equal(saved.accepted_terms_version,null);
+  assert.equal(saved.accepted_privacy_version,null);
+  assert.equal(h.sqlite.prepare('SELECT COUNT(*) n FROM sessions WHERE user_id=?').get(created.id).n,0);
+  assert.equal((await h.req(path,'POST',{firstName:'Other',lastName:'Person',email:'lionaugust@icloud.com'},cookie)).status,409);
  }finally{h.sqlite.close();}
 });
