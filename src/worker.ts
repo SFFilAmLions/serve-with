@@ -281,7 +281,7 @@ async function legacyFetch(request: Request, env: Env): Promise<Response> {
         FROM event_signups s LEFT JOIN users u ON u.id=s.user_id
         LEFT JOIN user_stubs stub ON stub.id=s.user_id
         WHERE s.event_id=? AND s.deleted_at IS NULL
-        ORDER BY u.last_name,u.first_name,s.id`).bind(eventId)
+        ORDER BY COALESCE(u.last_name,stub.last_name),COALESCE(u.first_name,stub.first_name),s.id`).bind(eventId)
         .all<{first_name:string|null;last_name:string|null}>();
       return json({participants:rows.results.map(row=>({
         name:[row.first_name,row.last_name].filter(Boolean).join(' ').trim()||'Unnamed participant'
