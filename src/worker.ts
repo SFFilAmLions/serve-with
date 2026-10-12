@@ -166,6 +166,15 @@ const agreementReady = (u: UserRow, versions: {terms:string;privacy:string}|null
   Boolean(versions && u.terms_accepted_at && u.accepted_terms_version === versions.terms && u.accepted_privacy_version === versions.privacy);
 const privilegeReady = (subject: Subject, env: Env) => Boolean(subject.user.email_verified_at && profileReady(subject.user) && agreementReady(subject.user,policyVersions(env)));
 const registrationEligible = (email: string, env: Env) => allowed.has(email) || isStagingRegistrationEligible(email,env,allowed);
+async function loginEligible(email:string,env:Env,db:D1Database):Promise<boolean>{
+ if(registrationEligible(email,env))return true;
+ if(!email)return false;
+ // A verified-email claimant may use the same normal OTP flow to claim
+ // a matching unclaimed stub; names are deliberately never claim keys.
+ const stub=await db.prepare('SELECT id FROM users WHERE email=? AND is_stub=1').bind(email).first();
+ return Boolean(stub);
+}
+
 const validName = (x: unknown): x is string => typeof x === 'string' && x.trim().length >= 1 && x.trim().length <= 100;
 // Apply the minimum age at profile creation and administrator DOB corrections.
 const meetsMinimumAge = (dob: string, now = new Date()): boolean => {
@@ -512,7 +521,7 @@ async function legacyFetch(request: Request, env: Env): Promise<Response> {
         await db.batch([
           db.prepare('INSERT INTO agreement_acceptances(id,user_id,terms_version,privacy_version,accepted_at) VALUES(?,?,?,?,?)')
             .bind(id,userId,versions.terms,versions.privacy,now),
-          db.prepare('UPDATE users SET terms_accepted_at=?,accepted_terms_version=?,accepted_privacy_version=?,updated_at=? WHERE id=?')
+          db.prepare('UPDATE users SET terms_accepted_at=?,accepted_terms_version=?,accepted_privacy_version=?,updated_at=?,is_stub=0 WHERE id=?')
             .bind(now,versions.terms,versions.privacy,now,userId)
         ]);
         return json({agreementCurrent:true});
@@ -523,7 +532,7 @@ async function legacyFetch(request: Request, env: Env): Promise<Response> {
         const generic = json({ message: 'If this account is authorized, a sign-in email will arrive shortly.' });
         const now = Date.now();
         const withinRate = await withinLimits(request, db, env.AUTH_PEPPER, email || 'invalid', 'request', now);
-        if (!withinRate || !registrationEligible(email,env)) return generic;
+        if (!withinRate || !await loginEligible(email,env,db)) return generic;
         if (!env.RESEND_API_KEY || !env.AUTH_FROM_EMAIL) return json({error:'Email service unavailable'},503);
         const count = await db.prepare('SELECT COUNT(*) AS n FROM login_challenges WHERE email=? AND created_at>?').bind(email, now - 3600000).first<{ n: number }>();
         if ((count?.n || 0) >= 5) return generic;
@@ -551,7 +560,7 @@ async function legacyFetch(request: Request, env: Env): Promise<Response> {
         const submittedEmail = normalize(body.email);
         const code = typeof body.code === 'string' ? body.code : '';
         const token = typeof body.token === 'string' ? body.token : '';
-        if (isMagic ? !/^[a-f0-9]{64}$/.test(token) : (!registrationEligible(submittedEmail,env) || !/^\d{8}$/.test(code))) return error();
+        if (isMagic ? !/^[a-f0-9]{64}$/.test(token) : (!await loginEligible(submittedEmail,env,db) || !/^\d{8}$/.test(code))) return error();
         const now = Date.now();
         const hashed = await digest(isMagic ? token : submittedEmail + ':' + code, env.AUTH_PEPPER);
         // A magic link is a bearer credential: find the account by its token hash,
@@ -563,7 +572,7 @@ async function legacyFetch(request: Request, env: Env): Promise<Response> {
               .bind(submittedEmail,now).first<{ id: string; email: string; attempts: number }>();
         const email = latest?.email || submittedEmail;
         if (!await withinLimits(request, db, env.AUTH_PEPPER, email || 'invalid', 'verify', now)) return error();
-        if (!latest || !registrationEligible(email,env) || latest.attempts >= 5) return error();
+        if (!latest || !await loginEligible(email,env,db) || latest.attempts >= 5) return error();
         const row = isMagic
           ? latest
           : await db.prepare('SELECT id FROM login_challenges WHERE id=? AND code_hash=? AND consumed_at IS NULL AND expires_at>?')
@@ -575,6 +584,10 @@ async function legacyFetch(request: Request, env: Env): Promise<Response> {
         const consumed = await db.prepare('UPDATE login_challenges SET consumed_at=? WHERE id=? AND consumed_at IS NULL').bind(now,row.id).run();
         if (consumed.meta.changes !== 1) return error();
         const userId = await resolveUser(db, email, now);
+        // Verification belongs to the claimant, never the administrator who
+        // created the stub. Preserve the stable ID and existing history.
+        await db.prepare('UPDATE users SET email_verified_at=COALESCE(email_verified_at,?),updated_at=? WHERE id=?')
+          .bind(now,now,userId).run();
         const session = random();
         await db.prepare('INSERT INTO sessions(token_hash,email,user_id,expires_at,created_at) VALUES(?,?,?,?,?)')
           .bind(await digest(session, env.AUTH_PEPPER),email,userId,now+604800000,now).run();
