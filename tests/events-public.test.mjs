@@ -377,6 +377,9 @@ test('self signup API enforces identity, capacity, withdrawal history and origin
   const history=await (await h.req('/api/me/signups','GET',undefined,cookie)).json();
   assert.equal(history.signups.length,1);
   assert.equal(history.signups[0].event_id,eventId);
+  assert.equal((await h.req('/api/me/signups','POST',{},cookie)).status,405,'personal history is strictly read-only');
+  assert.equal((await h.req(rosterUrl,'POST',{},cookie)).status,405,'participant roster is strictly read-only');
+  assert.equal((await h.req(rosterUrl,'GET',undefined,cookie)).status,200,'active participant retains private roster access');
   assert.equal((await h.req(root,'DELETE',{},cookie)).status,200);
   assert.equal((await h.req(rosterUrl,'GET',undefined,cookie)).status,403);
   assert.equal((await (await h.req(root,'GET',undefined,cookie)).json()).signup,null);
