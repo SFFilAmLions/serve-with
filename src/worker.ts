@@ -491,7 +491,8 @@ async function legacyFetch(request: Request, env: Env): Promise<Response> {
       // Render the SPA for canonical deep links; retain ordinary asset handling.
       const spaRoute = request.method === 'GET' && (
         path === '/terms' || path === '/privacy' || path === '/login' || path === '/admin' || path === '/admin/events' || path === '/admin/users' ||
-        path === '/admin/events/new' || /^\/admin\/events\/[0-9a-f-]{36}\/edit$/.test(path) ||
+        path === '/admin/events/new' || path === '/admin/users/new' || path === '/admin/usage' || path === '/my-signups' ||
+        /^\/admin\/events\/[0-9a-f-]{36}(?:\/edit)?$/.test(path) ||
         /^\/users\/[0-9a-f-]{36}(?:\/edit)?$/.test(path) ||
         /^\/events\/[0-9a-f-]{36}$/.test(path)
       );
