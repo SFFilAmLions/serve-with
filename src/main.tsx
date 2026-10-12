@@ -249,6 +249,9 @@ function UsersDirectory(){
 function EventDetail({id,admin,me}:{id:string;admin:boolean;me:Me}){
  const [event,setEvent]=useState<EventRecord|null>(null),[error,setError]=useState(''),[notice,setNotice]=useState('');
  const [signup,setSignup]=useState<{id:string}|null>(null),[participants,setParticipants]=useState<{name:string}[]>([]);
+ // A pending login continuation must not POST until the authoritative
+ // per-event signup lookup finishes; otherwise existing signups race the GET.
+ const [signupLoadedFor,setSignupLoadedFor]=useState<string|null>(null);
  const [busy,setBusy]=useState(false);
  const [clockNow,setClockNow]=useState(Date.now());
  useEffect(()=>{const interval=setInterval(()=>setClockNow(Date.now()),60000);return()=>clearInterval(interval)},[]);
@@ -259,20 +262,25 @@ function EventDetail({id,admin,me}:{id:string;admin:boolean;me:Me}){
    setEvent((response.data as {event:EventRecord}).event);
    if(eligible){
      const current=await generatedApi.getMyEventSignup({id});
-     if(current.status===200){
-       const record=(current.data as {signup:{id:string}|null}).signup;
-       setSignup(record);
-       if(record){
-         const roster=await generatedApi.getEventParticipants({id});
-         setParticipants(roster.status===200?(roster.data as {participants:{name:string}[]}).participants:[]);
-       }else setParticipants([]);
-     }
+     if(current.status!==200)throw Error('Unable to check your current signup');
+     const record=(current.data as {signup:{id:string}|null}).signup;
+     setSignup(record);
+     setSignupLoadedFor(id);
+     if(record){
+       const roster=await generatedApi.getEventParticipants({id});
+       setParticipants(roster.status===200?(roster.data as {participants:{name:string}[]}).participants:[]);
+     }else setParticipants([]);
+   }else{
+     setSignup(null);
+     setParticipants([]);
    }
  };
- useEffect(()=>{let active=true;setError('');void refresh().catch(e=>{if(active)setError(e instanceof Error?e.message:'Unable to load event')});return()=>{active=false}},[id,eligible]);
+ useEffect(()=>{let active=true;setSignupLoadedFor(null);setError('');void refresh().catch(e=>{if(active)setError(e instanceof Error?e.message:'Unable to load event')});return()=>{active=false}},[id,eligible]);
  const act=async(action:'signup'|'withdraw')=>{
-   if(!me.authenticated){localStorage.setItem('servewith-pending-signup',JSON.stringify({id,expiresAt:Date.now()+3600000}));go('/login');return;}
-   if(!eligible){go('/login');return;}
+   if(!eligible){
+     if(action==='signup')localStorage.setItem('servewith-pending-signup',JSON.stringify({id,expiresAt:Date.now()+3600000}));
+     go('/login');return;
+   }
    if(busy)return;
    setBusy(true);setError('');setNotice('');
    try {
@@ -287,7 +295,7 @@ function EventDetail({id,admin,me}:{id:string;admin:boolean;me:Me}){
    finally{setBusy(false);}
  };
  useEffect(()=>{
-  if(!eligible||!event)return;
+  if(!eligible||!event||event.id!==id||signupLoadedFor!==id)return;
   const raw=localStorage.getItem('servewith-pending-signup');
   if(!raw)return;
   try{
@@ -297,9 +305,10 @@ function EventDetail({id,admin,me}:{id:string;admin:boolean;me:Me}){
    localStorage.removeItem('servewith-pending-signup');
    if(event.start_at<=Date.now()){setError('Signups closed when the event started.');return;}
    if(event.spots_available===0){setError('This event is full.');return;}
-   if(!signup)void act('signup');
+   if(signup){setNotice('You are already signed up for this event.');return;}
+   void act('signup');
   }catch{localStorage.removeItem('servewith-pending-signup');}
- },[id,eligible,event?.id]);
+ },[id,eligible,event?.id,signupLoadedFor,signup?.id]);
  if(error&&!event)return <Alert severity="error" role="alert">{error}</Alert>;
  if(!event)return <Skeleton height={200}/>;
  const closed=Date.now()>=event.start_at;
