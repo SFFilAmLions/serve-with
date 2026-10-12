@@ -21,3 +21,17 @@ BEGIN SELECT RAISE(ABORT,'Email belongs to registered account'); END;
 CREATE TRIGGER users_no_other_stub_email BEFORE INSERT ON users
 WHEN EXISTS(SELECT 1 FROM user_stubs WHERE email=NEW.email AND id!=NEW.id)
 BEGIN SELECT RAISE(ABORT,'Email belongs to another stub identity'); END;
+
+-- Email ownership must also remain collision-safe during later profile edits
+-- and administrative stub email additions, not just initial INSERT.
+CREATE TRIGGER stubs_no_registered_email_update BEFORE UPDATE OF email ON user_stubs
+WHEN NEW.email IS NOT NULL AND EXISTS(
+ SELECT 1 FROM users WHERE email=NEW.email AND id!=NEW.id
+)
+BEGIN SELECT RAISE(ABORT,'Email belongs to registered account'); END;
+
+CREATE TRIGGER users_no_other_stub_email_update BEFORE UPDATE OF email ON users
+WHEN EXISTS(
+ SELECT 1 FROM user_stubs WHERE email=NEW.email AND id!=NEW.id AND claimed_at IS NULL
+)
+BEGIN SELECT RAISE(ABORT,'Email belongs to another stub identity'); END;
