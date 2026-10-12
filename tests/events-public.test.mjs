@@ -481,6 +481,8 @@ test('admin creates email-optional unverified user without consent or login',asy
   assert.equal(h.sqlite.prepare('SELECT COUNT(*) n FROM user_stubs WHERE email=?').get('test-claim@example.org').n,1);
   assert.equal(h.sqlite.prepare('SELECT id FROM user_stubs WHERE email=?').get('test-claim@example.org').id,firstId);
   assert.equal(h.sqlite.prepare('SELECT COUNT(*) n FROM agreement_acceptances WHERE user_id=?').get(firstId).n,0,'admin-created identity must not inherit consent');
+  assert.equal(h.sqlite.prepare('SELECT COUNT(*) n FROM sessions WHERE user_id=?').get(firstId).n,0,'stub identity must not grant a login session');
+  assert.equal(h.sqlite.prepare('SELECT COUNT(*) n FROM users WHERE id=?').get(firstId).n,0,'stub identity must not silently become verified');
  }finally{h.sqlite.close();}
 });
 
