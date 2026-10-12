@@ -610,5 +610,9 @@ test('verified-email claim migration preserves stub signup identity and rejects 
   assert.equal(h.sqlite.prepare('SELECT COUNT(*) n FROM agreement_acceptances WHERE user_id=?').get(stubId).n,0,'email claiming alone cannot imply agreement consent');
   assert.equal(h.sqlite.prepare('SELECT claimed_at FROM user_stubs WHERE id=?').get(stubId).claimed_at,now+1);
   assert.equal(h.sqlite.prepare('SELECT COUNT(*) n FROM participation_identities WHERE id=?').get(stubId).n,1);
+  assert.throws(()=>h.sqlite.prepare('UPDATE event_signups SET user_id=? WHERE id=?')
+   .run('11111111-1111-4111-8111-111111111111','pre-claim-signup'),/Signup identity and creation time are immutable/,'identity claim cannot transfer historical signups');
+  assert.equal(h.sqlite.prepare('SELECT COUNT(*) n FROM sessions WHERE user_id=?').get(stubId).n,0,'database claim is not an automatic session grant');
+  assert.equal(h.sqlite.prepare('SELECT terms_accepted_at FROM users WHERE id=?').get(stubId).terms_accepted_at,null,'claim does not forge user consent');
  }finally{h.sqlite.close()}
 });
