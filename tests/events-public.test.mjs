@@ -382,6 +382,7 @@ test('self signup API enforces identity, capacity, withdrawal history and origin
   assert.equal((await h.req(rosterUrl,'GET',undefined,cookie)).status,200,'active participant retains private roster access');
   assert.equal((await h.req(root,'DELETE',{},cookie)).status,200);
   assert.equal((await h.req(rosterUrl,'GET',undefined,cookie)).status,403);
+  assert.equal((await h.req('/api/me/signups','GET',undefined,cookie)).status,200,'withdrawn attendee can still inspect own history');
   assert.equal((await (await h.req(root,'GET',undefined,cookie)).json()).signup,null);
   assert.equal((await h.req(root,'POST',{},cookie)).status,201);
   assert.equal(h.sqlite.prepare('SELECT COUNT(*) n FROM event_signups WHERE event_id=?').get(eventId).n,2);
