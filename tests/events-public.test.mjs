@@ -391,7 +391,7 @@ test('admin delegated signup allows explicit attendee selection and preserves hi
   const eventId='123e4567-e89b-42d3-a456-426614174989', now=Date.now();
   h.insert(eventId,now+300000,now+600000);
   const targetId='22222222-2222-4222-8222-222222222222';
-  h.sqlite.prepare('INSERT INTO users(id,email,first_name,last_name,created_at,updated_at) VALUES(?,?,?,?,?,?)')
+  h.sqlite.prepare('INSERT INTO users(id,email,first_name,last_name,created_at,updated_at,is_stub) VALUES(?,?,?,?,?,?,1)')
    .run(targetId,'attendee@example.org','Alex','Volunteer',1,1);
   const path='/api/admin/events/'+eventId+'/signups';
   assert.equal((await h.req(path,'GET')).status,401);
