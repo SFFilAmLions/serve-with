@@ -5,7 +5,7 @@ import ts from 'typescript';
 const source=readFileSync('src/event-form.ts','utf8');
 const output=ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText;
 const {validateDraft,emptyDraft,localInput,timeZones}=await import('data:text/javascript;base64,'+Buffer.from(output).toString('base64'));
-const valid={title:'Community cleanup',location:'San Francisco',timezone:'America/Los_Angeles',start:'2026-11-14T09:00',end:'2026-11-14T12:00'};
+const valid={title:'Community cleanup',location:'San Francisco',timezone:'America/Los_Angeles',start:'2026-11-14T09:00',end:'2026-11-14T12:00',capacity:null};
 test('editor defaults and Pacific zone are available',()=>{assert.equal(emptyDraft().timezone,'America/Los_Angeles');assert.ok(timeZones.includes('America/Los_Angeles'));assert.deepEqual(validateDraft(valid),{});});
 test('invalid names, locations, time zones and intervals are rejected',()=>{
  for(const [name,draft] of Object.entries({title:{...valid,title:' '},location:{...valid,location:' '},timezone:{...valid,timezone:'invalid/zone'},start:{...valid,start:'nope'},end:{...valid,end:valid.start}})) assert.ok(validateDraft(draft)[name],name);
@@ -17,4 +17,10 @@ test('cross-midnight events and different IANA zones format correctly',()=>{
  const instant=Date.UTC(2026,10,14,17,0);
  assert.equal(localInput(instant,'America/Los_Angeles'),'2026-11-14T09:00');
  assert.equal(localInput(instant,'America/New_York'),'2026-11-14T12:00');
+});
+
+test('optional capacity accepts unlimited, zero and finite seats but rejects invalid numbers',()=>{
+ assert.equal(emptyDraft().capacity,null);
+ for(const capacity of [null,0,1,30]) assert.deepEqual(validateDraft({...valid,capacity}),{},String(capacity));
+ for(const capacity of [-1,0.5,NaN,Infinity,Number.MAX_SAFE_INTEGER+1]) assert.ok(validateDraft({...valid,capacity}).capacity,String(capacity));
 });
