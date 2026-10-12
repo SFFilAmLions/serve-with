@@ -84,3 +84,15 @@ test('administrative OpenAPI endpoints explicitly require session authentication
   }
  }
 });
+
+
+test('private attendee and user API operations explicitly declare session-cookie security', () => {
+ const privatePaths=['/api/users/{id}','/api/me/signups','/api/events/{id}/signups','/api/events/{id}/participants'];
+ for(const path of privatePaths){
+  assert.ok(spec.paths[path],path+' must be documented');
+  for(const [method,op] of Object.entries(spec.paths[path])){
+   if(!['get','post','put','patch','delete'].includes(method))continue;
+   assert.deepEqual(op.security,[{SessionCookie:[]}],method.toUpperCase()+' '+path+' must require a session');
+  }
+ }
+});
