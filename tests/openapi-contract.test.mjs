@@ -72,3 +72,15 @@ test('generated browser client sends same-origin JSON mutation and captures type
   assert.equal(JSON.parse(seen.init.body).title,'Test');
   assert.equal(result.status,201);
 });
+
+
+test('administrative OpenAPI endpoints explicitly require session authentication', () => {
+ const methods=new Set(['get','post','put','patch','delete']);
+ for(const [path,item] of Object.entries(spec.paths)){
+  if(!path.startsWith('/api/admin/'))continue;
+  for(const [method,operation] of Object.entries(item)){
+   if(!methods.has(method))continue;
+   assert.deepEqual(operation.security,[{SessionCookie:[]}],method.toUpperCase()+' '+path+' must not be public');
+  }
+ }
+});
