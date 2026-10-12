@@ -90,14 +90,15 @@ test('incomplete verified profile stays on the login flow without policy fabrica
  }finally{await browser.close()}
 });
 
-test('administrator workspace has Events and Users tabs and separate appearance choices',async()=>{
+test('administrator workspace has segmented Events, Users, Usage pills and separate appearance choices',async()=>{
  const {browser,page}=await context(admin);
  try{
   await page.goto(base);
   await page.getByRole('button',{name:'Admin view'}).click();
-  await page.getByText('Administrator',{exact:true}).first().waitFor();
-  await page.getByRole('tab',{name:'Events',exact:true}).waitFor();
-  await page.getByRole('tab',{name:'Users',exact:true}).waitFor();
+  await page.getByText('· Admin',{exact:true}).first().waitFor();
+  await page.getByRole('button',{name:'Events',exact:true}).waitFor();
+  await page.getByRole('button',{name:'Users',exact:true}).waitFor();
+  await page.getByRole('button',{name:'Usage',exact:true}).waitFor();
   await page.getByRole('button',{name:'Appearance'}).click();
   await page.getByRole('menuitem',{name:'Dark'}).click();
   assert.equal(await page.evaluate(()=>localStorage.getItem('servewith-appearance')),'dark');
