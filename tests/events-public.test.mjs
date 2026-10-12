@@ -503,8 +503,8 @@ test('admin event capacity edits retain unlimited, reject overfull and stale ver
   const reduced=await update(0,2);
   assert.equal(reduced.status,409,'active signups prevent lowering capacity below occupancy');
   assert.ok((await reduced.json()).fields.capacity);
-  assert.deepEqual(h.sqlite.prepare('SELECT capacity,version FROM events WHERE id=?').get(id),{capacity:1,version:2});
+  assert.deepEqual({...h.sqlite.prepare('SELECT capacity,version FROM events WHERE id=?').get(id)},{capacity:1,version:2});
   assert.equal((await update(null,2)).status,200,'unlimited capacity remains supported');
-  assert.deepEqual(h.sqlite.prepare('SELECT capacity,version FROM events WHERE id=?').get(id),{capacity:null,version:3});
+  assert.deepEqual({...h.sqlite.prepare('SELECT capacity,version FROM events WHERE id=?').get(id)},{capacity:null,version:3});
  }finally{h.sqlite.close();}
 });
