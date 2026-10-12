@@ -82,7 +82,7 @@ test('public events include in-progress, hide deleted, sort deterministically an
     assert.deepEqual(upcoming.events.map(e=>e.id),['current','future-a','future-b']);
     assert.deepEqual(past.events.map(e=>e.id),['boundary','past']);
     assert.equal(upcoming.events[0].version,1);
-    assert.deepEqual(Object.keys(upcoming.events[0]).sort(),['end_at','id','location','start_at','timezone','title','version']);
+    assert.deepEqual(Object.keys(upcoming.events[0]).sort(),['capacity','end_at','id','location','signups_count','spots_available','start_at','timezone','title','version']);
   }finally{h.sqlite.close();}
 });
 
