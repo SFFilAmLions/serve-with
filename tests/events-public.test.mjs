@@ -418,6 +418,8 @@ test('admin delegated signup allows explicit attendee selection and preserves hi
   const cookie='__Host-sw_session='+token;
   assert.equal((await h.req(path,'POST',{userId:targetId},cookie)).status,201);
   assert.equal((await h.req(path,'POST',{userId:targetId},cookie)).status,409);
+  assert.equal((await h.req(path,'POST',{userId:'not-a-uuid'},cookie)).status,422,'reject malformed delegated attendee IDs');
+  assert.equal((await h.req(path,'POST',{userId:'44444444-4444-4444-8444-444444444444'},cookie)).status,404,'reject absent delegated attendee IDs');
   const roster=await (await h.req(path,'GET',undefined,cookie)).json();
   assert.equal(roster.signups.length,1);
   assert.equal(roster.signups[0].email,'attendee@example.org');
