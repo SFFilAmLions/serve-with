@@ -38,6 +38,11 @@ for (const [path, item] of Object.entries(api.paths)) {
       throw new Error('Protected operation must explicitly require SessionCookie: '+method.toUpperCase()+' '+path);
     }
     if (!Object.keys(operation.responses ?? {}).length) throw new Error('Missing responses for '+operation.operationId);
+    for (const [status,response] of Object.entries(operation.responses)) {
+      if (!/^(?:[1-5][0-9]{2}|default)$/.test(status)) throw new Error('Invalid HTTP response status '+status+' for '+operation.operationId);
+      if (!response || typeof response.description !== 'string' || !response.description.trim())
+        throw new Error('Missing HTTP response description '+status+' for '+operation.operationId);
+    }
     for (const requirement of operation.security ?? api.security ?? []) {
       for (const scheme of Object.keys(requirement)) if (!knownSchemes.has(scheme)) throw new Error('Unknown security scheme: '+scheme);
     }
