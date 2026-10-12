@@ -318,6 +318,19 @@ async function legacyFetch(request: Request, env: Env): Promise<Response> {
       if (!subject.admin) return json({ error: 'Forbidden' }, 403);
       if (!privilegeReady(subject,env)) return json({ error: 'Profile or current agreement required', code: 'account_completion_required' }, 403);
       const email = subject.user.email;
+      if(path==='/api/admin/usage'){
+        if(request.method!=='GET')return json({error:'Method not allowed'},405);
+        // No analytics credential exists within the approved scope. Do not
+        // reuse transactional Resend keys or invent limits/usage values.
+        const environment=env.ENVIRONMENT==='production'?'production':env.ENVIRONMENT==='staging'?'staging':'unknown';
+        const providers=['Cloudflare Workers','Cloudflare D1','Resend','Turnstile'];
+        return json({environment,collectedAt:new Date().toISOString(),providers:providers.map(name=>({
+          name,scope:name==='Resend'?'account':'unverified',status:'unavailable',
+          used:null,limit:null,remaining:null,resetsAt:null,
+          reason:'Analytics permissions and resource scope have not been verified'
+        }))});
+      }
+
       const adminSignupMatch=path.match(/^\/api\/admin\/events\/([0-9a-f-]{36})\/signups$/);
       if (adminSignupMatch) {
         const eventId=adminSignupMatch[1],db=env.AUTH_DB,now=Date.now();
