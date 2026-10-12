@@ -96,3 +96,13 @@ test('private attendee and user API operations explicitly declare session-cookie
   }
  }
 });
+
+
+test('event creation and editing contracts preserve optional capacity semantics',()=>{
+ const create=spec.components.schemas.EventCreateInput.properties.capacity;
+ const update=spec.paths['/api/admin/events/{id}'].put.requestBody.content['application/json'].schema.properties.capacity;
+ for(const [kind,value] of [['create',create],['update',update]]){
+  assert.deepEqual(value.type,['integer','null'],kind+' must distinguish unlimited and finite capacity');
+  assert.equal(value.minimum,0,kind+' cannot allow a negative capacity');
+ }
+});
