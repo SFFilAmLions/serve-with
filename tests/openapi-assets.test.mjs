@@ -12,7 +12,7 @@ test('generated public OpenAPI is exactly the authoritative YAML contract',()=>{
  assert.deepEqual(json,yaml);
  assert.ok(Object.keys(json.paths).length>=10,'All current APIs must be documented');
  const ops=Object.values(json.paths).flatMap(p=>Object.values(p).filter(v=>v?.operationId));
- assert.equal(ops.length,25,'Existing endpoints plus SDDW-006 attendee and admin signup operations should be inventoried');
+ assert.equal(ops.length,26,'Existing endpoints plus signups and usage operations should be inventoried');
 });
 test('Scalar documentation references only the deployed same-origin JSON endpoint',()=>{
  const html=readFileSync('public/api/docs/index.html','utf8');
