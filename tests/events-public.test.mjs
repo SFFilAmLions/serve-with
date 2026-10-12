@@ -385,6 +385,7 @@ test('self signup API enforces identity, capacity, withdrawal history and origin
   assert.equal(h.sqlite.prepare('SELECT COUNT(*) n FROM event_signups WHERE event_id=? AND deleted_at IS NULL').get(eventId).n,1);
   h.sqlite.prepare('UPDATE events SET start_at=? WHERE id=?').run(Date.now()-1000,eventId);
   assert.equal((await h.req(root,'DELETE',{},cookie)).status,409);
+  assert.equal((await h.req(root,'POST',{},cookie)).status,409,'event-start cutoff also prevents new attendee signup');
   assert.equal(h.sqlite.prepare('SELECT COUNT(*) n FROM event_signups WHERE event_id=? AND deleted_at IS NULL').get(eventId).n,1);
  }finally{h.sqlite.close();}
 });
