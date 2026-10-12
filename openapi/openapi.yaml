@@ -51,6 +51,18 @@ components:
           description: Unix epoch milliseconds
         version:
           type: integer
+        capacity:
+          type: [integer, 'null']
+          minimum: 0
+          description: Null means unlimited
+        signups_count:
+          type: integer
+          minimum: 0
+          description: Number of active signups; contains no participant identities
+        spots_available:
+          type: [integer, 'null']
+          minimum: 0
+          description: Null means unlimited
     EventCreateInput:
       type: object
       additionalProperties: false
