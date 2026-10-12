@@ -80,3 +80,13 @@ CREATE TRIGGER event_signups_withdrawn_immutable
 BEFORE UPDATE OF deleted_at ON event_signups
 WHEN OLD.deleted_at IS NOT NULL AND NEW.deleted_at IS NOT OLD.deleted_at
 BEGIN SELECT RAISE(ABORT, 'Withdrawal history is immutable'); END;
+
+-- A signup is an append-only identity/event association. Neither an admin
+-- operation nor a later identity claim may reassign or backdate the record.
+-- Withdrawals only set deleted_at and preserve this original audit history.
+CREATE TRIGGER event_signups_identity_immutable
+BEFORE UPDATE OF event_id,user_id,created_at ON event_signups
+WHEN NEW.event_id IS NOT OLD.event_id
+  OR NEW.user_id IS NOT OLD.user_id
+  OR NEW.created_at IS NOT OLD.created_at
+BEGIN SELECT RAISE(ABORT, 'Signup identity and creation time are immutable'); END;
