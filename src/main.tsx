@@ -322,7 +322,7 @@ function EventDetail({id,admin,me}:{id:string;admin:boolean;me:Me}){
   {signup&&<Box><Typography variant="h6">Participants</Typography>
    {participants.map((participant,index)=><Typography key={index}>{participant.name}</Typography>)}
   </Box>}
-  {admin&&<Button onClick={()=>go('/admin/events/'+id+'/edit')}>Edit event</Button>}
+  
  </Stack>;
 }
 
@@ -398,6 +398,56 @@ function AgreementCompletion({me,refresh}:{me:Me;refresh:()=>Promise<void>}) {
  </Stack>;
 }
 
+function AdminEventSignups({id}:{id:string}){
+ const [entries,setEntries]=useState<{id:string;user_id:string;first_name:string|null;last_name:string|null;email:string|null;created_at:number;deleted_at:number|null}[]>([]);
+ const [query,setQuery]=useState(''),[people,setPeople]=useState<{id:string;first_name:string|null;last_name:string|null;email:string|null}[]>([]);
+ const [selected,setSelected]=useState(''),[error,setError]=useState(''),[notice,setNotice]=useState(''),[busy,setBusy]=useState(false);
+ const load=async()=>{
+  const result=await generatedApi.listAdminEventSignups({id});
+  if(result.status!==200)throw Error((result.data as {error?:string}).error||'Unable to load roster');
+  setEntries((result.data as {signups:typeof entries}).signups);
+ };
+ useEffect(()=>{void load().catch(e=>setError(e instanceof Error?e.message:'Unable to load roster'))},[id]);
+ const search=async()=>{
+  setError('');
+  try{const result=await requestJson('/api/admin/users?q='+encodeURIComponent(query));setPeople(result.users);}
+  catch(e){setError(e instanceof Error?e.message:'Unable to find users');}
+ };
+ const act=async(kind:'signup'|'withdraw',userId:string)=>{
+  if(busy)return;setBusy(true);setError('');setNotice('');
+  try{
+   const response=kind==='signup'?await generatedApi.adminSignUpAttendee({id,body:{userId}})
+     :await generatedApi.adminWithdrawAttendee({id,body:{userId}});
+   if(response.status!==201&&response.status!==200)throw Error((response.data as {error?:string}).error||'Signup update failed');
+   await load();setNotice(kind==='signup'?'Attendee signed up':'Attendee withdrawn');
+  }catch(e){setError(e instanceof Error?e.message:'Signup update failed');}finally{setBusy(false);}
+ };
+ return <Stack spacing={2} sx={{my:4}}>
+  <Button sx={{alignSelf:'flex-start'}} onClick={()=>go('/admin/events')}>Back to admin events</Button>
+  <Typography variant="h4">Manage event signups</Typography>
+  {error&&<Alert severity="error" role="alert">{error}</Alert>}
+  {notice&&<Alert severity="success" role="status">{notice}</Alert>}
+  <Typography variant="h6">Add an attendee</Typography>
+  <Stack direction={{xs:'column',sm:'row'}} spacing={1}>
+   <TextField size="small" label="Search attendees by name or email" value={query} onChange={e=>setQuery(e.target.value)}/>
+   <Button onClick={()=>void search()}>Search users</Button>
+  </Stack>
+  {people.length>0&&<Autocomplete options={people} value={people.find(p=>p.id===selected)||null}
+    getOptionLabel={p=>[p.first_name,p.last_name].filter(Boolean).join(' ')||p.email||'Unnamed user'}
+    onChange={(_,p)=>setSelected(p?.id||'')}
+    renderInput={params=><TextField {...params} label="Select attendee"/>}/>}
+  <Button variant="contained" sx={{alignSelf:'flex-start'}} disabled={!selected||busy} onClick={()=>void act('signup',selected)}>Confirm signup</Button>
+  <Typography variant="h6">Roster and history</Typography>
+  {entries.length===0?<Typography>No signups yet.</Typography>:entries.map(entry=><Card key={entry.id} variant="outlined"><CardContent>
+   <Typography>{[entry.first_name,entry.last_name].filter(Boolean).join(' ')||'Unnamed attendee'}</Typography>
+   <Typography variant="body2" color="text.secondary">{entry.email||'No email'} · {entry.deleted_at===null?'Active':'Withdrawn'}</Typography>
+   <Typography variant="body2" color="text.secondary">Added {new Date(entry.created_at).toLocaleString()}</Typography>
+   {entry.deleted_at!==null&&<Typography variant="body2">Withdrawn {new Date(entry.deleted_at).toLocaleString()}</Typography>}
+   {entry.deleted_at===null&&<Button color="error" disabled={busy} onClick={()=>void act('withdraw',entry.user_id)}>Withdraw attendee</Button>}
+  </CardContent></Card>)}
+ </Stack>;
+}
+
 function MySignups({me}:{me:Me}){
  const [items,setItems]=useState<{id:string;event_id:string;created_at:number;deleted_at:number|null;title:string;start_at:number;end_at:number}[]>([]);
  const [error,setError]=useState(''),[loading,setLoading]=useState(true);
@@ -445,10 +495,11 @@ function RoutedApp(){
  },[me.authenticated,me.profileComplete,me.agreementCurrent,path]);
  const userRoute=path.match(/^\/users\/([0-9a-f-]{36})(\/edit)?$/);
  const eventRoute=path.match(/^\/events\/([0-9a-f-]{36})$/);
+ const adminEventRoute=path.match(/^\/admin\/events\/([0-9a-f-]{36})$/);
  const editRoute=path.match(/^\/admin\/events\/([0-9a-f-]{36})\/edit$/);
 
  return <ThemeProvider theme={theme}><CssBaseline/><AppBar position="static" color="default" elevation={0} sx={{borderBottom:1,borderColor:'divider'}}><Container maxWidth="lg"><Stack direction="row" alignItems="center" spacing={1} sx={{py:1}}><Box component="img" src="/club-logo.png" alt="SF Fil-Am Lions logo" sx={{width:40,height:40}}/><Button color="inherit" onClick={()=>go('/')} sx={{fontWeight:700}}>Serve With Lions</Button>{admin&&<Chip size="small" color="primary" variant="outlined" label="Administrator"/>}<Box sx={{flexGrow:1}}/>{canAdmin&&<Button size="small" color="inherit" startIcon={<Glyph type="swap"/>} sx={{display:{xs:'none',md:'inline-flex'}}} onClick={()=>go(admin?'/':'/admin/events')}>{admin?'Attendee':'Admin'} view</Button>}<Tooltip title="Appearance"><IconButton color="inherit" aria-label="Appearance" onClick={e=>setAppearanceAnchor(e.currentTarget)}><Glyph type={appearance==='dark'?'moon':appearance==='light'?'sun':'system'}/></IconButton></Tooltip><Menu anchorEl={appearanceAnchor} open={!!appearanceAnchor} onClose={()=>setAppearanceAnchor(null)}>{(['light','dark','system'] as const).map(mode=><MenuItem key={mode} selected={appearance===mode} onClick={()=>{setAppearance(mode);localStorage.setItem('servewith-appearance',mode);setAppearanceAnchor(null)}}><Box sx={{mr:1.5}}><Glyph type={mode==='light'?'sun':mode==='dark'?'moon':'system'}/></Box>{mode[0].toUpperCase()+mode.slice(1)}</MenuItem>)}</Menu><Button size="small" color="inherit" onClick={e=>setAnchor(e.currentTarget)} aria-label="Account menu" startIcon={<AccountAvatar email={me.authenticated?me.email:undefined} name={me.firstName||undefined}/>}>{me.authenticated?<Box sx={{display:{xs:'none',sm:'block'}}}>{me.firstName||'Account'}</Box>:<Box sx={{display:{xs:'none',sm:'block'}}}>Sign in</Box>}</Button><Menu anchorEl={anchor} open={!!anchor} onClose={()=>setAnchor(null)}>{me.authenticated&&<MenuItem onClick={()=>{setAnchor(null);go('/users/'+me.userId)}}><Box sx={{mr:1.5}}><Glyph type="person"/></Box>My Profile</MenuItem>}{me.authenticated&&<MenuItem onClick={()=>{setAnchor(null);go('/my-signups')}}>My signups</MenuItem>}{canAdmin&&<Box sx={{display:{xs:'block',md:'none'}}}><MenuItem onClick={()=>{setAnchor(null);go(admin?'/':'/admin/events')}}><Box sx={{mr:1.5}}><Glyph type="swap"/></Box>{admin?'Attendee workspace':'Administrator workspace'}</MenuItem></Box>}{me.authenticated?<MenuItem onClick={()=>{setAnchor(null);void api('logout',{}).then(refresh).then(()=>go('/'))}}><Box sx={{mr:1.5}}><Glyph type="logout"/></Box>Sign out</MenuItem>:<MenuItem onClick={()=>{setAnchor(null);go('/login')}}><Box sx={{mr:1.5}}><Glyph type="login"/></Box>Sign in</MenuItem>}</Menu></Stack>{admin&&canAdmin&&<Tabs value={path.startsWith('/admin/users')?'users':'events'} onChange={(_,v)=>go(v==='users'?'/admin/users':'/admin/events')} indicatorColor="primary"><Tab label="Events" value="events"/><Tab label="Users" value="users"/></Tabs>}</Container></AppBar>
- <Container maxWidth="lg" component="main">{path==='/terms'?<PolicyPage kind="terms"/>:path==='/privacy'?<PolicyPage kind="privacy"/>:path==='/login'?<AuthScreen me={me} refresh={refresh}/>:path==='/admin/events/new'&&canAdmin?<EventPageEditor/>:editRoute&&canAdmin?<EventPageEditor id={editRoute[1]}/>:userRoute?<UserView key={path} id={userRoute[1]} edit={!!userRoute[2]}/>:eventRoute?<EventDetail id={eventRoute[1]} admin={canAdmin} me={me}/>:path==='/admin/users'&&canAdmin?<UsersDirectory/>:path==='/my-signups'?<MySignups me={me}/>:path.startsWith('/admin')&&!canAdmin?<Alert severity="warning" sx={{mt:3}}>Complete your profile and current agreement to access administrator tools. <Button onClick={()=>go('/login')}>Account setup</Button></Alert>:<><Typography variant="h4" sx={{mt:4}}>{admin?'Manage events':'Serve With SF Fil-Am Lions'}</Typography><EventList admin={canAdmin&&admin}/></>}<BuildFooter/></Container></ThemeProvider>;
+ <Container maxWidth="lg" component="main">{path==='/terms'?<PolicyPage kind="terms"/>:path==='/privacy'?<PolicyPage kind="privacy"/>:path==='/login'?<AuthScreen me={me} refresh={refresh}/>:path==='/admin/events/new'&&canAdmin?<EventPageEditor/>:editRoute&&canAdmin?<EventPageEditor id={editRoute[1]}/>:adminEventRoute&&canAdmin?<AdminEventSignups id={adminEventRoute[1]}/>:userRoute?<UserView key={path} id={userRoute[1]} edit={!!userRoute[2]}/>:eventRoute?<EventDetail id={eventRoute[1]} admin={canAdmin} me={me}/>:path==='/admin/users'&&canAdmin?<UsersDirectory/>:path==='/my-signups'?<MySignups me={me}/>:path.startsWith('/admin')&&!canAdmin?<Alert severity="warning" sx={{mt:3}}>Complete your profile and current agreement to access administrator tools. <Button onClick={()=>go('/login')}>Account setup</Button></Alert>:<><Typography variant="h4" sx={{mt:4}}>{admin?'Manage events':'Serve With SF Fil-Am Lions'}</Typography><EventList admin={canAdmin&&admin}/></>}<BuildFooter/></Container></ThemeProvider>;
 }
 
 createRoot(document.getElementById('app')!).render(<RoutedApp/>);
