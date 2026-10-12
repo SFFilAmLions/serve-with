@@ -45,7 +45,11 @@ function harness() {
       first: async () => statement.get(...args) || null,
       run: async () => ({ meta: { changes: Number(statement.run(...args).changes) } })
     }; }
-  }; } };
+  }; }, batch:async(statements)=>{
+    sqlite.exec('BEGIN');
+    try{for(const stmt of statements)await stmt.run();sqlite.exec('COMMIT');}
+    catch(e){sqlite.exec('ROLLBACK');throw e;}
+  } };
   const req = (path, method='GET', body, cookie) => worker.fetch(new Request('https://servewith-beta.sffilamlions.org' + path,{
     method, headers:{ origin:'https://servewith-beta.sffilamlions.org', 'content-type':'application/json', ...(cookie ? {cookie}:{}) },
     ...(body ? {body:JSON.stringify(body)}:{})
