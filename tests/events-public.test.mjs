@@ -33,6 +33,7 @@ function harness() {
   sqlite.exec(readFileSync('migrations/0001_auth.sql','utf8'));
   sqlite.exec(readFileSync('migrations/0003_events.sql','utf8'));
   sqlite.exec(readFileSync('migrations/0004_users_and_agreements.sql','utf8'));
+  sqlite.exec(readFileSync('migrations/0005_event_signups.sql','utf8'));
   const versionTerms=JSON.parse(readFileSync('src/generated/policy-versions.json','utf8')).terms.version, versionPrivacy=JSON.parse(readFileSync('src/generated/policy-versions.json','utf8')).privacy.version;
   // Event regressions retain an already-completed authorized administrator session.
   sqlite.prepare('INSERT INTO users(id,email,first_name,last_name,date_of_birth,email_verified_at,created_at,updated_at,terms_accepted_at,accepted_terms_version,accepted_privacy_version) VALUES(?,?,?,?,?,?,?,?,?,?,?)')
@@ -339,4 +340,35 @@ test('generated OpenAPI dispatcher delegates to actual Worker without bypassing 
     assert.equal((await created.json()).event.title,'Service');
     assert.equal(h.sqlite.prepare('SELECT COUNT(*) n FROM events').get().n,1);
   } finally {h.sqlite.close();}
+});
+
+test('self signup API enforces identity, capacity, withdrawal history and origin using real Worker',async()=>{
+ const h=harness();
+ try {
+  const eventId='123e4567-e89b-42d3-a456-426614174987',now=Date.now();
+  h.insert(eventId,now+300000,now+600000);
+  h.sqlite.prepare('UPDATE events SET capacity=1 WHERE id=?').run(eventId);
+  const root='/api/events/'+eventId+'/signups';
+  assert.equal((await h.req(root,'POST',{})).status,401);
+  const session='9'.repeat(64);
+  const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode('test:'+session))),b=>b.toString(16).padStart(2,'0')).join('');
+  h.sqlite.prepare('INSERT INTO sessions(token_hash,email,expires_at,created_at) VALUES(?,?,?,?)')
+   .run(hash,'lionaugust@icloud.com',now+600000,now);
+  const cookie='__Host-sw_session='+session;
+  assert.equal((await h.req(root,'POST',{},cookie)).status,201);
+  assert.equal((await h.req(root,'POST',{},cookie)).status,409);
+  const own=await (await h.req(root,'GET',undefined,cookie)).json();
+  assert.ok(own.signup.id);
+  const history=await (await h.req('/api/me/signups','GET',undefined,cookie)).json();
+  assert.equal(history.signups.length,1);
+  assert.equal(history.signups[0].event_id,eventId);
+  assert.equal((await h.req(root,'DELETE',{},cookie)).status,200);
+  assert.equal((await (await h.req(root,'GET',undefined,cookie)).json()).signup,null);
+  assert.equal((await h.req(root,'POST',{},cookie)).status,201);
+  assert.equal(h.sqlite.prepare('SELECT COUNT(*) n FROM event_signups WHERE event_id=?').get(eventId).n,2);
+  assert.equal(h.sqlite.prepare('SELECT COUNT(*) n FROM event_signups WHERE event_id=? AND deleted_at IS NULL').get(eventId).n,1);
+  h.sqlite.prepare('UPDATE events SET start_at=? WHERE id=?').run(Date.now()-1000,eventId);
+  assert.equal((await h.req(root,'DELETE',{},cookie)).status,409);
+  assert.equal(h.sqlite.prepare('SELECT COUNT(*) n FROM event_signups WHERE event_id=? AND deleted_at IS NULL').get(eventId).n,1);
+ }finally{h.sqlite.close();}
 });
