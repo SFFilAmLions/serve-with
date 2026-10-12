@@ -33,8 +33,9 @@ for (const [path, item] of Object.entries(api.paths)) {
     for (const parameter of [...(item.parameters ?? []), ...(operation.parameters ?? [])]) {
       if (parameter.in === 'path' && parameter.required !== true) throw new Error('Path parameter must be required: '+parameter.name);
     }
-    if (path.startsWith('/api/admin/') && JSON.stringify(operation.security) !== JSON.stringify([{SessionCookie:[]}])) {
-      throw new Error('Admin operation must explicitly require SessionCookie: '+method.toUpperCase()+' '+path);
+    const protectedPath = path.startsWith('/api/admin/') || path.startsWith('/api/users/') || path === '/api/me/signups' || path === '/api/events/{id}/signups' || path === '/api/events/{id}/participants';
+    if (protectedPath && JSON.stringify(operation.security) !== JSON.stringify([{SessionCookie:[]}])) {
+      throw new Error('Protected operation must explicitly require SessionCookie: '+method.toUpperCase()+' '+path);
     }
     if (!Object.keys(operation.responses ?? {}).length) throw new Error('Missing responses for '+operation.operationId);
     for (const requirement of operation.security ?? api.security ?? []) {
