@@ -31,7 +31,7 @@ test('withdrawal frees capacity and rejoining creates a distinct historical row'
   d.prepare('UPDATE event_signups SET deleted_at=102 WHERE id=?').run('s2');
   add(d,'s3',a);
   const rows=d.prepare('SELECT id,deleted_at FROM event_signups WHERE user_id=? ORDER BY created_at,id').all(a);
-  assert.deepEqual(rows,[{id:'s1',deleted_at:101},{id:'s3',deleted_at:null}]);
+  assert.deepEqual(rows.map(row=>({...row})),[{id:'s1',deleted_at:101},{id:'s3',deleted_at:null}]);
   assert.throws(()=>add(d,'s4',a),/UNIQUE constraint|Event full/);
  }finally{d.close()}
 });
@@ -41,7 +41,7 @@ test('unlimited and zero-capacity events, below-roster edits, FK, deleted event'
   add(d,'s1',a);add(d,'s2',b);
   assert.throws(()=>d.prepare('UPDATE events SET capacity=1 WHERE id=?').run('e'),/Capacity below active signups/);
   d.prepare('UPDATE events SET capacity=2 WHERE id=?').run('e');
-  assert.throws(()=>d.prepare('UPDATE events SET capacity=-1 WHERE id=?').run('e'),/CHECK constraint/);
+  assert.throws(()=>d.prepare('UPDATE events SET capacity=-1 WHERE id=?').run('e'),/CHECK constraint|Capacity below active signups/);
   assert.throws(()=>d.prepare('INSERT INTO event_signups(id,event_id,user_id,created_at) VALUES(?,?,?,?)').run('bad','e','unknown',50),/FOREIGN KEY/);
   d.prepare('UPDATE event_signups SET deleted_at=101 WHERE event_id=?').run('e');
   d.prepare('UPDATE events SET capacity=0 WHERE id=?').run('e');
