@@ -6,7 +6,7 @@
 - [ ] All T001–T024 requirements have corresponding automated or manual evidence.
 - [ ] Complete a formal schema-level OpenAPI drift review, including role, security and error responses.
 - [ ] Check signup capacity and start-time cutoff under actual concurrent Cloudflare D1 requests.
-- [ ] Approve migrations 0005 and subsequent nullable-email/stub migration; exercise both on a restored staging copy.
+- [ ] Approve migrations 0005 and additive 0006 participation-stub schema; exercise both on a restored staging copy.
 - [ ] Verify foreign keys and archived/withdrawn history across any user-table rebuild.
 - [ ] Verify zero overbookings and no duplicate active signup at event capacity 1 using parallel users.
 - [ ] Verify login return intent, magic-link across tabs, full/started/deleted events, error recovery, exactly once continuation.
@@ -17,7 +17,7 @@
 - [ ] Verify keyboard interaction, theme contrast, browser layout and screen reader labels.
 
 ## Migration/rollback approach
-Migrations are forward-only and **must not be applied under this batch's current permissions**. Before staging, create an authorized backup and test restore on a disposable isolated database. Do not drop signup records to roll back a partial release: retain five-column row history and record additive corrections in later migrations. Rebuilding users for nullable email/stub identities must preserve stable user IDs, existing verified emails, sessions, agreement history and DOB audits, and must pass `PRAGMA foreign_key_check` on a representative copy.
+Migrations are forward-only and **must not be applied under this batch's current permissions**. Before staging, create an authorized backup and test restore on a disposable isolated database. Do not drop signup records to roll back a partial release: retain five-column row history and record additive corrections in later migrations. The additive `participation_identities` + `user_stubs` design must preserve existing `users` rows and all existing account/session/agreement/DOB-audit foreign keys, while keeping event signup IDs stable through verified-email claims; run `PRAGMA foreign_key_check` on a representative copy.
 
 ## Release record (fill only with actual evidence)
 - Staging migration authorization: **not granted**
