@@ -482,3 +482,29 @@ test('database withdrawal rejection maps to a structured conflict for attendee a
   assert.equal(h.sqlite.prepare('SELECT deleted_at FROM event_signups WHERE id=?').get('signup-race').deleted_at,null);
  }finally{h.sqlite.close()}
 });
+
+
+test('admin event capacity edits retain unlimited, reject overfull and stale versions',async()=>{
+ const h=harness();
+ try{
+  const id='123e4567-e89b-42d3-a456-426614174091',now=Date.now();
+  h.insert(id,now+600000,now+900000);
+  const token='d'.repeat(64);
+  const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode('test:'+token))),b=>b.toString(16).padStart(2,'0')).join('');
+  h.sqlite.prepare('INSERT INTO sessions(token_hash,email,expires_at,created_at) VALUES(?,?,?,?)').run(hash,'lionaugust@icloud.com',now+600000,now);
+  const cookie='__Host-sw_session='+token, path='/api/admin/events/'+id;
+  const payload={title:'Capacity test',location:'Park',timezone:'America/Los_Angeles',start:'2026-11-14T09:00',end:'2026-11-14T12:00'};
+  const update=(capacity,version)=>h.req(path,'PUT',{...payload,capacity,version},cookie);
+  assert.equal((await update(1,1)).status,200);
+  assert.equal(h.sqlite.prepare('SELECT capacity,version FROM events WHERE id=?').get(id).capacity,1);
+  assert.equal((await update(2,1)).status,409,'stale editor cannot overwrite a newer revision');
+  h.sqlite.prepare('INSERT INTO event_signups(id,event_id,user_id,created_at) VALUES(?,?,?,?)')
+   .run('capacity-test-signup',id,'11111111-1111-4111-8111-111111111111',now);
+  const reduced=await update(0,2);
+  assert.equal(reduced.status,409,'active signups prevent lowering capacity below occupancy');
+  assert.ok((await reduced.json()).fields.capacity);
+  assert.deepEqual(h.sqlite.prepare('SELECT capacity,version FROM events WHERE id=?').get(id),{capacity:1,version:2});
+  assert.equal((await update(null,2)).status,200,'unlimited capacity remains supported');
+  assert.deepEqual(h.sqlite.prepare('SELECT capacity,version FROM events WHERE id=?').get(id),{capacity:null,version:3});
+ }finally{h.sqlite.close();}
+});
