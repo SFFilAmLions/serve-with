@@ -85,8 +85,9 @@ BEGIN SELECT RAISE(ABORT, 'Withdrawal history is immutable'); END;
 -- operation nor a later identity claim may reassign or backdate the record.
 -- Withdrawals only set deleted_at and preserve this original audit history.
 CREATE TRIGGER event_signups_identity_immutable
-BEFORE UPDATE OF event_id,user_id,created_at ON event_signups
-WHEN NEW.event_id IS NOT OLD.event_id
+BEFORE UPDATE OF id,event_id,user_id,created_at ON event_signups
+WHEN NEW.id IS NOT OLD.id
+  OR NEW.event_id IS NOT OLD.event_id
   OR NEW.user_id IS NOT OLD.user_id
   OR NEW.created_at IS NOT OLD.created_at
 BEGIN SELECT RAISE(ABORT, 'Signup identity and creation time are immutable'); END;
