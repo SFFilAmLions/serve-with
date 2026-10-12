@@ -35,6 +35,12 @@ test('additive nullable-email stubs preserve existing identity foreign keys and 
   assert.equal(d.prepare('SELECT email FROM user_stubs WHERE id=?').get(stubId).email,null);
   assert.equal(d.prepare('SELECT COUNT(*) n FROM users WHERE id=?').get(stubId).n,0);
   assert.deepEqual(d.prepare('PRAGMA foreign_key_check').all(),[]);
+  // Test collision prevention on both updates as well as inserts.
+  assert.throws(()=>d.prepare('UPDATE user_stubs SET email=? WHERE id=?').run('registered@example.org',stubId),/Email belongs to registered account/);
+  d.prepare('UPDATE user_stubs SET email=? WHERE id=?').run('stub@example.org',stubId);
+  assert.throws(()=>d.prepare('UPDATE users SET email=? WHERE id=?').run('stub@example.org',legacyId),/Email belongs to another stub identity/);
+  assert.equal(d.prepare('SELECT email FROM users WHERE id=?').get(legacyId).email,'registered@example.org');
+  assert.equal(d.prepare('SELECT email FROM user_stubs WHERE id=?').get(stubId).email,'stub@example.org');
   assert.throws(()=>d.prepare('UPDATE users SET created_at=2 WHERE id=?').run(legacyId),/immutable/);
  }finally{d.close();}
 });
