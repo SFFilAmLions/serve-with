@@ -252,7 +252,7 @@ function UsersDirectory(){
 
 function EventDetail({id,admin}:{id:string;admin:boolean}){
  const [event,setEvent]=useState<EventRecord|null>(null),[error,setError]=useState('');
- useEffect(()=>{void requestJson('/api/events/'+id).then(r=>setEvent(r.event)).catch(e=>setError(e.message))},[id]);
+ useEffect(()=>{void generatedApi.getEvent({id}).then(r=>{if(r.status!==200)throw Error('Unable to load event');setEvent((r.data as {event:EventRecord}).event)}).catch(e=>setError(e.message))},[id]);
  if(error)return <Alert severity="error">{error}</Alert>;
  if(!event)return <Skeleton height={200}/>;
  return <Stack spacing={2} sx={{my:4}}><Button size="small" startIcon={<Glyph type="back"/>} sx={{alignSelf:"flex-start"}} onClick={()=>go(admin?"/admin/events":"/")}>Back to events</Button><Typography variant="h4">{event.title}</Typography><Typography>{formatTime(event.start_at,event.timezone)} – {formatTime(event.end_at,event.timezone)}</Typography><Typography>{event.location}</Typography>{admin&&<Button onClick={()=>go('/admin/events/'+id+'/edit')}>✎ Edit</Button>}</Stack>;
@@ -264,7 +264,7 @@ function EventPageEditor({id}:{id?:string}){
  const [confirmClose,setConfirmClose]=useState(false);
  const duplication=(history.state as {duplicate?:EventRecord}|null)?.duplicate;
  useEffect(()=>{const populate=(event:EventRecord)=>{const value={title:event.title,location:event.location,timezone:event.timezone,start:localInput(event.start_at,event.timezone),end:localInput(event.end_at,event.timezone)};setDraft(value);setOriginal(value);setVersion(event.version)};
-  if(id){void requestJson('/api/events/'+id).then(r=>populate(r.event)).catch(e=>setMessage(e.message))}
+  if(id){void generatedApi.getEvent({id}).then(r=>{if(r.status!==200)throw Error('Unable to load event');populate((r.data as {event:EventRecord}).event)}).catch(e=>setMessage(e.message))}
   else if(duplication)populate(duplication);
  },[id]);
  const update=(key:keyof Draft,value:string)=>setDraft(d=>({...d,[key]:value}));
