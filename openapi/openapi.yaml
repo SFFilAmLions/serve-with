@@ -1205,3 +1205,115 @@ paths:
             application/json:
               schema:
                   $ref: '#/components/schemas/Error'
+
+  /api/me/signups:
+    get:
+      operationId: listMySignups
+      tags: [Events]
+      summary: Current and withdrawn signup history for the authenticated attendee
+      security:
+        - SessionCookie: []
+      responses:
+        '200':
+          description: Own signup records including withdrawals
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [signups]
+                properties:
+                  signups:
+                    type: array
+                    items:
+                      type: object
+                      additionalProperties: true
+        '401':
+          description: Not signed in
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Profile or consent incomplete
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/events/{id}/signups:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema: {type: string, format: uuid}
+    get:
+      operationId: getMyEventSignup
+      tags: [Events]
+      summary: Get the current attendee's active signup, if any
+      security:
+        - SessionCookie: []
+      responses:
+        '200':
+          description: Own active signup or null
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [signup]
+                properties:
+                  signup: {type: [object, 'null']}
+        '401':
+          description: Not signed in
+    post:
+      operationId: signUpForEvent
+      tags: [Events]
+      summary: Sign up the authenticated eligible attendee
+      security:
+        - SessionCookie: []
+      parameters:
+        - in: header
+          name: Origin
+          required: true
+          schema: {type: string, format: uri}
+      responses:
+        '201':
+          description: Created signup
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [signup]
+                properties:
+                  signup: {type: object}
+        '401':
+          description: Not signed in
+        '403':
+          description: Profile or consent incomplete
+        '409':
+          description: Closed, full or duplicate
+    delete:
+      operationId: withdrawFromEvent
+      tags: [Events]
+      summary: Soft-delete attendee's own active signup before event start
+      security:
+        - SessionCookie: []
+      parameters:
+        - in: header
+          name: Origin
+          required: true
+          schema: {type: string, format: uri}
+      responses:
+        '200':
+          description: Whether an active signup was withdrawn
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [withdrawn]
+                properties:
+                  withdrawn: {type: boolean}
+        '401':
+          description: Not signed in
+        '403':
+          description: Profile or consent incomplete
+        '409':
+          description: Event already started
