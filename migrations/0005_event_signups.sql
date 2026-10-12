@@ -63,3 +63,20 @@ WHEN NEW.capacity IS NOT NULL AND NEW.capacity < (
   SELECT COUNT(*) FROM event_signups WHERE event_id = NEW.id AND deleted_at IS NULL
 )
 BEGIN SELECT RAISE(ABORT, 'Capacity below active signups'); END;
+
+-- Enforce the same exact cutoff when withdrawing, even if two concurrent
+-- Worker requests interleave after the initial event-start check.
+CREATE TRIGGER event_signups_withdraw_before_update
+BEFORE UPDATE OF deleted_at ON event_signups
+WHEN OLD.deleted_at IS NULL AND NEW.deleted_at IS NOT NULL
+BEGIN
+  SELECT CASE WHEN NEW.deleted_at >= (
+    SELECT start_at FROM events WHERE id = OLD.event_id
+  ) THEN RAISE(ABORT, 'Withdrawals closed') END;
+END;
+
+-- A withdrawn row is immutable: re-signing creates a new distinct row.
+CREATE TRIGGER event_signups_withdrawn_immutable
+BEFORE UPDATE OF deleted_at ON event_signups
+WHEN OLD.deleted_at IS NOT NULL AND NEW.deleted_at IS NOT OLD.deleted_at
+BEGIN SELECT RAISE(ABORT, 'Withdrawal history is immutable'); END;
