@@ -79,3 +79,14 @@ test('signup event, participant and creation timestamp remain immutable after in
   assert.equal(d.prepare('SELECT deleted_at FROM event_signups WHERE id=?').get('s1').deleted_at,101,'withdrawal remains permitted');
  }finally{d.close()}
 });
+
+
+test('signup audit history cannot be hard-deleted even after withdrawal',()=>{
+ const d=setup();try{
+  add(d,'s1',a);
+  assert.throws(()=>d.prepare('DELETE FROM event_signups WHERE id=?').run('s1'),/Signup history must be retained/);
+  d.prepare('UPDATE event_signups SET deleted_at=? WHERE id=?').run(101,'s1');
+  assert.throws(()=>d.prepare('DELETE FROM event_signups WHERE id=?').run('s1'),/Signup history must be retained/);
+  assert.equal(d.prepare('SELECT COUNT(*) n FROM event_signups WHERE id=?').get('s1').n,1);
+ }finally{d.close()}
+});
