@@ -41,12 +41,15 @@ const allowed = new Set(admins.filter(a => a.enabled).map(a => a.email));
 async function resolveUser(db: D1Database, email: string, now: number): Promise<string> {
   const normalized = normalize(email);
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized) || normalized.length > 254) throw new Error('Invalid verified email');
-  // SQLite/D1 applies the unique-email constraint atomically. Concurrent callers
-  // can generate different UUIDs; exactly one INSERT OR IGNORE wins.
-  await db.prepare('INSERT OR IGNORE INTO users (id,email,email_verified_at,created_at,updated_at) VALUES (?,?,?,?,?)')
-    .bind(crypto.randomUUID(), normalized, now, now, now).run();
-  const user = await db.prepare('SELECT id FROM users WHERE email=?').bind(normalized).first<{ id: string }>();
-  if (!user) throw new Error('Unable to resolve verified identity');
+  const existing=await db.prepare('SELECT id FROM users WHERE email=?').bind(normalized).first<{id:string}>();
+  if(existing)return existing.id;
+  const stub=await db.prepare('SELECT id FROM user_stubs WHERE email=?').bind(normalized).first<{id:string}>();
+  // Registered users and user stubs share a stable participation identity.
+  // Email ownership is verified before this method is called by OTP flow.
+  await db.prepare('INSERT OR IGNORE INTO users(id,email,email_verified_at,created_at,updated_at) VALUES(?,?,?,?,?)')
+    .bind(stub?.id||crypto.randomUUID(),normalized,now,now,now).run();
+  const user=await db.prepare('SELECT id FROM users WHERE email=?').bind(normalized).first<{id:string}>();
+  if(!user || (stub&&user.id!==stub.id))throw Error('Identity collision requires administrator review');
   return user.id;
 }
 
@@ -171,7 +174,7 @@ async function loginEligible(email:string,env:Env,db:D1Database):Promise<boolean
  if(!email)return false;
  // A verified-email claimant may use the same normal OTP flow to claim
  // a matching unclaimed stub; names are deliberately never claim keys.
- const stub=await db.prepare('SELECT id FROM users WHERE email=? AND is_stub=1').bind(email).first();
+ const stub=await db.prepare('SELECT id FROM user_stubs WHERE email=?').bind(email).first();
  return Boolean(stub);
 }
 
@@ -265,8 +268,10 @@ async function legacyFetch(request: Request, env: Env): Promise<Response> {
       const active=await env.AUTH_DB.prepare('SELECT id FROM event_signups WHERE event_id=? AND user_id=? AND deleted_at IS NULL')
         .bind(eventId,subject.user.id).first();
       if(!active)return json({error:'Active signup required'},403);
-      const rows=await env.AUTH_DB.prepare(`SELECT u.first_name,u.last_name
-        FROM event_signups s JOIN users u ON u.id=s.user_id
+      const rows=await env.AUTH_DB.prepare(`SELECT COALESCE(u.first_name,stub.first_name) AS first_name,
+          COALESCE(u.last_name,stub.last_name) AS last_name
+        FROM event_signups s LEFT JOIN users u ON u.id=s.user_id
+        LEFT JOIN user_stubs stub ON stub.id=s.user_id
         WHERE s.event_id=? AND s.deleted_at IS NULL
         ORDER BY u.last_name,u.first_name,s.id`).bind(eventId)
         .all<{first_name:string|null;last_name:string|null}>();
@@ -347,8 +352,9 @@ async function legacyFetch(request: Request, env: Env): Promise<Response> {
           .first<{id:string;start_at:number;deleted_at:number|null}>();
         if(!event||event.deleted_at!==null)return json({error:'Event not found'},404);
         if(request.method==='GET'){
-          const rows=await db.prepare(`SELECT s.id,s.user_id,s.created_at,s.deleted_at,u.first_name,u.last_name,u.email
-            FROM event_signups s JOIN users u ON u.id=s.user_id WHERE s.event_id=?
+          const rows=await db.prepare(`SELECT s.id,s.user_id,s.created_at,s.deleted_at,COALESCE(u.first_name,stub.first_name) AS first_name,COALESCE(u.last_name,stub.last_name) AS last_name,COALESCE(u.email,stub.email) AS email
+            FROM event_signups s LEFT JOIN users u ON u.id=s.user_id
+            LEFT JOIN user_stubs stub ON stub.id=s.user_id WHERE s.event_id=?
             ORDER BY s.created_at DESC,s.id DESC`).bind(eventId).all();
           return json({signups:rows.results});
         }
@@ -360,11 +366,13 @@ async function legacyFetch(request: Request, env: Env): Promise<Response> {
         const userId=body.userId;
         if(typeof userId!=='string'||!/^[0-9a-f-]{36}$/.test(userId))return json({error:'Invalid attendee'},422);
         const target=await db.prepare(`SELECT id,email,first_name,last_name,date_of_birth,email_verified_at,
-          terms_accepted_at,accepted_terms_version,accepted_privacy_version,is_stub FROM users WHERE id=?`)
-          .bind(userId).first<UserRow & {is_stub:number}>();
-        if(!target)return json({error:'Attendee not found'},404);
-        if(request.method==='POST'&&target.is_stub!==1&&
-            !(target.email_verified_at&&profileReady(target)&&agreementReady(target,policyVersions(env))))
+          terms_accepted_at,accepted_terms_version,accepted_privacy_version FROM users WHERE id=?`)
+          .bind(userId).first<UserRow>();
+        const stub=await db.prepare('SELECT id FROM user_stubs WHERE id=? AND claimed_at IS NULL')
+          .bind(userId).first();
+        if(!target&&!stub)return json({error:'Attendee not found'},404);
+        if(request.method==='POST'&&!stub&&
+            !(target?.email_verified_at&&profileReady(target)&&agreementReady(target,policyVersions(env))))
           return json({error:'Attendee account not eligible'},403);
         if(request.method==='DELETE'){
           const result=await db.prepare('UPDATE event_signups SET deleted_at=? WHERE event_id=? AND user_id=? AND deleted_at IS NULL')
@@ -395,10 +403,16 @@ async function legacyFetch(request: Request, env: Env): Promise<Response> {
           if(dobValue!==null&&!validDob(dobValue))return json({error:'Invalid date of birth'},422);
           const id=crypto.randomUUID(),now=Date.now();
           try{
-            await env.AUTH_DB.prepare(`INSERT INTO users
-              (id,email,first_name,last_name,date_of_birth,created_at,updated_at,is_stub)
-              VALUES(?,?,?,?,?,?,?,1)`)
-             .bind(id,emailValue,body.firstName.trim(),body.lastName.trim(),dobValue,now,now).run();
+            if(emailValue!==null){
+              const collision=await env.AUTH_DB.prepare('SELECT id FROM users WHERE email=?').bind(emailValue).first();
+              if(collision)return json({error:'Email is already registered'},409);
+            }
+            await env.AUTH_DB.batch([
+              env.AUTH_DB.prepare('INSERT INTO participation_identities(id) VALUES(?)').bind(id),
+              env.AUTH_DB.prepare(`INSERT INTO user_stubs
+                (id,email,first_name,last_name,date_of_birth,created_at,updated_at)
+                VALUES(?,?,?,?,?,?,?)`).bind(id,emailValue,body.firstName.trim(),body.lastName.trim(),dobValue,now,now)
+            ]);
           }catch{return json({error:'Unable to create user; email may already be in use'},409)}
           return json({user:{id,email:emailValue,firstName:body.firstName.trim(),lastName:body.lastName.trim(),dateOfBirth:dobValue,isStub:true}},201);
         }
@@ -526,8 +540,10 @@ async function legacyFetch(request: Request, env: Env): Promise<Response> {
         await db.batch([
           db.prepare('INSERT INTO agreement_acceptances(id,user_id,terms_version,privacy_version,accepted_at) VALUES(?,?,?,?,?)')
             .bind(id,userId,versions.terms,versions.privacy,now),
-          db.prepare('UPDATE users SET terms_accepted_at=?,accepted_terms_version=?,accepted_privacy_version=?,updated_at=?,is_stub=0 WHERE id=?')
-            .bind(now,versions.terms,versions.privacy,now,userId)
+          db.prepare('UPDATE users SET terms_accepted_at=?,accepted_terms_version=?,accepted_privacy_version=?,updated_at=? WHERE id=?')
+            .bind(now,versions.terms,versions.privacy,now,userId),
+          db.prepare('UPDATE user_stubs SET claimed_at=?,updated_at=? WHERE id=? AND claimed_at IS NULL')
+            .bind(now,now,userId)
         ]);
         return json({agreementCurrent:true});
       }
