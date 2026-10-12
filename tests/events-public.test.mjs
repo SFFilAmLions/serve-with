@@ -391,7 +391,8 @@ test('admin delegated signup allows explicit attendee selection and preserves hi
   const eventId='123e4567-e89b-42d3-a456-426614174989', now=Date.now();
   h.insert(eventId,now+300000,now+600000);
   const targetId='22222222-2222-4222-8222-222222222222';
-  h.sqlite.prepare('INSERT INTO users(id,email,first_name,last_name,created_at,updated_at,is_stub) VALUES(?,?,?,?,?,?,1)')
+  h.sqlite.prepare('INSERT INTO participation_identities(id) VALUES(?)').run(targetId);
+  h.sqlite.prepare('INSERT INTO user_stubs(id,email,first_name,last_name,created_at,updated_at) VALUES(?,?,?,?,?,?)')
    .run(targetId,'attendee@example.org','Alex','Volunteer',1,1);
   const path='/api/admin/events/'+eventId+'/signups';
   assert.equal((await h.req(path,'GET')).status,401);
@@ -443,10 +444,10 @@ test('admin creates email-optional unverified user without consent or login',asy
   assert.equal(response.status,201);
   const created=(await response.json()).user;
   assert.equal(created.email,null);assert.equal(created.isStub,true);
-  const saved=h.sqlite.prepare('SELECT is_stub,email,email_verified_at,terms_accepted_at,accepted_terms_version,accepted_privacy_version FROM users WHERE id=?').get(created.id);
-  assert.equal(saved.is_stub,1);assert.equal(saved.email,null);assert.equal(saved.email_verified_at,null);
-  assert.equal(saved.terms_accepted_at,null);assert.equal(saved.accepted_terms_version,null);
-  assert.equal(saved.accepted_privacy_version,null);
+  const saved=h.sqlite.prepare('SELECT email,claimed_at FROM user_stubs WHERE id=?').get(created.id);
+  assert.equal(saved.email,null);assert.equal(saved.claimed_at,null);
+  assert.equal(h.sqlite.prepare('SELECT COUNT(*) n FROM users WHERE id=?').get(created.id).n,0);
+  assert.equal(h.sqlite.prepare('SELECT COUNT(*) n FROM agreement_acceptances WHERE user_id=?').get(created.id).n,0);
   assert.equal(h.sqlite.prepare('SELECT COUNT(*) n FROM sessions WHERE user_id=?').get(created.id).n,0);
   assert.equal((await h.req(path,'POST',{firstName:'Other',lastName:'Person',email:'lionaugust@icloud.com'},cookie)).status,409);
  }finally{h.sqlite.close();}
