@@ -308,6 +308,7 @@ export default {
       }
       return json({ error: 'Not found' }, 404);
     }
+    if (path === '/api/docs') return Response.redirect(new URL('/api/docs/', request.url), 308);
     if (!path.startsWith('/api/auth/')) {
       // Render the SPA for canonical deep links; retain ordinary asset handling.
       const spaRoute = request.method === 'GET' && (
