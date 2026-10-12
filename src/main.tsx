@@ -14,7 +14,7 @@ import { createClubTheme } from './theme';
 import { createApiClient } from './generated/openapi-client';
 import { type Draft, timeZones, validateDraft, emptyDraft, localInput } from './event-form';
 
-type EventRecord = { id:string; title:string; location:string; timezone:string; start_at:number; end_at:number; version:number };
+type EventRecord = { id:string; title:string; location:string; timezone:string; start_at:number; end_at:number; version:number; capacity?:number|null; signups_count?:number; spots_available?:number|null };
 type View = 'upcoming'|'past';
 function Glyph({type}:{type:'sun'|'moon'|'system'|'person'|'swap'|'logout'|'login'|'pin'|'back'|'save'|'edit'|'copy'|'trash'|'github'}) {
  const paths:{[key:string]:string}={
