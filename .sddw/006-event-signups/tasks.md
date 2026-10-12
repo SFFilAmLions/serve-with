@@ -81,3 +81,13 @@ The user authorized T001–T009 in one batch. **Commits and draft PR updates are
 The generated request validator intentionally supports only the JSON Schema keywords used by current request bodies. It is **not a complete OpenAPI 3.1 / JSON Schema 2020-12 validator**; ordinary Worker handlers still enforce business rules. These tasks should not be checked complete solely because CI passes the intermediate integration work.
 
 **Scope rule:** This remains a draft branch. No merge or deployment without separate user authorization.
+
+## Full implementation batch authorization — execution record
+
+The user subsequently approved implementation of **T001–T024 and T025–T026 preparation** as one coordinated batch. Permitted: code, migrations **as files only**, branches, PRs, tests, documentation. **Not permitted:** merge, applying staging/production migrations, staging/production deployment, new paid services, credential changes or expanded service permissions. Continue committing within the approved work without repeated confirmations. Staging and production acceptance remain separate gates.
+
+**Participation persistence groundwork:** [migration 0005](../../migrations/0005_event_signups.sql) adds optional nonnegative event capacity and the five-column signup table; active uniqueness is enforced by a partial index. An atomic SQLite insert trigger prevents over-capacity writes and additional triggers reject lowering capacity beneath current active signups. [Database regression tests](../../tests/signups-database.test.mjs) exercise capacity, duplicate/rejoin history, unlimited/zero capacity, foreign keys and deleted events. **Do not execute this migration yet.**
+
+**Still required for T010–T011:** safely transition `users.email` from NOT NULL to nullable with an explicit stub marker while preserving historical identity, agreement and session foreign keys; implement Worker APIs with server-clock cutoff, verified participant/admin permissions, atomic capacity and business-error translation; prove parallel D1 execution in staging after separate authorization. The SQL trigger cannot replace handler-level event-start and authorization checks.
+
+**Next batches:** event APIs and safe private/public projections (T012–T013); attendee continuation and admin/stub pages (T014–T018); provider-availability assessment without new credentials (T019), dashboard and UI (T020–T023), then acceptance/release artifacts (T024–T026 preparation).
