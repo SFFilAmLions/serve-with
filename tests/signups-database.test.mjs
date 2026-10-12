@@ -42,6 +42,7 @@ test('unlimited and zero-capacity events, below-roster edits, FK, deleted event'
   assert.throws(()=>d.prepare('UPDATE events SET capacity=1 WHERE id=?').run('e'),/Capacity below active signups/);
   d.prepare('UPDATE events SET capacity=2 WHERE id=?').run('e');
   assert.throws(()=>d.prepare('UPDATE events SET capacity=-1 WHERE id=?').run('e'),/CHECK constraint|Capacity below active signups/);
+  d.prepare('UPDATE events SET capacity=NULL WHERE id=?').run('e');
   assert.throws(()=>d.prepare('INSERT INTO event_signups(id,event_id,user_id,created_at) VALUES(?,?,?,?)').run('bad','e','unknown',50),/FOREIGN KEY/);
   d.prepare('UPDATE event_signups SET deleted_at=101 WHERE event_id=?').run('e');
   d.prepare('UPDATE events SET capacity=0 WHERE id=?').run('e');
