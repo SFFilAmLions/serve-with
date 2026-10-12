@@ -28,7 +28,6 @@ const source = [
   'export function matchOperation(method: string, pathname: string): { id: OperationId; params: Record<string,string> } | null {',
   '  for (const op of operations) {',
   '    if (op.method !== method) continue;',
-  '    const names: string[] = [];',
   '    const parts = op.path.split("/").filter(Boolean);',
   '    const actual = pathname.split("/").filter(Boolean);',
   '    if (parts.length !== actual.length) continue;',
