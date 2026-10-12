@@ -71,6 +71,7 @@ test('signup event, participant and creation timestamp remain immutable after in
   add(d,'s1',a);
   const sql='UPDATE event_signups SET ';
   assert.throws(()=>d.prepare(sql+'user_id=? WHERE id=?').run(b,'s1'),/Signup identity and creation time are immutable/);
+  assert.throws(()=>d.prepare(sql+'id=? WHERE id=?').run('new-signup-id','s1'),/Signup identity and creation time are immutable/);
   assert.throws(()=>d.prepare(sql+'event_id=? WHERE id=?').run('other','s1'),/Signup identity and creation time are immutable/);
   assert.throws(()=>d.prepare(sql+'created_at=? WHERE id=?').run(99,'s1'),/Signup identity and creation time are immutable/);
   assert.deepEqual({...d.prepare('SELECT event_id,user_id,created_at,deleted_at FROM event_signups WHERE id=?').get('s1')},{event_id:'e',user_id:a,created_at:100,deleted_at:null});
