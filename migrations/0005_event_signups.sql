@@ -3,10 +3,22 @@
 -- must preserve sessions, agreement history and other foreign key references.
 ALTER TABLE events ADD COLUMN capacity INTEGER CHECK (capacity IS NULL OR capacity >= 0);
 
+-- Shared participation IDs cover registered users and unclaimed stubs
+-- without rebuilding the existing users table or its foreign keys.
+CREATE TABLE participation_identities (
+ id TEXT PRIMARY KEY NOT NULL
+);
+INSERT INTO participation_identities(id) SELECT id FROM users;
+CREATE TRIGGER participation_user_insert AFTER INSERT ON users
+BEGIN
+ INSERT OR IGNORE INTO participation_identities(id) VALUES(NEW.id);
+END;
+
+
 CREATE TABLE event_signups (
   id TEXT PRIMARY KEY NOT NULL,
   event_id TEXT NOT NULL REFERENCES events(id),
-  user_id TEXT NOT NULL REFERENCES users(id),
+  user_id TEXT NOT NULL REFERENCES participation_identities(id),
   created_at INTEGER NOT NULL,
   deleted_at INTEGER CHECK (deleted_at IS NULL OR deleted_at >= created_at)
 );
