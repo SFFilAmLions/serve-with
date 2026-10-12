@@ -411,3 +411,19 @@ test('admin delegated signup allows explicit attendee selection and preserves hi
   assert.equal((await h.req(path,'DELETE',{userId:targetId},cookie)).status,409);
  }finally{h.sqlite.close();}
 });
+
+test('usage endpoint hides provider credentials and never fabricates limits',async()=>{
+ const h=harness();try{
+  assert.equal((await h.req('/api/admin/usage')).status,401);
+  const now=Date.now(),token='b'.repeat(64);
+  const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode('test:'+token))),b=>b.toString(16).padStart(2,'0')).join('');
+  h.sqlite.prepare('INSERT INTO sessions(token_hash,email,expires_at,created_at) VALUES(?,?,?,?)')
+   .run(hash,'lionaugust@icloud.com',now+600000,now);
+  const response=await h.req('/api/admin/usage','GET',undefined,'__Host-sw_session='+token);
+  assert.equal(response.status,200);
+  const data=await response.json();
+  assert.equal(data.providers.length,4);
+  assert.ok(data.providers.every(p=>p.status==='unavailable'&&p.used===null&&p.limit===null&&p.remaining===null));
+  assert.equal(JSON.stringify(data).includes('fake'),false);
+ }finally{h.sqlite.close();}
+});
