@@ -30,6 +30,9 @@ BEGIN
   SELECT CASE WHEN NOT EXISTS (
     SELECT 1 FROM events WHERE id = NEW.event_id AND deleted_at IS NULL
   ) THEN RAISE(ABORT, 'Event unavailable') END;
+  SELECT CASE WHEN NEW.created_at >= (
+    SELECT start_at FROM events WHERE id = NEW.event_id
+  ) THEN RAISE(ABORT, 'Signups closed') END;
   SELECT CASE WHEN (
     SELECT capacity FROM events WHERE id = NEW.event_id
   ) IS NOT NULL AND (
