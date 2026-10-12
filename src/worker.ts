@@ -1,3 +1,4 @@
+import { operations, matchOperation, dispatchOperation, type WorkerHandlers } from './generated/openapi-operations';
 interface D1Statement { bind(...values: unknown[]): D1Statement; first<T>(): Promise<T | null>; all<T>(): Promise<{ results: T[] }>; run(): Promise<{ meta: { changes: number } }> }
 interface D1Database { prepare(query: string): D1Statement; batch(statements: D1Statement[]): Promise<unknown> }
 import admins from './generated/admins.json';
@@ -177,8 +178,7 @@ const validDob = (x: unknown): x is string => {
   catch { return false; }
 };
 
-export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+async function legacyFetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
     const path = url.pathname;
     if (path === '/api/events') {
@@ -441,5 +441,18 @@ export default {
     } catch {
       return error();
     }
+}
+
+export default {
+  async fetch(request: Request, env: Env): Promise<Response> {
+    // The route registry is generated from OpenAPI YAML. During the
+    // incremental migration the existing handlers still own semantics,
+    // authorization, input validation, and error behavior.
+    const url = new URL(request.url);
+    if (!matchOperation(request.method, url.pathname)) return legacyFetch(request, env);
+    const handlers = Object.fromEntries(operations.map(op =>
+      [op.id, (matchedRequest: Request) => legacyFetch(matchedRequest, env)]
+    )) as WorkerHandlers;
+    return dispatchOperation(request, handlers);
   }
 };
