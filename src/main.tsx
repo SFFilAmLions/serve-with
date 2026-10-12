@@ -79,7 +79,7 @@ const api = async (path:string,body?:Record<string,string>) => {
  const data=await r.json();if(!r.ok)throw new Error(data.error||'Request failed');return data;
 };
 function Editor({event,onClose,onSaved,onReload}:{event:EventRecord|null;onClose:()=>void;onSaved:()=>void;onReload:()=>void}){
- const original=React.useMemo<Draft>(()=>event?{title:event.title,location:event.location,timezone:event.timezone,start:localInput(event.start_at,event.timezone),end:localInput(event.end_at,event.timezone)}:emptyDraft(),[event]);
+ const original=React.useMemo<Draft>(()=>event?{title:event.title,location:event.location,timezone:event.timezone,start:localInput(event.start_at,event.timezone),end:localInput(event.end_at,event.timezone),capacity:event.capacity??null}:emptyDraft(),[event]);
  const [form,setForm]=useState<Draft>(original),[saving,setSaving]=useState(false),[errors,setErrors]=useState<Record<string,string>>({}),[message,setMessage]=useState(''),[discard,setDiscard]=useState(false),[conflict,setConflict]=useState(false),[reloadConfirm,setReloadConfirm]=useState(false);
  const changed=JSON.stringify(form)!==JSON.stringify(original);
  const close=()=>{if(saving||discard||reloadConfirm)return;if(changed)setDiscard(true);else onClose()};
@@ -332,7 +332,8 @@ function EventPageEditor({id}:{id?:string}){
   if(id){void generatedApi.getEvent({id}).then(r=>{if(r.status!==200)throw Error('Unable to load event');populate((r.data as {event:EventRecord}).event)}).catch(e=>setMessage(e.message))}
   else if(duplication)populate(duplication);
  },[id]);
- const update=(key:keyof Draft,value:string)=>setDraft(d=>({...d,[key]:value}));
+ const update=(key:Exclude<keyof Draft,'capacity'>,value:string)=>setDraft(d=>({...d,[key]:value}));
+ const updateCapacity=(value:string)=>setDraft(d=>({...d,capacity:value===''?null:Number(value)}));
  const date=(key:'start'|'end')=>draft[key]?dayjs(draft[key]):null;
  const setDate=(key:'start'|'end',v:Dayjs|null)=>{if(!v?.isValid())return;const stamp=v.format('YYYY-MM-DD');setDraft(old=>{const before=old.start.slice(0,10);const next={...old,[key]:stamp+'T'+(old[key].slice(11)||'09:00')};if(key==='start'&&(!old.end||old.end.slice(0,10)===before))next.end=stamp+'T'+(old.end.slice(11)||'10:00');return next})};
  const setTime=(key:'start'|'end',v:Dayjs|null)=>{if(v?.isValid())update(key,(draft[key].slice(0,10)||dayjs().format('YYYY-MM-DD'))+'T'+v.format('HH:mm'))};
@@ -345,6 +346,7 @@ function EventPageEditor({id}:{id?:string}){
  {message&&<Alert severity="error">{message}</Alert>}
  <TextField required label="Event title" value={draft.title} onChange={e=>update('title',e.target.value)}/>
  <TextField required label="Location" value={draft.location} onChange={e=>update('location',e.target.value)}/>
+ <TextField label="Maximum active signups" type="number" value={draft.capacity??''} onChange={e=>updateCapacity(e.target.value)} slotProps={{htmlInput:{min:0,step:1}}} helperText="Leave blank for unlimited signups. Capacity cannot be reduced below current active signups." error={draft.capacity!==null&&(!Number.isSafeInteger(draft.capacity)||draft.capacity<0)} fullWidth/>
  <DatePicker label="Start date" value={date('start')} onChange={v=>setDate('start',v)} slotProps={{textField:{fullWidth:true,required:true}}}/>
  <Stack direction={{xs:'column',sm:'row'}} spacing={2}><TimePicker label="Start time" value={date('start')} onChange={v=>setTime('start',v)} slotProps={{textField:{fullWidth:true}}}/><TimePicker label="End time" value={date('end')} onChange={v=>setTime('end',v)} slotProps={{textField:{fullWidth:true}}}/></Stack>
  {duration>0&&<Typography>Duration: {Math.floor(duration/60)}h {duration%60}m</Typography>}
