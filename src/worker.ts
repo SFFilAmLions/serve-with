@@ -397,7 +397,7 @@ async function legacyFetch(request: Request, env: Env): Promise<Response> {
           if(!validName(body.firstName)||!validName(body.lastName))return json({error:'First and last names required'},422);
           const submittedEmail=body.email;
           const emailValue=submittedEmail===undefined||submittedEmail===null||submittedEmail===''?null:normalize(submittedEmail);
-          if(emailValue!==null&&(!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(emailValue)||emailValue.length>254))
+          if(emailValue!==null&&(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailValue)||emailValue.length>254))
             return json({error:'Invalid email'},422);
           const dobValue=body.dateOfBirth===undefined||body.dateOfBirth===null||body.dateOfBirth===''?null:body.dateOfBirth;
           if(dobValue!==null&&!validDob(dobValue))return json({error:'Invalid date of birth'},422);
