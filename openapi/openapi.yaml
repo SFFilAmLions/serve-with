@@ -1364,3 +1364,86 @@ paths:
           description: Active participation required
         '404':
           description: Event missing or deleted
+
+  /api/admin/events/{id}/signups:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema: {type: string, format: uuid}
+    get:
+      operationId: listAdminEventSignups
+      tags: [Administration]
+      summary: Roster and history for an event, administrator only
+      security:
+        - SessionCookie: []
+      responses:
+        '200':
+          description: Authorized administrative signup history
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [signups]
+                properties:
+                  signups:
+                    type: array
+                    items: {type: object, additionalProperties: true}
+        '401': {description: Sign-in required}
+        '403': {description: Administrator permission required}
+    post:
+      operationId: adminSignUpAttendee
+      tags: [Administration]
+      summary: Register a chosen attendee subject to capacity and event-start cutoff
+      security:
+        - SessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [userId]
+              properties:
+                userId: {type: string, format: uuid}
+      responses:
+        '201':
+          description: Signup created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [signup]
+                properties:
+                  signup: {type: object}
+        '401': {description: Sign-in required}
+        '403': {description: Administrator permission required}
+        '409': {description: Duplicate, full or cutoff}
+    delete:
+      operationId: adminWithdrawAttendee
+      tags: [Administration]
+      summary: Withdraw selected attendee before event start
+      security:
+        - SessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [userId]
+              properties:
+                userId: {type: string, format: uuid}
+      responses:
+        '200':
+          description: Withdrawal result
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [withdrawn]
+                properties:
+                  withdrawn: {type: boolean}
+        '401': {description: Sign-in required}
+        '403': {description: Administrator permission required}
+        '409': {description: Event already started}
