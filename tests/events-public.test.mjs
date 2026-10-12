@@ -552,3 +552,28 @@ test('participant roster sorts registered and stub identities together without l
   assert.deepEqual(afterWithdrawal.participants.map(x=>x.name),['Amy Able','Admin Example'],'withdrawn stub is immediately excluded from names-only roster');
  }finally{h.sqlite.close();}
 });
+
+
+test('parallel delegated signups at capacity one accept only one distinct attendee',async()=>{
+ const h=harness();
+ try{
+  const eventId='123e4567-e89b-42d3-a456-426614174095', now=Date.now();
+  h.insert(eventId,now+600000,now+900000);
+  h.sqlite.prepare('UPDATE events SET capacity=1 WHERE id=?').run(eventId);
+  const ids=['22222222-2222-4222-8222-222222222222','33333333-3333-4333-8333-333333333333'];
+  for(const [index,id] of ids.entries()){
+   h.sqlite.prepare('INSERT INTO participation_identities(id) VALUES(?)').run(id);
+   h.sqlite.prepare('INSERT INTO user_stubs(id,first_name,last_name,created_at,updated_at) VALUES(?,?,?,?,?)')
+    .run(id,'Volunteer',String(index+1),now,now);
+  }
+  const token='f'.repeat(64);
+  const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode('test:'+token))),b=>b.toString(16).padStart(2,'0')).join('');
+  h.sqlite.prepare('INSERT INTO sessions(token_hash,email,expires_at,created_at) VALUES(?,?,?,?)')
+   .run(hash,'lionaugust@icloud.com',now+600000,now);
+  const cookie='__Host-sw_session='+token;
+  const responses=await Promise.all(ids.map(userId=>h.req('/api/admin/events/'+eventId+'/signups','POST',{userId},cookie)));
+  assert.deepEqual(responses.map(r=>r.status).sort(),[201,409]);
+  assert.equal(h.sqlite.prepare('SELECT COUNT(*) AS n FROM event_signups WHERE event_id=? AND deleted_at IS NULL').get(eventId).n,1);
+  assert.equal(h.sqlite.prepare('SELECT COUNT(*) AS n FROM event_signups WHERE event_id=?').get(eventId).n,1);
+ }finally{h.sqlite.close();}
+});
