@@ -67,7 +67,7 @@ for(const [path,item] of Object.entries(spec.paths ?? {}))for(const [method,oper
  const argument=fields.length?'args: '+argType:'';
  const urlExpression=path.replace(/\{([^}]+)\}/g,(_m,name)=>'${encodeURIComponent(String(args['+JSON.stringify(name)+']))}');
  const queryLines=queryParams.map(p=>'      if (args['+JSON.stringify(p.name)+'] !== undefined) url.searchParams.set('+JSON.stringify(p.name)+', String(args['+JSON.stringify(p.name)+']));');
- out.push('    async '+id+'('+argument+'): Promise<ApiResult<'+responseType+'> | ApiResult<Error>> {');
+ out.push('    async '+id+'('+argument+'): Promise<ApiResult<'+responseType+' | Error>> {');
  out.push('      const url = new URL(\`'+ '${baseUrl || "http://local.invalid"}'+urlExpression+'\`);');
  out.push(...queryLines);
  out.push('      const response = await fetcher((baseUrl ? url.toString() : url.pathname + url.search), { method: '+JSON.stringify(method.toUpperCase())+', credentials: "same-origin"'+(requestSchema?', headers: {"content-type":"application/json"}, body: JSON.stringify(args.body)':'')+' });');
