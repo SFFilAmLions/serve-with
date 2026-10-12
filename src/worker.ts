@@ -368,6 +368,26 @@ async function legacyFetch(request: Request, env: Env): Promise<Response> {
         }catch{return json({error:'Signup unavailable or event full',code:'signup_conflict'},409)}
       }
       if (path === '/api/admin/users') {
+        if(request.method==='POST'){
+          if(!originOk(request)||request.headers.get('sec-fetch-site')==='cross-site')return error();
+          let body:Record<string,unknown>;
+          try{body=await bodyOf(request)}catch{return error()}
+          if(!validName(body.firstName)||!validName(body.lastName))return json({error:'First and last names required'},422);
+          const submittedEmail=body.email;
+          const emailValue=submittedEmail===undefined||submittedEmail===null||submittedEmail===''?null:normalize(submittedEmail);
+          if(emailValue!==null&&(!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(emailValue)||emailValue.length>254))
+            return json({error:'Invalid email'},422);
+          const dobValue=body.dateOfBirth===undefined||body.dateOfBirth===null||body.dateOfBirth===''?null:body.dateOfBirth;
+          if(dobValue!==null&&!validDob(dobValue))return json({error:'Invalid date of birth'},422);
+          const id=crypto.randomUUID(),now=Date.now();
+          try{
+            await env.AUTH_DB.prepare(`INSERT INTO users
+              (id,email,first_name,last_name,date_of_birth,created_at,updated_at,is_stub)
+              VALUES(?,?,?,?,?,?,?,1)`)
+             .bind(id,emailValue,body.firstName.trim(),body.lastName.trim(),dobValue,now,now).run();
+          }catch{return json({error:'Unable to create user; email may already be in use'},409)}
+          return json({user:{id,email:emailValue,firstName:body.firstName.trim(),lastName:body.lastName.trim(),dateOfBirth:dobValue,isStub:true}},201);
+        }
         if (request.method!=='GET') return json({error:'Method not allowed'},405);
         const sort=url.searchParams.get('sort')==='first'?'first_name':'last_name';
         const direction=url.searchParams.get('direction')==='desc'?'DESC':'ASC';
