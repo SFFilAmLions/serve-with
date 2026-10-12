@@ -71,7 +71,7 @@ for(const [path,item] of Object.entries(spec.paths ?? {}))for(const [method,oper
  out.push('      const url = new URL(\`'+ '${baseUrl || "http://local.invalid"}'+urlExpression+'\`);');
  out.push(...queryLines);
  out.push('      const response = await fetcher((baseUrl ? url.toString() : url.pathname + url.search), { method: '+JSON.stringify(method.toUpperCase())+', credentials: "same-origin"'+(requestSchema?', headers: {"content-type":"application/json"}, body: JSON.stringify(args.body)':'')+' });');
- out.push('      const data: unknown = await response.json();');
+ out.push('      const data: unknown = response.status === 204 ? null : await response.json();');
  out.push('      return {status: response.status, data: data as '+responseType+' | Error};');
  out.push('    },');
  operations.push(id);
