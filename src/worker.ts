@@ -1,4 +1,5 @@
 import { operations, matchOperation, dispatchOperation, type WorkerHandlers } from './generated/openapi-operations';
+import { validateOperationBody } from './generated/openapi-validators';
 interface D1Statement { bind(...values: unknown[]): D1Statement; first<T>(): Promise<T | null>; all<T>(): Promise<{ results: T[] }>; run(): Promise<{ meta: { changes: number } }> }
 interface D1Database { prepare(query: string): D1Statement; batch(statements: D1Statement[]): Promise<unknown> }
 import admins from './generated/admins.json';
@@ -274,6 +275,13 @@ async function legacyFetch(request: Request, env: Env): Promise<Response> {
         const result = eventInput(body);
         if (!result.event) return json({ error: 'Invalid event', fields: result.errors }, 422);
         const event = result.event;
+        // Existing business validation and normalization run first; this
+        // YAML-derived schema check guards the canonical request representation.
+        // Authorization and same-origin checks have already succeeded.
+        if (!validateOperationBody('createAdminEvent', {
+          title:event.title,location:event.location,timezone:event.timezone,
+          start:body.start,end:body.end
+        })) return json({error:'Invalid event',fields:{}},422);
         const now = Date.now(), id = crypto.randomUUID();
         await env.AUTH_DB.prepare('INSERT INTO events (id,title,location,timezone,start_at,end_at,created_at,updated_at,version) VALUES (?,?,?,?,?,?,?,?,1)')
           .bind(id,event.title,event.location,event.timezone,event.start_at,event.end_at,now,now).run();
