@@ -243,6 +243,28 @@ async function legacyFetch(request: Request, env: Env): Promise<Response> {
         return json({error:'Signup unavailable or event full',code:'signup_conflict'},409);
       }
     }
+    if (/^\/api\/events\/[0-9a-f-]{36}\/participants$/.test(path)) {
+      if(request.method!=='GET') return json({error:'Method not allowed'},405);
+      if(!env.AUTH_DB||!env.AUTH_PEPPER)return json({error:'Service unavailable'},503);
+      const subject=await sessionSubject(request,env);
+      if(!subject)return json({error:'Authentication required'},401);
+      if(!privilegeReady(subject,env))return json({error:'Profile or current agreement required',code:'account_completion_required'},403);
+      const eventId=path.slice('/api/events/'.length,-'/participants'.length);
+      const event=await env.AUTH_DB.prepare('SELECT id FROM events WHERE id=? AND deleted_at IS NULL')
+        .bind(eventId).first();
+      if(!event)return json({error:'Event not found'},404);
+      const active=await env.AUTH_DB.prepare('SELECT id FROM event_signups WHERE event_id=? AND user_id=? AND deleted_at IS NULL')
+        .bind(eventId,subject.user.id).first();
+      if(!active)return json({error:'Active signup required'},403);
+      const rows=await env.AUTH_DB.prepare(`SELECT u.first_name,u.last_name
+        FROM event_signups s JOIN users u ON u.id=s.user_id
+        WHERE s.event_id=? AND s.deleted_at IS NULL
+        ORDER BY u.last_name,u.first_name,s.id`).bind(eventId)
+        .all<{first_name:string|null;last_name:string|null}>();
+      return json({participants:rows.results.map(row=>({
+        name:[row.first_name,row.last_name].filter(Boolean).join(' ').trim()||'Unnamed participant'
+      }))});
+    }
     // Canonical event details remain anonymously accessible.
     if (path.startsWith('/api/events/')) {
       if (request.method !== 'GET') return json({error:'Method not allowed'},405);
