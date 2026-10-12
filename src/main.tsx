@@ -303,9 +303,9 @@ function EventDetail({id,admin,me}:{id:string;admin:boolean;me:Me}){
    if(!pending.expiresAt||pending.expiresAt<Date.now()){localStorage.removeItem('servewith-pending-signup');return;}
    if(pending.id!==id)return;
    localStorage.removeItem('servewith-pending-signup');
+   if(signup){setNotice('You are already signed up for this event.');return;}
    if(event.start_at<=Date.now()){setError('Signups closed when the event started.');return;}
    if(event.spots_available===0){setError('This event is full.');return;}
-   if(signup){setNotice('You are already signed up for this event.');return;}
    void act('signup');
   }catch{localStorage.removeItem('servewith-pending-signup');}
  },[id,eligible,event?.id,signupLoadedFor,signup?.id]);
