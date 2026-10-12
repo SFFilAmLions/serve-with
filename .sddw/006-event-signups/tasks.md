@@ -102,3 +102,13 @@ The user subsequently approved implementation of **T001–T024 and T025–T026 p
 - **T024–T026:** [Release readiness](./release-readiness.md) prepares staging test/rollback checklists only. No live migration, merge or deployment is authorized.
 
 **Design caution:** Cloudflare D1 requires foreign keys to remain enforced. Rebuilding existing `users` by dropping the referenced table was shown to fail even when constraints were deferred. Additive participation identity plus unclaimed-stub sidecar storage avoids altering existing registered account foreign keys. Test on actual D1 only after staging migration approval.
+
+## Latest branch review and defensive fixes
+
+After checking current `spec/006-event-signups` (rather than assuming T010–T023 were still absent), additional security/data-integrity regressions were committed:
+
+- `0005_event_signups.sql`: enforce the exact event-start withdrawal cutoff within the SQLite update transaction, not only the Worker precheck, and make withdrawn historical timestamps immutable. Corresponding boundary tests include `deleted_at == start_at`, later withdrawals, and reactivation attempts.
+- `0006_unclaimed_users.sql`: protect account/stub email collisions on email **updates**, not just inserts. Tests assert both directions of collision are rejected without changing the original identity.
+- Previous branch work already includes self/admin signup APIs, aggregate public capacities, account claiming, attendee/admin UI, Usage & Quotas unavailable-state page, Material UI adjustments, and accessible relative event countdown. Acceptance gates remain open, notably actual D1 concurrency, live staging/browser flows and provider access. Do not reimplement existing features.
+
+Both migration files remain unapplied; CI checks are tracked through the draft feature branch.
