@@ -171,7 +171,9 @@ export function App(){
  const [admin,setAdmin]=useState(false);
  const dark=useMediaQuery('(prefers-color-scheme: dark)');
  const theme=React.useMemo(()=>createClubTheme(dark?'dark':'light'),[dark]);
- return <ThemeProvider theme={theme}><CssBaseline/><AppBar position="static" color="default" elevation={0}><Container><Box sx={{py:1.5,display:"flex",alignItems:"center",gap:1.5}}><Box component="img" src="/club-logo.png" alt="San Francisco Fil-Am Lions Club logo" sx={{width:48,height:48,objectFit:"contain"}}/><Typography variant="h6">Serve With Lions</Typography></Box></Container></AppBar><Container maxWidth="md" component="main"><Typography variant="h3" component="h1" sx={{mt:5}}>Serve With SF Fil-Am Lions</Typography><Typography color="text.secondary">Making it easier to serve together.</Typography><EventList admin={admin}/><SignIn onAuthChange={setAdmin}/><Box sx={{mt:3,display:'flex',gap:2}}><a href="/terms">Terms of Use</a><a href="/privacy">Privacy Policy</a></Box><BuildFooter/></Container></ThemeProvider>
+ return <ThemeProvider theme={theme}><CssBaseline/><Snackbar open={adminRedirectAlert} autoHideDuration={6000} onClose={()=>setAdminRedirectAlert(false)}>
+ <Alert severity="warning" role="alert" onClose={()=>setAdminRedirectAlert(false)}>You don't have access to the administrator event page. Showing the public event page instead.</Alert>
+ </Snackbar><AppBar position="static" color="default" elevation={0}><Container><Box sx={{py:1.5,display:"flex",alignItems:"center",gap:1.5}}><Box component="img" src="/club-logo.png" alt="San Francisco Fil-Am Lions Club logo" sx={{width:48,height:48,objectFit:"contain"}}/><Typography variant="h6">Serve With Lions</Typography></Box></Container></AppBar><Container maxWidth="md" component="main"><Typography variant="h3" component="h1" sx={{mt:5}}>Serve With SF Fil-Am Lions</Typography><Typography color="text.secondary">Making it easier to serve together.</Typography><EventList admin={admin}/><SignIn onAuthChange={setAdmin}/><Box sx={{mt:3,display:'flex',gap:2}}><a href="/terms">Terms of Use</a><a href="/privacy">Privacy Policy</a></Box><BuildFooter/></Container></ThemeProvider>
 }
 
 type Me = {requiredVersions?:{terms:string;privacy:string}|null;authenticated:boolean;email?:string;userId?:string;firstName?:string|null;lastName?:string|null;profileComplete?:boolean;agreementCurrent?:boolean;administratorEligible?:boolean;privileged?:boolean};
@@ -476,10 +478,11 @@ function MySignups({me}:{me:Me}){
 }
 
 function RoutedApp(){
+ const [sessionReady,setSessionReady]=useState(false),[adminRedirectAlert,setAdminRedirectAlert]=useState(false);
  const [path,setPath]=useState(location.pathname),[me,setMe]=useState<Me>({authenticated:false}),[appearance,setAppearance]=useState<'light'|'dark'|'system'>(()=>(localStorage.getItem('servewith-appearance') as 'light'|'dark'|'system')||'system'),[anchor,setAnchor]=useState<HTMLElement|null>(null),[appearanceAnchor,setAppearanceAnchor]=useState<HTMLElement|null>(null);
  const systemDark=useMediaQuery('(prefers-color-scheme: dark)');
  const theme=React.useMemo(()=>createClubTheme(appearance==='system'?(systemDark?'dark':'light'):appearance),[appearance,systemDark]);
- const refresh=async()=>{try{setMe(await api('me'))}catch{setMe({authenticated:false})}};
+ const refresh=async()=>{try{setMe(await api('me'))}catch{setMe({authenticated:false})}finally{setSessionReady(true)}};
  useEffect(()=>{const fn=()=>setPath(location.pathname);addEventListener('popstate',fn);void refresh();return()=>removeEventListener('popstate',fn)},[]);
  const admin=path.startsWith('/admin'),canAdmin=Boolean(me.privileged&&me.administratorEligible);
  useEffect(()=>{
@@ -496,6 +499,11 @@ function RoutedApp(){
  const userRoute=path.match(/^\/users\/([0-9a-f-]{36})(\/edit)?$/);
  const eventRoute=path.match(/^\/events\/([0-9a-f-]{36})$/);
  const adminEventRoute=path.match(/^\/admin\/events\/([0-9a-f-]{36})$/);
+ useEffect(()=>{
+  if(!sessionReady||!adminEventRoute||canAdmin)return;
+  setAdminRedirectAlert(true);
+  go('/events/'+adminEventRoute[1]);
+ },[sessionReady,adminEventRoute?.[1],canAdmin]);
  const editRoute=path.match(/^\/admin\/events\/([0-9a-f-]{36})\/edit$/);
 
  return <ThemeProvider theme={theme}><CssBaseline/><AppBar position="static" color="default" elevation={0} sx={{borderBottom:1,borderColor:'divider'}}><Container maxWidth="lg"><Stack direction="row" alignItems="center" spacing={1} sx={{py:1}}><Box component="img" src="/club-logo.png" alt="SF Fil-Am Lions logo" sx={{width:40,height:40}}/><Button color="inherit" onClick={()=>go('/')} sx={{fontWeight:700}}>Serve With Lions</Button>{admin&&<Chip size="small" color="primary" variant="outlined" label="Administrator"/>}<Box sx={{flexGrow:1}}/>{canAdmin&&<Button size="small" color="inherit" startIcon={<Glyph type="swap"/>} sx={{display:{xs:'none',md:'inline-flex'}}} onClick={()=>go(admin?'/':'/admin/events')}>{admin?'Attendee':'Admin'} view</Button>}<Tooltip title="Appearance"><IconButton color="inherit" aria-label="Appearance" onClick={e=>setAppearanceAnchor(e.currentTarget)}><Glyph type={appearance==='dark'?'moon':appearance==='light'?'sun':'system'}/></IconButton></Tooltip><Menu anchorEl={appearanceAnchor} open={!!appearanceAnchor} onClose={()=>setAppearanceAnchor(null)}>{(['light','dark','system'] as const).map(mode=><MenuItem key={mode} selected={appearance===mode} onClick={()=>{setAppearance(mode);localStorage.setItem('servewith-appearance',mode);setAppearanceAnchor(null)}}><Box sx={{mr:1.5}}><Glyph type={mode==='light'?'sun':mode==='dark'?'moon':'system'}/></Box>{mode[0].toUpperCase()+mode.slice(1)}</MenuItem>)}</Menu><Button size="small" color="inherit" onClick={e=>setAnchor(e.currentTarget)} aria-label="Account menu" startIcon={<AccountAvatar email={me.authenticated?me.email:undefined} name={me.firstName||undefined}/>}>{me.authenticated?<Box sx={{display:{xs:'none',sm:'block'}}}>{me.firstName||'Account'}</Box>:<Box sx={{display:{xs:'none',sm:'block'}}}>Sign in</Box>}</Button><Menu anchorEl={anchor} open={!!anchor} onClose={()=>setAnchor(null)}>{me.authenticated&&<MenuItem onClick={()=>{setAnchor(null);go('/users/'+me.userId)}}><Box sx={{mr:1.5}}><Glyph type="person"/></Box>My Profile</MenuItem>}{me.authenticated&&<MenuItem onClick={()=>{setAnchor(null);go('/my-signups')}}>My signups</MenuItem>}{canAdmin&&<Box sx={{display:{xs:'block',md:'none'}}}><MenuItem onClick={()=>{setAnchor(null);go(admin?'/':'/admin/events')}}><Box sx={{mr:1.5}}><Glyph type="swap"/></Box>{admin?'Attendee workspace':'Administrator workspace'}</MenuItem></Box>}{me.authenticated?<MenuItem onClick={()=>{setAnchor(null);void api('logout',{}).then(refresh).then(()=>go('/'))}}><Box sx={{mr:1.5}}><Glyph type="logout"/></Box>Sign out</MenuItem>:<MenuItem onClick={()=>{setAnchor(null);go('/login')}}><Box sx={{mr:1.5}}><Glyph type="login"/></Box>Sign in</MenuItem>}</Menu></Stack>{admin&&canAdmin&&<Tabs value={path.startsWith('/admin/users')?'users':'events'} onChange={(_,v)=>go(v==='users'?'/admin/users':'/admin/events')} indicatorColor="primary"><Tab label="Events" value="events"/><Tab label="Users" value="users"/></Tabs>}</Container></AppBar>
