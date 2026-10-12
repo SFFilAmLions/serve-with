@@ -425,7 +425,9 @@ async function legacyFetch(request: Request, env: Env): Promise<Response> {
         const offset=Number(url.searchParams.get('offset')||'0');
         if (!Number.isSafeInteger(offset) || offset<0 || offset>100000) return json({error:'Invalid offset'},400);
         const search='%'+query.replace(/[\\%_]/g,x=>'\\'+x)+'%';
-        const rows=await env.AUTH_DB.prepare(`SELECT id,first_name,last_name,email FROM users
+        const rows=await env.AUTH_DB.prepare(`SELECT id,first_name,last_name,email FROM
+          (SELECT id,first_name,last_name,email FROM users
+           UNION ALL SELECT id,first_name,last_name,email FROM user_stubs WHERE claimed_at IS NULL) users
           WHERE (?='' OR lower(first_name) LIKE ? ESCAPE '\\' OR lower(last_name) LIKE ? ESCAPE '\\'
             OR lower(trim(coalesce(first_name,'')||' '||coalesce(last_name,''))) LIKE ? ESCAPE '\\'
             OR email LIKE ? ESCAPE '\\')
