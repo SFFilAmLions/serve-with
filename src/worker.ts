@@ -85,7 +85,7 @@ const bodyOf = async (request: Request): Promise<Record<string, unknown>> => {
   return body as Record<string, unknown>;
 };
 
-type EventFields = { title: string; location: string; timezone: string; start_at: number; end_at: number };
+type EventFields = { title: string; location: string; timezone: string; start_at: number; end_at: number; capacity: number|null };
 function eventInput(body: Record<string,unknown>): { event?: EventFields; errors?: Record<string,string> } {
   const errors: Record<string,string> = {};
   const title = typeof body.title === 'string' ? body.title.trim() : '';
@@ -94,6 +94,8 @@ function eventInput(body: Record<string,unknown>): { event?: EventFields; errors
   if (!title || title.length > 200) errors.title = 'Title must contain 1–200 characters';
   if (!location || location.length > 500) errors.location = 'Location must contain 1–500 characters';
   if (!timezone || timezone.length > 100) errors.timezone = 'Select a valid IANA time zone';
+  const capacity=body.capacity===undefined||body.capacity===null||body.capacity===''?null:body.capacity;
+  if(capacity!==null&&(!Number.isSafeInteger(capacity)||(capacity as number)<0))errors.capacity='Capacity must be a nonnegative whole number';
   const resolve = (field: 'start'|'end'): number | undefined => {
     const value = body[field];
     if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value)) {
@@ -112,7 +114,7 @@ function eventInput(body: Record<string,unknown>): { event?: EventFields; errors
   const start = resolve('start');
   const end = resolve('end');
   if (start !== undefined && end !== undefined && end <= start) errors.end = 'End must be after start';
-  return Object.keys(errors).length ? { errors } : { event: { title, location, timezone, start_at: start!, end_at: end! } };
+  return Object.keys(errors).length ? { errors } : { event: { title, location, timezone, start_at: start!, end_at: end!, capacity: capacity as number|null } };
 }
 
 async function sendEmail(env: Env, email: string, code: string, link: string): Promise<boolean> {
@@ -453,8 +455,8 @@ async function legacyFetch(request: Request, env: Env): Promise<Response> {
           start:body.start,end:body.end
         })) return json({error:'Invalid event',fields:{}},422);
         const now = Date.now(), id = crypto.randomUUID();
-        await env.AUTH_DB.prepare('INSERT INTO events (id,title,location,timezone,start_at,end_at,created_at,updated_at,version) VALUES (?,?,?,?,?,?,?,?,1)')
-          .bind(id,event.title,event.location,event.timezone,event.start_at,event.end_at,now,now).run();
+        await env.AUTH_DB.prepare('INSERT INTO events (id,title,location,timezone,start_at,end_at,created_at,updated_at,version,capacity) VALUES (?,?,?,?,?,?,?,?,1,?)')
+          .bind(id,event.title,event.location,event.timezone,event.start_at,event.end_at,now,now,event.capacity).run();
         return json({ event: {id,...event,version:1} },201);
       }
       if (path.startsWith('/api/admin/events/')) {
@@ -465,18 +467,24 @@ async function legacyFetch(request: Request, env: Env): Promise<Response> {
         let body: Record<string,unknown>;
         try { body = await bodyOf(request); } catch { return error(); }
         if (!Number.isSafeInteger(body.version) || (body.version as number) < 1) return json({ error: 'Valid event version required' }, 422);
-        const existing = await env.AUTH_DB.prepare('SELECT version FROM events WHERE id=? AND deleted_at IS NULL').bind(id).first<{version:number}>();
+        const existing = await env.AUTH_DB.prepare('SELECT version,capacity FROM events WHERE id=? AND deleted_at IS NULL').bind(id).first<{version:number;capacity:number|null}>();
         if (!existing) return json({ error: 'Event not found' }, 404);
         if (request.method === 'PUT') {
           const validated = eventInput(body);
           if (!validated.event) return json({ error: 'Invalid event', fields: validated.errors }, 422);
           const event = validated.event;
           const now = Date.now();
-          const updated = await env.AUTH_DB.prepare(
-            'UPDATE events SET title=?,location=?,timezone=?,start_at=?,end_at=?,updated_at=?,version=version+1 WHERE id=? AND version=? AND deleted_at IS NULL'
-          ).bind(event.title,event.location,event.timezone,event.start_at,event.end_at,now,id,body.version).run();
+          const capacity=body.capacity===undefined?existing.capacity:event.capacity;
+          let updated;
+          try {
+            updated=await env.AUTH_DB.prepare(
+              'UPDATE events SET title=?,location=?,timezone=?,start_at=?,end_at=?,capacity=?,updated_at=?,version=version+1 WHERE id=? AND version=? AND deleted_at IS NULL'
+            ).bind(event.title,event.location,event.timezone,event.start_at,event.end_at,capacity,now,id,body.version).run();
+          } catch {
+            return json({error:'Capacity cannot be below active signups',fields:{capacity:'Current signups exceed this capacity'}},409);
+          }
           if (updated.meta.changes !== 1) return json({ error: 'Event changed since you opened it', code: 'version_conflict' }, 409);
-          return json({ event: { id,...event,version:(body.version as number)+1 } });
+          return json({ event: { id,...event,capacity,version:(body.version as number)+1 } });
         }
         const now = Date.now();
         const result = await env.AUTH_DB.prepare('UPDATE events SET deleted_at=?,updated_at=?,version=version+1 WHERE id=? AND version=? AND deleted_at IS NULL')
