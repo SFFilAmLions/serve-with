@@ -29,3 +29,13 @@ test('YAML generates typed Cloudflare Worker operation registry and dispatch', (
   assert.match(generated, /export type WorkerHandlers =/);
   assert.match(generated, /export function dispatchOperation/);
 });
+
+test('YAML generates a typed same-origin browser client', () => {
+  const result = spawnSync(process.execPath, ['scripts/generate-openapi-client.mjs'], {encoding:'utf8'});
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  const generated = readFileSync('src/generated/openapi-client.ts', 'utf8');
+  for (const id of ['listEvents','getEvent','createAdminEvent','getCurrentSession','requestSignIn'])
+    assert.ok(generated.includes('async '+id+'('), id);
+  assert.match(generated, /credentials: "same-origin"/);
+  assert.match(generated, /export type EventCreateInput/);
+});
