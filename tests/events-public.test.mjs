@@ -544,5 +544,8 @@ test('participant roster sorts registered and stub identities together without l
   const roster=await (await h.req('/api/events/'+id+'/participants','GET',undefined,'__Host-sw_session='+token)).json();
   assert.deepEqual(roster.participants.map(x=>x.name),['Amy Able','Admin Example','Zed Zulu']);
   assert.ok(roster.participants.every(x=>Object.keys(x).length===1&&typeof x.name==='string'));
+  h.sqlite.prepare('UPDATE event_signups SET deleted_at=? WHERE id=?').run(now+1,names[0][0]+'-signup');
+  const afterWithdrawal=await (await h.req('/api/events/'+id+'/participants','GET',undefined,'__Host-sw_session='+token)).json();
+  assert.deepEqual(afterWithdrawal.participants.map(x=>x.name),['Amy Able','Admin Example'],'withdrawn stub is immediately excluded from names-only roster');
  }finally{h.sqlite.close();}
 });
