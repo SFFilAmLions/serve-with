@@ -91,3 +91,9 @@ WHEN NEW.id IS NOT OLD.id
   OR NEW.user_id IS NOT OLD.user_id
   OR NEW.created_at IS NOT OLD.created_at
 BEGIN SELECT RAISE(ABORT, 'Signup identity and creation time are immutable'); END;
+
+-- Participation history is append-only: ordinary withdrawals are soft-deletes.
+-- Hard deletes would erase accountability for delegated signup operations.
+CREATE TRIGGER event_signups_no_hard_delete
+BEFORE DELETE ON event_signups
+BEGIN SELECT RAISE(ABORT, 'Signup history must be retained'); END;
