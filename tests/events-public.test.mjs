@@ -456,3 +456,29 @@ test('admin creates email-optional unverified user without consent or login',asy
   assert.equal((await h.req(path,'POST',{firstName:'Other',lastName:'Person',email:'lionaugust@icloud.com'},cookie)).status,409);
  }finally{h.sqlite.close();}
 });
+
+test('database withdrawal rejection maps to a structured conflict for attendee and administrator', async()=>{
+ const h=harness();
+ try{
+  const id='123e4567-e89b-42d3-a456-426614174089';
+  const user='11111111-1111-4111-8111-111111111111';
+  const now=Date.now();
+  h.insert(id,now+600000,now+900000);
+  h.sqlite.prepare('INSERT INTO event_signups(id,event_id,user_id,created_at) VALUES(?,?,?,?)').run('signup-race',id,user,now);
+  // Emulate the database denying a write after an earlier Worker precheck.
+  h.sqlite.exec(`CREATE TRIGGER test_withdraw_abort BEFORE UPDATE OF deleted_at ON event_signups
+    BEGIN SELECT RAISE(ABORT,'Withdrawals closed'); END;`);
+  const session='9'.repeat(64);
+  const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode('test:'+session))),b=>b.toString(16).padStart(2,'0')).join('');
+  h.sqlite.prepare('INSERT INTO sessions(token_hash,email,expires_at,created_at,user_id) VALUES(?,?,?,?,?)')
+    .run(hash,'lionaugust@icloud.com',now+600000,now,user);
+  const cookie='__Host-sw_session='+session;
+  const self=await h.req('/api/events/'+id+'/signups','DELETE',undefined,cookie);
+  assert.equal(self.status,409);
+  assert.equal((await self.json()).code,'withdrawal_conflict');
+  const delegated=await h.req('/api/admin/events/'+id+'/signups','DELETE',{userId:user},cookie);
+  assert.equal(delegated.status,409);
+  assert.equal((await delegated.json()).code,'withdrawal_conflict');
+  assert.equal(h.sqlite.prepare('SELECT deleted_at FROM event_signups WHERE id=?').get('signup-race').deleted_at,null);
+ }finally{h.sqlite.close()}
+});
