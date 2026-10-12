@@ -474,6 +474,13 @@ test('admin creates email-optional unverified user without consent or login',asy
   assert.equal(h.sqlite.prepare('SELECT COUNT(*) n FROM agreement_acceptances WHERE user_id=?').get(created.id).n,0);
   assert.equal(h.sqlite.prepare('SELECT COUNT(*) n FROM sessions WHERE user_id=?').get(created.id).n,0);
   assert.equal((await h.req(path,'POST',{firstName:'Other',lastName:'Person',email:'lionaugust@icloud.com'},cookie)).status,409);
+  const firstStub=await h.req(path,'POST',{firstName:'First',lastName:'Stub',email:'test-claim@example.org'},cookie);
+  assert.equal(firstStub.status,201);
+  const firstId=(await firstStub.json()).user.id;
+  assert.equal((await h.req(path,'POST',{firstName:'Second',lastName:'Stub',email:' TEST-CLAIM@EXAMPLE.ORG '},cookie)).status,409,'case-insensitive normalized stub email collision must be rejected');
+  assert.equal(h.sqlite.prepare('SELECT COUNT(*) n FROM user_stubs WHERE email=?').get('test-claim@example.org').n,1);
+  assert.equal(h.sqlite.prepare('SELECT id FROM user_stubs WHERE email=?').get('test-claim@example.org').id,firstId);
+  assert.equal(h.sqlite.prepare('SELECT COUNT(*) n FROM agreement_acceptances WHERE user_id=?').get(firstId).n,0,'admin-created identity must not inherit consent');
  }finally{h.sqlite.close();}
 });
 
