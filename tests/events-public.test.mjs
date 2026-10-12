@@ -356,6 +356,11 @@ test('self signup API enforces identity, capacity, withdrawal history and origin
    .run(hash,'lionaugust@icloud.com',now+600000,now);
   const cookie='__Host-sw_session='+session;
   assert.equal((await h.req(root,'POST',{},cookie)).status,201);
+  const rosterUrl='/api/events/'+eventId+'/participants';
+  assert.equal((await h.req(rosterUrl)).status,401);
+  const roster=(await (await h.req(rosterUrl,'GET',undefined,cookie)).json()).participants;
+  assert.deepEqual(roster.map(x=>({...x})),[{name:'Admin Example'}]);
+  assert.equal(JSON.stringify(roster).includes('@'),false);
   const publicEvent=(await (await h.req('/api/events/'+eventId)).json()).event;
   assert.equal(publicEvent.signups_count,1);
   assert.equal(publicEvent.spots_available,0);
@@ -368,6 +373,7 @@ test('self signup API enforces identity, capacity, withdrawal history and origin
   assert.equal(history.signups.length,1);
   assert.equal(history.signups[0].event_id,eventId);
   assert.equal((await h.req(root,'DELETE',{},cookie)).status,200);
+  assert.equal((await h.req(rosterUrl,'GET',undefined,cookie)).status,403);
   assert.equal((await (await h.req(root,'GET',undefined,cookie)).json()).signup,null);
   assert.equal((await h.req(root,'POST',{},cookie)).status,201);
   assert.equal(h.sqlite.prepare('SELECT COUNT(*) n FROM event_signups WHERE event_id=?').get(eventId).n,2);
