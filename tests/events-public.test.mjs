@@ -299,3 +299,35 @@ test('compatibility normalizer forwards legacy event-create bodies to real Worke
     assert.equal(h.sqlite.prepare('SELECT COUNT(*) n FROM events').get().n,1);
   } finally {h.sqlite.close();}
 });
+
+test('generated OpenAPI dispatcher delegates to actual Worker without bypassing CSRF or admin checks', async () => {
+  const {spawnSync}=await import('node:child_process');
+  const generated=spawnSync(process.execPath,['scripts/generate-openapi-operations.mjs'],{encoding:'utf8'});
+  assert.equal(generated.status,0,generated.stderr||generated.stdout);
+  const source=readFileSync('src/generated/openapi-operations.ts','utf8');
+  const js=ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText;
+  const {operations,dispatchOperation}=await import('data:text/javascript;base64,'+Buffer.from(js).toString('base64'));
+  const h=harness();
+  try {
+    const origin='https://servewith-beta.sffilamlions.org';
+    const env={AUTH_DB:h.adapter,AUTH_PEPPER:'test',ASSETS:{fetch:async()=>new Response('asset')}};
+    const handlers=Object.fromEntries(operations.map(op=>[op.id,(request)=>worker.fetch(request,env)]));
+    const send=(headers)=>dispatchOperation(new Request(origin+'/api/admin/events',{
+      method:'POST',headers:{'content-type':'application/json',...headers},
+      body:JSON.stringify({title:'Service',location:'Park',timezone:'America/Los_Angeles',start:'2026-11-14T09:00',end:'2026-11-14T12:00'})
+    }),handlers);
+    assert.equal((await dispatchOperation(new Request(origin+'/api/events'),handlers)).status,200);
+    assert.equal((await send({origin})).status,401);
+    const session='8'.repeat(64),now=Date.now();
+    const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode('test:'+session))),b=>b.toString(16).padStart(2,'0')).join('');
+    h.sqlite.prepare('INSERT INTO sessions(token_hash,email,expires_at,created_at) VALUES (?,?,?,?)')
+      .run(hash,'lionaugust@icloud.com',now+600000,now);
+    const cookie='__Host-sw_session='+session;
+    assert.equal((await send({origin:'https://attacker.example',cookie})).status,400);
+    assert.equal((await send({origin,cookie,'sec-fetch-site':'cross-site'})).status,400);
+    const created=await send({origin,cookie});
+    assert.equal(created.status,201);
+    assert.equal((await created.json()).event.title,'Service');
+    assert.equal(h.sqlite.prepare('SELECT COUNT(*) n FROM events').get().n,1);
+  } finally {h.sqlite.close();}
+});
