@@ -5,7 +5,7 @@ import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { TimePicker } from '@mui/x-date-pickers/TimePicker';
-import { AppBar, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Alert, Autocomplete, Snackbar, Checkbox, FormControlLabel, Container, CssBaseline, Stack, Tab, Tabs, TextField, ThemeProvider, Typography, useMediaQuery, IconButton, Menu, MenuItem, ListItemButton, Divider, Tooltip, Skeleton, Card, CardContent, CardActions, Chip, SvgIcon, Avatar, ToggleButtonGroup, ToggleButton } from '@mui/material';
+import { AppBar, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Alert, Autocomplete, Snackbar, Checkbox, FormControlLabel, Container, CssBaseline, Stack, TextField, ThemeProvider, Typography, useMediaQuery, IconButton, Menu, MenuItem, ListItemButton, Divider, Tooltip, Skeleton, Card, CardContent, CardActions, Chip, SvgIcon, Avatar, ToggleButtonGroup, ToggleButton } from '@mui/material';
 import './style.css';
 import policyMetadata from './generated/policy-versions.json';
 import privacyPolicy from '../policies/privacy/approved-draft.md?raw';
@@ -483,7 +483,7 @@ function UsageDashboard(){
   try{
    const response=await generatedApi.getAdminUsage();
    if(response.status!==200)throw Error((response.data as {error?:string}).error||'Unable to load usage data');
-   setData(response.data as typeof data & NonNullable<typeof data>);
+   setData(response.data as NonNullable<typeof data>);
   }catch(e){setError(e instanceof Error?e.message:'Unable to load provider usage');}finally{setLoading(false);}
  };
  useEffect(()=>{void refresh()},[]);
