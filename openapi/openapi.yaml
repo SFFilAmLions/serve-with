@@ -790,6 +790,39 @@ paths:
               schema:
                   $ref: '#/components/schemas/Error'
   /api/admin/users:
+    post:
+      operationId: createAdminUserStub
+      tags: [Administration]
+      summary: Create a name-required, email-optional unclaimed user
+      security:
+        - SessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              required: [firstName, lastName]
+              properties:
+                firstName: {type: string, minLength: 1, maxLength: 100}
+                lastName: {type: string, minLength: 1, maxLength: 100}
+                email: {type: [string, 'null']}
+                dateOfBirth: {type: [string, 'null']}
+      responses:
+        '201':
+          description: Unclaimed identity created, without verified email or agreements
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [user]
+                properties:
+                  user: {type: object}
+        '401': {description: Sign-in required}
+        '403': {description: Administrator rights required}
+        '409': {description: Email collision}
+        '422': {description: Invalid form data}
     get:
       operationId: listAdminUsers
       tags: [Administration]
