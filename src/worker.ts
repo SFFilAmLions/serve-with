@@ -191,11 +191,12 @@ async function legacyFetch(request: Request, env: Env): Promise<Response> {
       const comparison = view === 'upcoming' ? '>' : '<=';
       const direction = view === 'upcoming' ? 'ASC' : 'DESC';
       const events = await env.AUTH_DB.prepare(
-        `SELECT id,title,location,timezone,start_at,end_at,version FROM events
-         WHERE deleted_at IS NULL AND end_at ${comparison} ?
-         ORDER BY start_at ${direction}, id ${direction}`
-      ).bind(now).all<{ id: string; title: string; location: string; timezone: string; start_at: number; end_at: number; version: number }>();
-      return json({ view, events: events.results });
+        `SELECT e.id,e.title,e.location,e.timezone,e.start_at,e.end_at,e.version,e.capacity,
+          (SELECT COUNT(*) FROM event_signups s WHERE s.event_id=e.id AND s.deleted_at IS NULL) AS signups_count
+         FROM events e WHERE e.deleted_at IS NULL AND e.end_at ${comparison} ?
+         ORDER BY e.start_at ${direction}, e.id ${direction}`
+      ).bind(now).all<{id:string;title:string;location:string;timezone:string;start_at:number;end_at:number;version:number;capacity:number|null;signups_count:number}>();
+      return json({view,events:events.results.map(e=>({...e,spots_available:e.capacity===null?null:Math.max(0,e.capacity-e.signups_count)}))});
     }
     // SDDW-006 participation: all decisions are rechecked at the write instant.
     if (path === '/api/me/signups' || /^\/api\/events\/[0-9a-f-]{36}\/signups$/.test(path)) {
@@ -248,8 +249,11 @@ async function legacyFetch(request: Request, env: Env): Promise<Response> {
       if (!env.AUTH_DB) return json({error:'Service unavailable'},503);
       const id=path.slice('/api/events/'.length);
       if (!/^[0-9a-f-]{36}$/.test(id)) return json({error:'Event not found'},404);
-      const event=await env.AUTH_DB.prepare('SELECT id,title,location,timezone,start_at,end_at,version FROM events WHERE id=? AND deleted_at IS NULL').bind(id).first();
-      return event ? json({event}) : json({error:'Event not found'},404);
+      const event=await env.AUTH_DB.prepare(`SELECT e.id,e.title,e.location,e.timezone,e.start_at,e.end_at,e.version,e.capacity,
+        (SELECT COUNT(*) FROM event_signups s WHERE s.event_id=e.id AND s.deleted_at IS NULL) AS signups_count
+        FROM events e WHERE e.id=? AND e.deleted_at IS NULL`).bind(id)
+        .first<{capacity:number|null;signups_count:number}>();
+      return event ? json({event:{...event,spots_available:event.capacity===null?null:Math.max(0,event.capacity-event.signups_count)}}) : json({error:'Event not found'},404);
     }
     if (path.startsWith('/api/users/')) {
       if (!env.AUTH_DB || !env.AUTH_PEPPER) return json({error:'Service unavailable'},503);
