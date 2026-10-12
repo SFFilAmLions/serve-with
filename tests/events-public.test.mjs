@@ -356,6 +356,11 @@ test('self signup API enforces identity, capacity, withdrawal history and origin
    .run(hash,'lionaugust@icloud.com',now+600000,now);
   const cookie='__Host-sw_session='+session;
   assert.equal((await h.req(root,'POST',{},cookie)).status,201);
+  const publicEvent=(await (await h.req('/api/events/'+eventId)).json()).event;
+  assert.equal(publicEvent.signups_count,1);
+  assert.equal(publicEvent.spots_available,0);
+  assert.equal(publicEvent.capacity,1);
+  assert.equal(JSON.stringify(publicEvent).includes('lionaugust@icloud.com'),false);
   assert.equal((await h.req(root,'POST',{},cookie)).status,409);
   const own=await (await h.req(root,'GET',undefined,cookie)).json();
   assert.ok(own.signup.id);
