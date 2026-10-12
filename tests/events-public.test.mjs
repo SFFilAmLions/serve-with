@@ -383,6 +383,10 @@ test('self signup API enforces identity, capacity, withdrawal history and origin
   assert.equal((await h.req(root,'POST',{},cookie)).status,201);
   assert.equal(h.sqlite.prepare('SELECT COUNT(*) n FROM event_signups WHERE event_id=?').get(eventId).n,2);
   assert.equal(h.sqlite.prepare('SELECT COUNT(*) n FROM event_signups WHERE event_id=? AND deleted_at IS NULL').get(eventId).n,1);
+  const afterRejoin=await (await h.req('/api/me/signups','GET',undefined,cookie)).json();
+  assert.equal(afterRejoin.signups.length,2,'withdrawn history is preserved after rejoining');
+  assert.equal(afterRejoin.signups.filter(s=>s.deleted_at===null).length,1,'exactly one active signup exists');
+  assert.equal(afterRejoin.signups.filter(s=>s.deleted_at!==null).length,1,'one withdrawn historical record is retained');
   h.sqlite.prepare('UPDATE events SET start_at=? WHERE id=?').run(Date.now()-1000,eventId);
   assert.equal((await h.req(root,'DELETE',{},cookie)).status,409);
   assert.equal((await h.req(root,'POST',{},cookie)).status,409,'event-start cutoff also prevents new attendee signup');
