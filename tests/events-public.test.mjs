@@ -588,3 +588,27 @@ test('parallel delegated signups at capacity one accept only one distinct attend
   assert.equal(h.sqlite.prepare('SELECT COUNT(*) AS n FROM event_signups WHERE event_id=?').get(eventId).n,1);
  }finally{h.sqlite.close();}
 });
+
+
+test('verified-email claim migration preserves stub signup identity and rejects cross-identity collisions',()=>{
+ const h=harness();
+ try{
+  const now=Date.now(),eventId='123e4567-e89b-42d3-a456-426614174096';
+  const stubId='55555555-5555-4555-8555-555555555555';
+  h.insert(eventId,now+600000,now+900000);
+  h.sqlite.prepare('INSERT INTO participation_identities(id) VALUES(?)').run(stubId);
+  h.sqlite.prepare('INSERT INTO user_stubs(id,email,first_name,last_name,created_at,updated_at) VALUES(?,?,?,?,?,?)')
+   .run(stubId,'claimable@example.org','Claim','Owner',now,now);
+  h.sqlite.prepare('INSERT INTO event_signups(id,event_id,user_id,created_at) VALUES(?,?,?,?)')
+   .run('pre-claim-signup',eventId,stubId,now);
+  assert.throws(()=>h.sqlite.prepare('INSERT INTO users(id,email,created_at,updated_at) VALUES(?,?,?,?)')
+   .run('66666666-6666-4666-8666-666666666666','claimable@example.org',now,now),/Email belongs to another stub identity/);
+  h.sqlite.prepare('INSERT INTO users(id,email,email_verified_at,created_at,updated_at) VALUES(?,?,?,?,?)')
+   .run(stubId,'claimable@example.org',now,now,now);
+  h.sqlite.prepare('UPDATE user_stubs SET claimed_at=?,updated_at=? WHERE id=?').run(now+1,now+1,stubId);
+  assert.equal(h.sqlite.prepare('SELECT user_id FROM event_signups WHERE id=?').get('pre-claim-signup').user_id,stubId);
+  assert.equal(h.sqlite.prepare('SELECT COUNT(*) n FROM agreement_acceptances WHERE user_id=?').get(stubId).n,0,'email claiming alone cannot imply agreement consent');
+  assert.equal(h.sqlite.prepare('SELECT claimed_at FROM user_stubs WHERE id=?').get(stubId).claimed_at,now+1);
+  assert.equal(h.sqlite.prepare('SELECT COUNT(*) n FROM participation_identities WHERE id=?').get(stubId).n,1);
+ }finally{h.sqlite.close()}
+});
