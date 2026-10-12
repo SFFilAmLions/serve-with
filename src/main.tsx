@@ -328,7 +328,7 @@ function EventPageEditor({id}:{id?:string}){
  const [version,setVersion]=useState(1),[message,setMessage]=useState(''),[busy,setBusy]=useState(false),[more,setMore]=useState(false);
  const [confirmClose,setConfirmClose]=useState(false);
  const duplication=(history.state as {duplicate?:EventRecord}|null)?.duplicate;
- useEffect(()=>{const populate=(event:EventRecord)=>{const value={title:event.title,location:event.location,timezone:event.timezone,start:localInput(event.start_at,event.timezone),end:localInput(event.end_at,event.timezone)};setDraft(value);setOriginal(value);setVersion(event.version)};
+ useEffect(()=>{const populate=(event:EventRecord)=>{const value={title:event.title,location:event.location,timezone:event.timezone,start:localInput(event.start_at,event.timezone),end:localInput(event.end_at,event.timezone),capacity:event.capacity??null};setDraft(value);setOriginal(value);setVersion(event.version)};
   if(id){void generatedApi.getEvent({id}).then(r=>{if(r.status!==200)throw Error('Unable to load event');populate((r.data as {event:EventRecord}).event)}).catch(e=>setMessage(e.message))}
   else if(duplication)populate(duplication);
  },[id]);
