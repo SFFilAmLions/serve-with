@@ -58,7 +58,9 @@ function EventWhen({event}:{event:EventRecord}){
  const time=(v:number)=>new Intl.DateTimeFormat('en-US',{hour:'numeric',minute:'2-digit',timeZone:event.timezone}).format(v);
  const start=date(event.start_at),end=date(event.end_at);
  const abbreviated=new Intl.DateTimeFormat('en-US',{timeZone:event.timezone,timeZoneName:'short'}).formatToParts(event.start_at).find(p=>p.type==='timeZoneName')?.value||event.timezone;
- return <Stack spacing={1}><Typography>{start===end?start:start+' – '+end}</Typography><Typography variant="body2" color="text.secondary">{time(event.start_at)} – {time(event.end_at)}</Typography><Stack direction="row" gap={1} flexWrap="wrap"><Chip icon={<Glyph type="pin"/>} size="small" label={event.location} variant="outlined"/>{timeZoneOffsetMinutes(event.start_at,event.timezone)!==timeZoneOffsetMinutes(event.start_at,Intl.DateTimeFormat().resolvedOptions().timeZone)&&<Tooltip title={event.timezone}><Chip size="small" variant="outlined" label={abbreviated}/></Tooltip>}</Stack></Stack>;
+ return <Stack spacing={1}><Typography>{start===end?start:start+' – '+end}</Typography><Typography variant="body2" color="text.secondary">{time(event.start_at)} – {time(event.end_at)}</Typography><Stack direction="row" gap={1} flexWrap="wrap"><Chip icon={<Glyph type="pin"/>} size="small" label={event.location} variant="outlined"/>{timeZoneOffsetMinutes(event.start_at,event.timezone)!==timeZoneOffsetMinutes(event.start_at,Intl.DateTimeFormat().resolvedOptions().timeZone)&&<Tooltip title={event.timezone}><Chip size="small" variant="outlined" label={abbreviated}/></Tooltip>}</Stack>{event.signups_count!==undefined&&<Typography variant="body2" color="text.secondary">
+  {event.signups_count} {event.signups_count===1?'spot taken':'spots taken'} · {event.capacity===null?'Unlimited capacity':event.spots_available===undefined?'Capacity information unavailable':event.spots_available+' spots available'}
+ </Typography>}</Stack>;
 }
 
 const generatedApi = createApiClient();
