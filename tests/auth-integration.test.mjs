@@ -4,6 +4,10 @@ import { readFileSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import ts from 'typescript';
 
+const opSource = readFileSync('src/generated/openapi-operations.ts','utf8');
+const opJS = ts.transpileModule(opSource,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText;
+globalThis.__testOpenapiRegistry = await import('data:text/javascript;base64,'+Buffer.from(opJS).toString('base64'));
+
 globalThis.__testTemporal = (await import('@js-temporal/polyfill')).Temporal;
 globalThis.__testEligibility = (await import('data:text/javascript;base64,' + Buffer.from(
   ts.transpileModule(readFileSync('src/registration-eligibility.ts','utf8'),
@@ -12,6 +16,7 @@ globalThis.__testEligibility = (await import('data:text/javascript;base64,' + Bu
 
 globalThis.__testPolicyMetadata = JSON.parse(readFileSync('src/generated/policy-versions.json','utf8'));
 const source = readFileSync('src/worker.ts', 'utf8')
+  .replace("import { operations, matchOperation, dispatchOperation, type WorkerHandlers } from './generated/openapi-operations';", "const {operations,matchOperation,dispatchOperation}=globalThis.__testOpenapiRegistry;")
   .replace("import policyMetadata from './generated/policy-versions.json';", "const policyMetadata = globalThis.__testPolicyMetadata;")
   .replace("import { Temporal } from '@js-temporal/polyfill';", "const Temporal = globalThis.__testTemporal;")
   .replace("import { isStagingRegistrationEligible } from './registration-eligibility';", "const isStagingRegistrationEligible = globalThis.__testEligibility;")
