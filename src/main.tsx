@@ -78,6 +78,7 @@ function BuildFooter() {
 const magic = new URL(location.href).searchParams.get('magic');
 if (magic) history.replaceState(null,'','/login');
 const api = async (path:string,body?:Record<string,string>) => {
+ if(path==='me'&&!body){const result=await generatedApi.getCurrentSession();if(result.status!==200)throw Error('Could not read session');return result.data;}
  const r=await fetch('/api/auth/'+path,{method:body?'POST':'GET',headers:body?{'content-type':'application/json'}:{},body:body?JSON.stringify(body):undefined,credentials:'same-origin',cache:'no-store'});
  const data=await r.json();if(!r.ok)throw new Error(data.error||'Request failed');return data;
 };
@@ -202,7 +203,7 @@ function AuthScreen({me,refresh}:{me:Me;refresh:()=>Promise<void>}){
  const [email,setEmail]=useState(''),[code,setCode]=useState(''),[stage,setStage]=useState<'email'|'code'>('email'),[busy,setBusy]=useState(false);
  const [message,setMessage]=useState(''),[first,setFirst]=useState(''),[last,setLast]=useState(''),[dob,setDob]=useState('');
  const [turnstileKey,setTurnstileKey]=useState<string|null>(null),[captchaReady,setCaptchaReady]=useState(false),[captchaToken,setCaptchaToken]=useState(''),[captchaRound,setCaptchaRound]=useState(0);
- useEffect(()=>{void requestJson('/api/auth/turnstile-config').then(r=>{setTurnstileKey(r.siteKey||null);setCaptchaReady(true)}).catch(()=>setCaptchaReady(false))},[]);
+ useEffect(()=>{void generatedApi.getTurnstileConfig().then(r=>{if(r.status!==200)throw Error('Unable to load verification settings');const data=r.data as {siteKey:string|null};setTurnstileKey(data.siteKey||null);setCaptchaReady(true)}).catch(()=>setCaptchaReady(false))},[]);
  const requestCode=async()=>{if(!captchaReady||(turnstileKey&&!captchaToken))throw Error('Complete the security check first');try{return await submitJson('/api/auth/request',{email,turnstileToken:captchaToken})}finally{setCaptchaToken('');setCaptchaRound(n=>n+1)}};
 
  const token=magic;
