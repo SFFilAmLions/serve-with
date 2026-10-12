@@ -416,6 +416,8 @@ test('admin delegated signup allows explicit attendee selection and preserves hi
   assert.equal(h.sqlite.prepare('SELECT COUNT(*) n FROM event_signups WHERE event_id=?').get(eventId).n,2);
   h.sqlite.prepare('UPDATE events SET start_at=? WHERE id=?').run(Date.now()-1,eventId);
   assert.equal((await h.req(path,'DELETE',{userId:targetId},cookie)).status,409);
+  assert.equal((await h.req(path,'POST',{userId:targetId},cookie)).status,409,'administrator cannot override event start cutoff');
+  assert.equal(h.sqlite.prepare('SELECT COUNT(*) n FROM event_signups WHERE event_id=?').get(eventId).n,2,'denied delegation does not create signup history');
  }finally{h.sqlite.close();}
 });
 
