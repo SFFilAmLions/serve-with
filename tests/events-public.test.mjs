@@ -523,3 +523,26 @@ test('admin event capacity edits retain unlimited, reject overfull and stale ver
   assert.deepEqual({...h.sqlite.prepare('SELECT capacity,version FROM events WHERE id=?').get(id)},{capacity:null,version:3});
  }finally{h.sqlite.close();}
 });
+
+
+test('participant roster sorts registered and stub identities together without leaking email',async()=>{
+ const h=harness();
+ try{
+  const id='123e4567-e89b-42d3-a456-426614174092',now=Date.now();
+  h.insert(id,now+300000,now+600000);
+  const names=[['22222222-2222-4222-8222-222222222222','Zed','Zulu'],['33333333-3333-4333-8333-333333333333','Amy','Able']];
+  for(const [user,first,last] of names){
+   h.sqlite.prepare('INSERT INTO participation_identities(id) VALUES(?)').run(user);
+   h.sqlite.prepare('INSERT INTO user_stubs(id,first_name,last_name,created_at,updated_at) VALUES(?,?,?,?,?)').run(user,first,last,now,now);
+   h.sqlite.prepare('INSERT INTO event_signups(id,event_id,user_id,created_at) VALUES(?,?,?,?)').run(user+'-signup',id,user,now);
+  }
+  const adminId='11111111-1111-4111-8111-111111111111';
+  h.sqlite.prepare('INSERT INTO event_signups(id,event_id,user_id,created_at) VALUES(?,?,?,?)').run('admin-roster',id,adminId,now);
+  const token='e'.repeat(64);
+  const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode('test:'+token))),b=>b.toString(16).padStart(2,'0')).join('');
+  h.sqlite.prepare('INSERT INTO sessions(token_hash,email,expires_at,created_at) VALUES(?,?,?,?)').run(hash,'lionaugust@icloud.com',now+600000,now);
+  const roster=await (await h.req('/api/events/'+id+'/participants','GET',undefined,'__Host-sw_session='+token)).json();
+  assert.deepEqual(roster.participants.map(x=>x.name),['Amy Able','Admin Example','Zed Zulu']);
+  assert.ok(roster.participants.every(x=>Object.keys(x).length===1&&typeof x.name==='string'));
+ }finally{h.sqlite.close();}
+});
