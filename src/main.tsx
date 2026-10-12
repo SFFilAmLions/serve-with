@@ -183,7 +183,6 @@ const requestJson=async(path:string, options?:RequestInit)=>{
 };
 const submitJson=(path:string,body:Record<string,unknown>,method='POST')=>requestJson(path,{method,headers:{'content-type':'application/json'},body:JSON.stringify(body)});
 const go=(path:string,state?:unknown)=>{history.pushState(state,'',path);window.dispatchEvent(new PopStateEvent('popstate'))};
-const formatTime=(value:number,zone:string)=>new Intl.DateTimeFormat('en-US',{weekday:'short',month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit',timeZone:zone,timeZoneName:'short'}).format(new Date(value));
 
 type TurnstileApi={render:(element:HTMLElement,options:{sitekey:string;action:string;callback:(token:string)=>void;'expired-callback':()=>void;'error-callback':()=>void})=>string;remove:(id:string)=>void};
 function LoginChallenge({siteKey,onToken}:{siteKey:string;onToken:(token:string)=>void}){
