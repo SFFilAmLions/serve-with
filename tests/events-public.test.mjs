@@ -418,6 +418,11 @@ test('admin delegated signup allows explicit attendee selection and preserves hi
   assert.equal((await h.req(path,'DELETE',{userId:targetId},cookie)).status,200);
   assert.equal((await h.req(path,'POST',{userId:targetId},cookie)).status,201);
   assert.equal(h.sqlite.prepare('SELECT COUNT(*) n FROM event_signups WHERE event_id=?').get(eventId).n,2);
+  const completeRoster=await (await h.req(path,'GET',undefined,cookie)).json();
+  assert.equal(completeRoster.signups.length,2,'admin can inspect both historical records');
+  assert.equal(completeRoster.signups.filter(row=>row.deleted_at===null).length,1);
+  assert.equal(completeRoster.signups.filter(row=>row.deleted_at!==null).length,1);
+  assert.ok(completeRoster.signups.every(row=>row.user_id===targetId),'history retains selected attendee identity');
   h.sqlite.prepare('UPDATE events SET start_at=? WHERE id=?').run(Date.now()-1,eventId);
   assert.equal((await h.req(path,'DELETE',{userId:targetId},cookie)).status,409);
   assert.equal((await h.req(path,'POST',{userId:targetId},cookie)).status,409,'administrator cannot override event start cutoff');
