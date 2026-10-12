@@ -398,10 +398,47 @@ function AgreementCompletion({me,refresh}:{me:Me;refresh:()=>Promise<void>}) {
  </Stack>;
 }
 
+function AdminCreateUser(){
+ const [first,setFirst]=useState(''),[last,setLast]=useState(''),[email,setEmail]=useState(''),[dob,setDob]=useState('');
+ const [busy,setBusy]=useState(false),[error,setError]=useState('');
+ const returnEventId=(history.state as {returnEventId?:string}|null)?.returnEventId;
+ const submit=async()=>{
+  if(busy)return;setBusy(true);setError('');
+  try{
+   const response=await generatedApi.createAdminUserStub({body:{
+     firstName:first,lastName:last,...(email.trim()?{email:email.trim()}:{}),
+     ...(dob?{dateOfBirth:dob}:{})
+   }});
+   if(response.status!==201)throw Error((response.data as {error?:string}).error||'Unable to create user');
+   const user=(response.data as {user:{id:string;firstName:string;lastName:string;email:string|null}}).user;
+   if(returnEventId&&/^[0-9a-f-]{36}$/.test(returnEventId))
+     go('/admin/events/'+returnEventId,{preselectedUser:user});
+   else go('/admin/users');
+  }catch(e){setError(e instanceof Error?e.message:'Unable to create user');}finally{setBusy(false);}
+ };
+ return <Stack spacing={2} sx={{my:4,maxWidth:650}}>
+  <Typography variant="h4">Create user</Typography>
+  <Typography color="text.secondary">Create an unclaimed attendee record. Names are required; email and date of birth are optional. No account verification or policy acceptance is performed on the person's behalf.</Typography>
+  {error&&<Alert severity="error" role="alert">{error}</Alert>}
+  <TextField required label="First name" value={first} onChange={e=>setFirst(e.target.value)}/>
+  <TextField required label="Last name" value={last} onChange={e=>setLast(e.target.value)}/>
+  <TextField label="Email (optional)" type="email" value={email} onChange={e=>setEmail(e.target.value)}/>
+  <TextField label="Date of birth (optional)" type="date" slotProps={{inputLabel:{shrink:true}}} value={dob} onChange={e=>setDob(e.target.value)}/>
+  <Stack direction="row" spacing={2}>
+   <Button onClick={()=>go(returnEventId?'/admin/events/'+returnEventId:'/admin/users')}>Cancel</Button>
+   <Button variant="contained" disabled={busy||!first.trim()||!last.trim()} onClick={()=>void submit()}>Create unclaimed user</Button>
+  </Stack>
+ </Stack>;
+}
+
 function AdminEventSignups({id}:{id:string}){
  const [entries,setEntries]=useState<{id:string;user_id:string;first_name:string|null;last_name:string|null;email:string|null;created_at:number;deleted_at:number|null}[]>([]);
  const [query,setQuery]=useState(''),[people,setPeople]=useState<{id:string;first_name:string|null;last_name:string|null;email:string|null}[]>([]);
  const [selected,setSelected]=useState(''),[error,setError]=useState(''),[notice,setNotice]=useState(''),[busy,setBusy]=useState(false);
+ useEffect(()=>{
+  const pre=(history.state as {preselectedUser?:{id:string;firstName:string;lastName:string;email:string|null}}|null)?.preselectedUser;
+  if(pre){setPeople([{id:pre.id,first_name:pre.firstName,last_name:pre.lastName,email:pre.email}]);setSelected(pre.id);history.replaceState(null,'',location.href);}
+ },[id]);
  const load=async()=>{
   const result=await generatedApi.listAdminEventSignups({id});
   if(result.status!==200)throw Error((result.data as {error?:string}).error||'Unable to load roster');
@@ -428,6 +465,7 @@ function AdminEventSignups({id}:{id:string}){
   {error&&<Alert severity="error" role="alert">{error}</Alert>}
   {notice&&<Alert severity="success" role="status">{notice}</Alert>}
   <Typography variant="h6">Add an attendee</Typography>
+  <Button sx={{alignSelf:'flex-start'}} onClick={()=>go('/admin/users/new',{returnEventId:id})}>Create user</Button>
   <Stack direction={{xs:'column',sm:'row'}} spacing={1}>
    <TextField size="small" label="Search attendees by name or email" value={query} onChange={e=>setQuery(e.target.value)}/>
    <Button onClick={()=>void search()}>Search users</Button>
@@ -549,7 +587,7 @@ function RoutedApp(){
   aria-label="Administrator sections" sx={{my:1,gap:1,'& .MuiToggleButton-root':{borderRadius:'24px !important',px:2}}}>
    <ToggleButton value="events">Events</ToggleButton><ToggleButton value="users">Users</ToggleButton><ToggleButton value="usage">Usage</ToggleButton>
   </ToggleButtonGroup>}</Container></AppBar>
- <Container maxWidth="lg" component="main">{path==='/terms'?<PolicyPage kind="terms"/>:path==='/privacy'?<PolicyPage kind="privacy"/>:path==='/login'?<AuthScreen me={me} refresh={refresh}/>:path==='/admin/events/new'&&canAdmin?<EventPageEditor/>:editRoute&&canAdmin?<EventPageEditor id={editRoute[1]}/>:adminEventRoute&&canAdmin?<AdminEventSignups id={adminEventRoute[1]}/>:userRoute?<UserView key={path} id={userRoute[1]} edit={!!userRoute[2]}/>:eventRoute?<EventDetail id={eventRoute[1]} admin={canAdmin} me={me}/>:path==='/admin/users'&&canAdmin?<UsersDirectory/>:path==='/admin/usage'&&canAdmin?<UsageDashboard/>:path==='/my-signups'?<MySignups me={me}/>:path.startsWith('/admin')&&!canAdmin?<Alert severity="warning" sx={{mt:3}}>Complete your profile and current agreement to access administrator tools. <Button onClick={()=>go('/login')}>Account setup</Button></Alert>:<><Typography variant="h4" sx={{mt:4}}>{admin?'Manage events':'Serve With SF Fil-Am Lions'}</Typography><EventList admin={canAdmin&&admin}/></>}<BuildFooter/></Container></ThemeProvider>;
+ <Container maxWidth="lg" component="main">{path==='/terms'?<PolicyPage kind="terms"/>:path==='/privacy'?<PolicyPage kind="privacy"/>:path==='/login'?<AuthScreen me={me} refresh={refresh}/>:path==='/admin/events/new'&&canAdmin?<EventPageEditor/>:editRoute&&canAdmin?<EventPageEditor id={editRoute[1]}/>:adminEventRoute&&canAdmin?<AdminEventSignups id={adminEventRoute[1]}/>:userRoute?<UserView key={path} id={userRoute[1]} edit={!!userRoute[2]}/>:eventRoute?<EventDetail id={eventRoute[1]} admin={canAdmin} me={me}/>:path==='/admin/users'&&canAdmin?<UsersDirectory/>:path==='/admin/users/new'&&canAdmin?<AdminCreateUser/>:path==='/admin/usage'&&canAdmin?<UsageDashboard/>:path==='/my-signups'?<MySignups me={me}/>:path.startsWith('/admin')&&!canAdmin?<Alert severity="warning" sx={{mt:3}}>Complete your profile and current agreement to access administrator tools. <Button onClick={()=>go('/login')}>Account setup</Button></Alert>:<><Typography variant="h4" sx={{mt:4}}>{admin?'Manage events':'Serve With SF Fil-Am Lions'}</Typography><EventList admin={canAdmin&&admin}/></>}<BuildFooter/></Container></ThemeProvider>;
 }
 
 createRoot(document.getElementById('app')!).render(<RoutedApp/>);
