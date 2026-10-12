@@ -39,3 +39,36 @@ test('YAML generates a typed same-origin browser client', () => {
   assert.match(generated, /credentials: "same-origin"/);
   assert.match(generated, /export type EventCreateInput/);
 });
+
+test('generated dispatcher matches dynamic paths and routes requests to handlers', async () => {
+  const ts = await import('typescript');
+  const source = readFileSync('src/generated/openapi-operations.ts', 'utf8');
+  const compiled = ts.transpileModule(source, {compilerOptions: {module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022}}).outputText;
+  const registry = await import('data:text/javascript;base64,'+Buffer.from(compiled).toString('base64'));
+  const match = registry.matchOperation('GET','/api/events/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa');
+  assert.equal(match.id, 'getEvent');
+  assert.equal(match.params.id, 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa');
+  assert.equal(registry.matchOperation('POST','/api/events/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'), null);
+  const handlers = Object.fromEntries(registry.operations.map(op=>[op.id, (_req, params) => Response.json({operation:op.id,params})]));
+  const response = await registry.dispatchOperation(new Request('https://example.test/api/events/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'), handlers);
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), {operation:'getEvent',params:{id:'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'}});
+});
+test('generated browser client sends same-origin JSON mutation and captures typed path', async () => {
+  const ts = await import('typescript');
+  const source = readFileSync('src/generated/openapi-client.ts', 'utf8');
+  const compiled = ts.transpileModule(source, {compilerOptions: {module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022}}).outputText;
+  const client = await import('data:text/javascript;base64,'+Buffer.from(compiled).toString('base64'));
+  let seen;
+  const api = client.createApiClient({fetcher: async (url,init) => {
+    seen={url,init};
+    return Response.json({event:{id:'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',title:'Test',location:'Park',timezone:'UTC',start_at:1,end_at:2,version:1}},{status:201});
+  }});
+  const body={title:'Test',location:'Park',timezone:'UTC',start:'2026-11-14T09:00',end:'2026-11-14T10:00'};
+  const result=await api.createAdminEvent({body});
+  assert.equal(seen.url,'/api/admin/events');
+  assert.equal(seen.init.method,'POST');
+  assert.equal(seen.init.credentials,'same-origin');
+  assert.equal(JSON.parse(seen.init.body).title,'Test');
+  assert.equal(result.status,201);
+});
