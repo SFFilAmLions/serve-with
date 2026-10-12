@@ -86,7 +86,1442 @@ components:
         end:
           type: string
           description: Local end time in YYYY-MM-DDTHH:mm format
-          pattern: '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$'
+          pattern: '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}
+      type: object
+      required: [event]
+      properties:
+        event:
+          $ref: '#/components/schemas/Event'
+paths:
+  /api/events:
+    get:
+      tags: [Events]
+      operationId: listEvents
+      summary: List public events
+      security: []
+      parameters:
+        - in: query
+          name: view
+          schema:
+            type: string
+            enum: [upcoming, past]
+            default: upcoming
+      responses:
+        '200':
+          description: Event list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [view, events]
+                properties:
+                  view:
+                    type: string
+                    enum: [upcoming, past]
+                  events:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Event'
+        '400':
+          description: Invalid query
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Database unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/events/{id}:
+    get:
+      tags: [Events]
+      operationId: getEvent
+      summary: Read public event details
+      security: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Event detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventDetail'
+        '404':
+          description: Event not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Database unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/admin/events:
+    post:
+      tags: [Administration]
+      operationId: createAdminEvent
+      summary: Create an event (administrator only)
+      description: |
+        Requires an authenticated, fully eligible administrator. The Worker
+        also requires a same-origin Origin header and rejects cross-site
+        Sec-Fetch-Site. Authorization, age/policy checks and CSRF defense
+        remain server-side and are not implied by the generated client.
+      security:
+        - SessionCookie: []
+      parameters:
+        - in: header
+          name: Origin
+          required: true
+          schema:
+            type: string
+            format: uri
+          description: Must equal the request origin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EventCreateInput'
+            example:
+              title: Neighborhood Cleanup
+              location: Community Park
+              timezone: America/Los_Angeles
+              start: '2026-11-14T09:00'
+              end: '2026-11-14T12:00'
+      responses:
+        '201':
+          description: Event created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventDetail'
+        '400':
+          description: Invalid request or origin
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Not an eligible administrator
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          description: Invalid event fields
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [error, fields]
+                properties:
+                  error:
+                    type: string
+                  fields:
+                    type: object
+                    additionalProperties:
+                      type: string
+        '503':
+          description: Service unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/auth/me:
+    get:
+      tags: [Authentication]
+      operationId: getCurrentSession
+      summary: Inspect current login and profile readiness
+      security: []
+      responses:
+        '200':
+          description: Current session state
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - type: object
+                    required: [authenticated, email]
+                    properties:
+                      authenticated:
+                        type: boolean
+                        const: false
+                      email:
+                        type: 'null'
+                  - type: object
+                    required: [authenticated, email, userId, firstName, lastName, emailVerified, profileComplete, agreementCurrent, administratorEligible, privileged, requiredVersions]
+                    properties:
+                      authenticated:
+                        type: boolean
+                        const: true
+                      email:
+                        type: string
+                        format: email
+                      userId:
+                        type: string
+                        format: uuid
+                      firstName:
+                        type: [string, 'null']
+                      lastName:
+                        type: [string, 'null']
+                      emailVerified:
+                        type: boolean
+                      profileComplete:
+                        type: boolean
+                      agreementCurrent:
+                        type: boolean
+                      administratorEligible:
+                        type: boolean
+                      privileged:
+                        type: boolean
+                      requiredVersions:
+                        type: object
+                        required: [terms, privacy]
+                        properties:
+                          terms:
+                            type: string
+                          privacy:
+                            type: string
+        '503':
+          description: Sign-in not configured
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/auth/request:
+    post:
+      tags: [Authentication]
+      operationId: requestSignIn
+      summary: Request a one-time sign-in email
+      description: |
+        Requires a same-origin request; enforces Turnstile and rate limits.
+        Returns a generic success message to avoid revealing whether an
+        address is eligible.
+      security: []
+      parameters:
+        - in: header
+          name: Origin
+          required: true
+          schema:
+            type: string
+            format: uri
+          description: Must match request origin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+                turnstileToken:
+                  type: string
+                  description: Required when Turnstile is configured
+              additionalProperties: true
+      responses:
+        '200':
+          description: Generic response irrespective of account eligibility
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message:
+                    type: string
+        '400':
+          description: Invalid request or origin
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Turnstile verification required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Authentication or email service unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/auth/turnstile-config:
+    get:
+      operationId: getTurnstileConfig
+      tags: [Authentication]
+      summary: getTurnstileConfig
+      security: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [siteKey]
+                properties:
+                  siteKey:
+                    type: [string, 'null']
+        '400':
+          description: Request error
+          content:
+            application/json:
+              schema:
+                  $ref: '#/components/schemas/Error'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                  $ref: '#/components/schemas/Error'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                  $ref: '#/components/schemas/Error'
+        '404':
+          description: Request error
+          content:
+            application/json:
+              schema:
+                  $ref: '#/components/schemas/Error'
+        '409':
+          description: Request error
+          content:
+            application/json:
+              schema:
+                  $ref: '#/components/schemas/Error'
+        '422':
+          description: Request error
+          content:
+            application/json:
+              schema:
+                  $ref: '#/components/schemas/Error'
+        '503':
+          description: Request error
+          content:
+            application/json:
+              schema:
+                  $ref: '#/components/schemas/Error'
+  /api/auth/profile:
+    post:
+      operationId: completeProfile
+      tags: [Authentication]
+      summary: completeProfile
+      security: 
+        - SessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              required: [firstName, lastName, dateOfBirth]
+              properties:
+                firstName:
+                  type: string
+                lastName:
+                  type: string
+                dateOfBirth:
+                  type: string
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [profileComplete]
+                properties:
+                  profileComplete:
+                    type: boolean
+        '400':
+          description: Request error
+          content:
+            application/json:
+              schema:
+                  $ref: '#/components/schemas/Error'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                  $ref: '#/components/schemas/Error'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                  $ref: '#/components/schemas/Error'
+        '404':
+          description: Request error
+          content:
+            application/json:
+              schema:
+                  $ref: '#/components/schemas/Error'
+        '409':
+          description: Request error
+          content:
+            application/json:
+              schema:
+                  $ref: '#/components/schemas/Error'
+        '422':
+          description: Request error
+          content:
+            application/json:
+              schema:
+                  $ref: '#/components/schemas/Error'
+        '503':
+          description: Request error
+          content:
+            application/json:
+              schema:
+                  $ref: '#/components/schemas/Error'
+  /api/auth/agreements:
+    post:
+      operationId: acceptAgreements
+      tags: [Authentication]
+      summary: acceptAgreements
+      security: 
+        - SessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              required: [accepted, termsVersion, privacyVersion]
+              properties:
+                accepted:
+                  type: boolean
+                termsVersion:
+                  type: string
+                privacyVersion:
+                  type: string
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [agreementCurrent]
+                properties:
+                  agreementCurrent:
+                    type: boolean
+        '400':
+          description: Request error
+          content:
+            application/json:
+              schema:
+                  $ref: '#/components/schemas/Error'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                  $ref: '#/components/schemas/Error'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                  $ref: '#/components/schemas/Error'
+        '404':
+          description: Request error
+          content:
+            application/json:
+              schema:
+                  $ref: '#/components/schemas/Error'
+        '409':
+          description: Request error
+          content:
+            application/json:
+              schema:
+                  $ref: '#/components/schemas/Error'
+        '422':
+          description: Request error
+          content:
+            application/json:
+              schema:
+                  $ref: '#/components/schemas/Error'
+        '503':
+          description: Request error
+          content:
+            application/json:
+              schema:
+                  $ref: '#/components/schemas/Error'
+  /api/auth/verify:
+    post:
+      operationId: verifyCode
+      tags: [Authentication]
+      summary: verifyCode
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              required: [email, code]
+              properties:
+                email:
+                  type: string
+                code:
+                  type: string
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [authenticated]
+                properties:
+                  authenticated:
+                    type: boolean
+        '400':
+          description: Request error
+          content:
+            application/json:
+              schema:
+                  $ref: '#/components/schemas/Error'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                  $ref: '#/components/schemas/Error'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                  $ref: '#/components/schemas/Error'
+        '404':
+          description: Request error
+          content:
+            application/json:
+              schema:
+                  $ref: '#/components/schemas/Error'
+        '409':
+          description: Request error
+          content:
+            application/json:
+              schema:
+                  $ref: '#/components/schemas/Error'
+        '422':
+          description: Request error
+          content:
+            application/json:
+              schema:
+                  $ref: '#/components/schemas/Error'
+        '503':
+          description: Request error
+          content:
+            application/json:
+              schema:
+                  $ref: '#/components/schemas/Error'
+  /api/auth/magic:
+    post:
+      operationId: verifyMagicLink
+      tags: [Authentication]
+      summary: verifyMagicLink
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              required: [token]
+              properties:
+                token:
+                  type: string
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [authenticated]
+                properties:
+                  authenticated:
+                    type: boolean
+        '400':
+          description: Request error
+          content:
+            application/json:
+              schema:
+                  $ref: '#/components/schemas/Error'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                  $ref: '#/components/schemas/Error'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                  $ref: '#/components/schemas/Error'
+        '404':
+          description: Request error
+          content:
+            application/json:
+              schema:
+                  $ref: '#/components/schemas/Error'
+        '409':
+          description: Request error
+          content:
+            application/json:
+              schema:
+                  $ref: '#/components/schemas/Error'
+        '422':
+          description: Request error
+          content:
+            application/json:
+              schema:
+                  $ref: '#/components/schemas/Error'
+        '503':
+          description: Request error
+          content:
+            application/json:
+              schema:
+                  $ref: '#/components/schemas/Error'
+  /api/auth/logout:
+    post:
+      operationId: logout
+      tags: [Authentication]
+      summary: logout
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              required: []
+              properties:
+
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [authenticated]
+                properties:
+                  authenticated:
+                    type: boolean
+        '400':
+          description: Request error
+          content:
+            application/json:
+              schema:
+                  $ref: '#/components/schemas/Error'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                  $ref: '#/components/schemas/Error'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                  $ref: '#/components/schemas/Error'
+        '404':
+          description: Request error
+          content:
+            application/json:
+              schema:
+                  $ref: '#/components/schemas/Error'
+        '409':
+          description: Request error
+          content:
+            application/json:
+              schema:
+                  $ref: '#/components/schemas/Error'
+        '422':
+          description: Request error
+          content:
+            application/json:
+              schema:
+                  $ref: '#/components/schemas/Error'
+        '503':
+          description: Request error
+          content:
+            application/json:
+              schema:
+                  $ref: '#/components/schemas/Error'
+  /api/admin/users:
+    post:
+      operationId: createAdminUserStub
+      tags: [Administration]
+      summary: Create a name-required, email-optional unclaimed user
+      security:
+        - SessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              required: [firstName, lastName]
+              properties:
+                firstName: {type: string, minLength: 1, maxLength: 100}
+                lastName: {type: string, minLength: 1, maxLength: 100}
+                email: {type: [string, 'null']}
+                dateOfBirth: {type: [string, 'null']}
+      responses:
+        '201':
+          description: Unclaimed identity created, without verified email or agreements
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [user]
+                properties:
+                  user: {type: object}
+        '401': {description: Sign-in required}
+        '403': {description: Administrator rights required}
+        '409': {description: Email collision}
+        '422': {description: Invalid form data}
+    get:
+      operationId: listAdminUsers
+      tags: [Administration]
+      summary: listAdminUsers
+      security: 
+        - SessionCookie: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [users, hasMore, nextOffset]
+                properties:
+                  users:
+                    type: array
+                    items: {type: object}
+                  hasMore:
+                    type: boolean
+                  nextOffset:
+                    type: integer
+        '400':
+          description: Request error
+          content:
+            application/json:
+              schema:
+                  $ref: '#/components/schemas/Error'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                  $ref: '#/components/schemas/Error'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                  $ref: '#/components/schemas/Error'
+        '404':
+          description: Request error
+          content:
+            application/json:
+              schema:
+                  $ref: '#/components/schemas/Error'
+        '409':
+          description: Request error
+          content:
+            application/json:
+              schema:
+                  $ref: '#/components/schemas/Error'
+        '422':
+          description: Request error
+          content:
+            application/json:
+              schema:
+                  $ref: '#/components/schemas/Error'
+        '503':
+          description: Request error
+          content:
+            application/json:
+              schema:
+                  $ref: '#/components/schemas/Error'
+  /api/admin/dashboard:
+    get:
+      operationId: getAdminDashboard
+      tags: [Administration]
+      summary: getAdminDashboard
+      security: 
+        - SessionCookie: []
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [email, message]
+                properties:
+                  email:
+                    type: string
+                  message:
+                    type: string
+        '400':
+          description: Request error
+          content:
+            application/json:
+              schema:
+                  $ref: '#/components/schemas/Error'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                  $ref: '#/components/schemas/Error'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                  $ref: '#/components/schemas/Error'
+        '404':
+          description: Request error
+          content:
+            application/json:
+              schema:
+                  $ref: '#/components/schemas/Error'
+        '409':
+          description: Request error
+          content:
+            application/json:
+              schema:
+                  $ref: '#/components/schemas/Error'
+        '422':
+          description: Request error
+          content:
+            application/json:
+              schema:
+                  $ref: '#/components/schemas/Error'
+        '503':
+          description: Request error
+          content:
+            application/json:
+              schema:
+                  $ref: '#/components/schemas/Error'
+  /api/users/{id}:
+    get:
+      operationId: getUser
+      tags: [Administration]
+      summary: getUser
+      security: 
+        - SessionCookie: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: string, format: uuid}
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [user, canCorrectDob]
+                properties:
+                  user:
+                    type: object
+                    additionalProperties: true
+                  canCorrectDob:
+                    type: boolean
+        '400':
+          description: Request error
+          content:
+            application/json:
+              schema:
+                  $ref: '#/components/schemas/Error'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                  $ref: '#/components/schemas/Error'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                  $ref: '#/components/schemas/Error'
+        '404':
+          description: Request error
+          content:
+            application/json:
+              schema:
+                  $ref: '#/components/schemas/Error'
+        '409':
+          description: Request error
+          content:
+            application/json:
+              schema:
+                  $ref: '#/components/schemas/Error'
+        '422':
+          description: Request error
+          content:
+            application/json:
+              schema:
+                  $ref: '#/components/schemas/Error'
+        '503':
+          description: Request error
+          content:
+            application/json:
+              schema:
+                  $ref: '#/components/schemas/Error'
+    put:
+      operationId: updateUser
+      tags: [Administration]
+      summary: updateUser
+      security: 
+        - SessionCookie: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: string, format: uuid}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              required: [firstName, lastName]
+              properties:
+                firstName:
+                  type: string
+                lastName:
+                  type: string
+                dateOfBirth:
+                  type: string
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [saved]
+                properties:
+                  saved:
+                    type: boolean
+        '400':
+          description: Request error
+          content:
+            application/json:
+              schema:
+                  $ref: '#/components/schemas/Error'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                  $ref: '#/components/schemas/Error'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                  $ref: '#/components/schemas/Error'
+        '404':
+          description: Request error
+          content:
+            application/json:
+              schema:
+                  $ref: '#/components/schemas/Error'
+        '409':
+          description: Request error
+          content:
+            application/json:
+              schema:
+                  $ref: '#/components/schemas/Error'
+        '422':
+          description: Request error
+          content:
+            application/json:
+              schema:
+                  $ref: '#/components/schemas/Error'
+        '503':
+          description: Request error
+          content:
+            application/json:
+              schema:
+                  $ref: '#/components/schemas/Error'
+  /api/admin/events/{id}:
+    put:
+      operationId: updateAdminEvent
+      tags: [Administration]
+      summary: updateAdminEvent
+      security: 
+        - SessionCookie: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: string, format: uuid}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              required: [title, location, timezone, start, end, version]
+              properties:
+                title:
+                  type: string
+                location:
+                  type: string
+                timezone:
+                  type: string
+                start:
+                  type: string
+                end:
+                  type: string
+                version:
+                  type: integer
+                capacity:
+                  type: [integer, 'null']
+                  minimum: 0
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [event]
+                properties:
+                  event:
+                    type: object
+                    additionalProperties: true
+        '400':
+          description: Request error
+          content:
+            application/json:
+              schema:
+                  $ref: '#/components/schemas/Error'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                  $ref: '#/components/schemas/Error'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                  $ref: '#/components/schemas/Error'
+        '404':
+          description: Request error
+          content:
+            application/json:
+              schema:
+                  $ref: '#/components/schemas/Error'
+        '409':
+          description: Request error
+          content:
+            application/json:
+              schema:
+                  $ref: '#/components/schemas/Error'
+        '422':
+          description: Request error
+          content:
+            application/json:
+              schema:
+                  $ref: '#/components/schemas/Error'
+        '503':
+          description: Request error
+          content:
+            application/json:
+              schema:
+                  $ref: '#/components/schemas/Error'
+    delete:
+      operationId: deleteAdminEvent
+      tags: [Administration]
+      summary: deleteAdminEvent
+      security: 
+        - SessionCookie: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: string, format: uuid}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              required: [version]
+              properties:
+                version:
+                  type: integer
+      responses:
+        '204':
+          description: Deleted successfully
+        '400':
+          description: Request error
+          content:
+            application/json:
+              schema:
+                  $ref: '#/components/schemas/Error'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                  $ref: '#/components/schemas/Error'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                  $ref: '#/components/schemas/Error'
+        '404':
+          description: Request error
+          content:
+            application/json:
+              schema:
+                  $ref: '#/components/schemas/Error'
+        '409':
+          description: Request error
+          content:
+            application/json:
+              schema:
+                  $ref: '#/components/schemas/Error'
+        '422':
+          description: Request error
+          content:
+            application/json:
+              schema:
+                  $ref: '#/components/schemas/Error'
+        '503':
+          description: Request error
+          content:
+            application/json:
+              schema:
+                  $ref: '#/components/schemas/Error'
+
+  /api/me/signups:
+    get:
+      operationId: listMySignups
+      tags: [Events]
+      summary: Current and withdrawn signup history for the authenticated attendee
+      security:
+        - SessionCookie: []
+      responses:
+        '200':
+          description: Own signup records including withdrawals
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [signups]
+                properties:
+                  signups:
+                    type: array
+                    items:
+                      type: object
+                      additionalProperties: true
+        '401':
+          description: Not signed in
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Profile or consent incomplete
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/events/{id}/signups:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema: {type: string, format: uuid}
+    get:
+      operationId: getMyEventSignup
+      tags: [Events]
+      summary: Get the current attendee's active signup, if any
+      security:
+        - SessionCookie: []
+      responses:
+        '200':
+          description: Own active signup or null
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [signup]
+                properties:
+                  signup: {type: [object, 'null']}
+        '401':
+          description: Not signed in
+    post:
+      operationId: signUpForEvent
+      tags: [Events]
+      summary: Sign up the authenticated eligible attendee
+      security:
+        - SessionCookie: []
+      parameters:
+        - in: header
+          name: Origin
+          required: true
+          schema: {type: string, format: uri}
+      responses:
+        '201':
+          description: Created signup
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [signup]
+                properties:
+                  signup: {type: object}
+        '401':
+          description: Not signed in
+        '403':
+          description: Profile or consent incomplete
+        '409':
+          description: Closed, full or duplicate
+    delete:
+      operationId: withdrawFromEvent
+      tags: [Events]
+      summary: Soft-delete attendee's own active signup before event start
+      security:
+        - SessionCookie: []
+      parameters:
+        - in: header
+          name: Origin
+          required: true
+          schema: {type: string, format: uri}
+      responses:
+        '200':
+          description: Whether an active signup was withdrawn
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [withdrawn]
+                properties:
+                  withdrawn: {type: boolean}
+        '401':
+          description: Not signed in
+        '403':
+          description: Profile or consent incomplete
+        '409':
+          description: Event already started
+
+  /api/events/{id}/participants:
+    get:
+      operationId: getEventParticipants
+      tags: [Events]
+      summary: Current attendee names, visible only to an active participant
+      security:
+        - SessionCookie: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: {type: string, format: uuid}
+      responses:
+        '200':
+          description: Active participant names only; no email, DOB or history
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [participants]
+                properties:
+                  participants:
+                    type: array
+                    items:
+                      type: object
+                      required: [name]
+                      properties:
+                        name: {type: string}
+        '401':
+          description: Sign-in required
+        '403':
+          description: Active participation required
+        '404':
+          description: Event missing or deleted
+
+  /api/admin/events/{id}/signups:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema: {type: string, format: uuid}
+    get:
+      operationId: listAdminEventSignups
+      tags: [Administration]
+      summary: Roster and history for an event, administrator only
+      security:
+        - SessionCookie: []
+      responses:
+        '200':
+          description: Authorized administrative signup history
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [signups]
+                properties:
+                  signups:
+                    type: array
+                    items: {type: object, additionalProperties: true}
+        '401': {description: Sign-in required}
+        '403': {description: Administrator permission required}
+    post:
+      operationId: adminSignUpAttendee
+      tags: [Administration]
+      summary: Register a chosen attendee subject to capacity and event-start cutoff
+      security:
+        - SessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [userId]
+              properties:
+                userId: {type: string, format: uuid}
+      responses:
+        '201':
+          description: Signup created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [signup]
+                properties:
+                  signup: {type: object}
+        '401': {description: Sign-in required}
+        '403': {description: Administrator permission required}
+        '409': {description: Duplicate, full or cutoff}
+    delete:
+      operationId: adminWithdrawAttendee
+      tags: [Administration]
+      summary: Withdraw selected attendee before event start
+      security:
+        - SessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [userId]
+              properties:
+                userId: {type: string, format: uuid}
+      responses:
+        '200':
+          description: Withdrawal result
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [withdrawn]
+                properties:
+                  withdrawn: {type: boolean}
+        '401': {description: Sign-in required}
+        '403': {description: Administrator permission required}
+        '409': {description: Event already started}
+
+  /api/admin/usage:
+    get:
+      operationId: getAdminUsage
+      tags: [Administration]
+      summary: Provider usage and availability for authorized administrators
+      security:
+        - SessionCookie: []
+      responses:
+        '200':
+          description: Metrics when verified, otherwise explicitly unavailable
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [environment, collectedAt, providers]
+                properties:
+                  environment: {type: string}
+                  collectedAt: {type: string, format: date-time}
+                  providers:
+                    type: array
+                    items:
+                      type: object
+                      required: [name, scope, status, used, limit, remaining]
+                      properties:
+                        name: {type: string}
+                        scope: {type: string}
+                        status: {type: string, enum: [available, stale, unavailable]}
+                        used: {type: [number, 'null']}
+                        limit: {type: [number, 'null']}
+                        remaining: {type: [number, 'null']}
+                        resetsAt: {type: [string, 'null']}
+                        reason: {type: string}
+        '401': {description: Not signed in}
+        '403': {description: Administrator rights required}
+
+        capacity:
+          type: [integer, 'null']
+          minimum: 0
+          description: Optional maximum active signups; null means unlimited
     EventDetail:
       type: object
       required: [event]
