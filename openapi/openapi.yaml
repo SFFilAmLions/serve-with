@@ -1447,3 +1447,38 @@ paths:
         '401': {description: Sign-in required}
         '403': {description: Administrator permission required}
         '409': {description: Event already started}
+
+  /api/admin/usage:
+    get:
+      operationId: getAdminUsage
+      tags: [Administration]
+      summary: Provider usage and availability for authorized administrators
+      security:
+        - SessionCookie: []
+      responses:
+        '200':
+          description: Metrics when verified, otherwise explicitly unavailable
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [environment, collectedAt, providers]
+                properties:
+                  environment: {type: string}
+                  collectedAt: {type: string, format: date-time}
+                  providers:
+                    type: array
+                    items:
+                      type: object
+                      required: [name, scope, status, used, limit, remaining]
+                      properties:
+                        name: {type: string}
+                        scope: {type: string}
+                        status: {type: string, enum: [available, stale, unavailable]}
+                        used: {type: [number, 'null']}
+                        limit: {type: [number, 'null']}
+                        remaining: {type: [number, 'null']}
+                        resetsAt: {type: [string, 'null']}
+                        reason: {type: string}
+        '401': {description: Not signed in}
+        '403': {description: Administrator rights required}
