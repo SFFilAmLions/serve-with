@@ -450,9 +450,10 @@ export default {
     // authorization, input validation, and error behavior.
     const url = new URL(request.url);
     if (!matchOperation(request.method, url.pathname)) return legacyFetch(request, env);
-    const handlers = Object.fromEntries(operations.map(op =>
-      [op.id, (matchedRequest: Request) => legacyFetch(matchedRequest, env)]
-    )) as WorkerHandlers;
+    const handlers = {} as WorkerHandlers;
+    for (const op of operations) {
+      handlers[op.id] = (matchedRequest: Request) => legacyFetch(matchedRequest, env);
+    }
     return dispatchOperation(request, handlers);
   }
 };
