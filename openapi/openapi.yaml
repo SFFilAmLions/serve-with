@@ -86,7 +86,12 @@ components:
         end:
           type: string
           description: Local end time in YYYY-MM-DDTHH:mm format
-          pattern: '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}
+          pattern: '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$'
+        capacity:
+          type: [integer, 'null']
+          minimum: 0
+          description: Optional maximum active signups; null means unlimited
+    EventDetail:
       type: object
       required: [event]
       properties:
