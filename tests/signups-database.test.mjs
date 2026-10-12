@@ -51,3 +51,16 @@ test('unlimited and zero-capacity events, below-roster edits, FK, deleted event'
   assert.throws(()=>add(d,'s4',a),/Event unavailable/);
  }finally{d.close()}
 });
+
+test('withdrawal cutoff is enforced atomically at the event start boundary',()=>{
+ const d=setup();try{
+  add(d,'s1',a);
+  assert.throws(()=>d.prepare('UPDATE event_signups SET deleted_at=? WHERE id=?').run(1000,'s1'),/Withdrawals closed/);
+  assert.throws(()=>d.prepare('UPDATE event_signups SET deleted_at=? WHERE id=?').run(1001,'s1'),/Withdrawals closed/);
+  assert.equal(d.prepare('SELECT deleted_at FROM event_signups WHERE id=?').get('s1').deleted_at,null);
+  d.prepare('UPDATE event_signups SET deleted_at=? WHERE id=?').run(999,'s1');
+  assert.throws(()=>d.prepare('UPDATE event_signups SET deleted_at=? WHERE id=?').run(998,'s1'),/immutable/);
+  assert.throws(()=>d.prepare('UPDATE event_signups SET deleted_at=NULL WHERE id=?').run('s1'),/immutable/);
+  assert.equal(d.prepare('SELECT deleted_at FROM event_signups WHERE id=?').get('s1').deleted_at,999);
+ }finally{d.close()}
+});
