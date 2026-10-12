@@ -318,6 +318,42 @@ async function legacyFetch(request: Request, env: Env): Promise<Response> {
       if (!subject.admin) return json({ error: 'Forbidden' }, 403);
       if (!privilegeReady(subject,env)) return json({ error: 'Profile or current agreement required', code: 'account_completion_required' }, 403);
       const email = subject.user.email;
+      const adminSignupMatch=path.match(/^\/api\/admin\/events\/([0-9a-f-]{36})\/signups$/);
+      if (adminSignupMatch) {
+        const eventId=adminSignupMatch[1],db=env.AUTH_DB,now=Date.now();
+        const event=await db.prepare('SELECT id,start_at,deleted_at FROM events WHERE id=?').bind(eventId)
+          .first<{id:string;start_at:number;deleted_at:number|null}>();
+        if(!event||event.deleted_at!==null)return json({error:'Event not found'},404);
+        if(request.method==='GET'){
+          const rows=await db.prepare(`SELECT s.id,s.user_id,s.created_at,s.deleted_at,u.first_name,u.last_name,u.email
+            FROM event_signups s JOIN users u ON u.id=s.user_id WHERE s.event_id=?
+            ORDER BY s.created_at DESC,s.id DESC`).bind(eventId).all();
+          return json({signups:rows.results});
+        }
+        if(request.method!=='POST'&&request.method!=='DELETE')return json({error:'Method not allowed'},405);
+        if(!originOk(request)||request.headers.get('sec-fetch-site')==='cross-site')return error();
+        if(now>=event.start_at)return json({error:'Signups are closed'},409);
+        let body:Record<string,unknown>;
+        try{body=await bodyOf(request)}catch{return error()}
+        const userId=body.userId;
+        if(typeof userId!=='string'||!/^[0-9a-f-]{36}$/.test(userId))return json({error:'Invalid attendee'},422);
+        const target=await db.prepare('SELECT id FROM users WHERE id=?').bind(userId).first();
+        if(!target)return json({error:'Attendee not found'},404);
+        if(request.method==='DELETE'){
+          const result=await db.prepare('UPDATE event_signups SET deleted_at=? WHERE event_id=? AND user_id=? AND deleted_at IS NULL')
+            .bind(now,eventId,userId).run();
+          return json({withdrawn:result.meta.changes===1});
+        }
+        const existing=await db.prepare('SELECT id FROM event_signups WHERE event_id=? AND user_id=? AND deleted_at IS NULL')
+          .bind(eventId,userId).first();
+        if(existing)return json({error:'Already signed up'},409);
+        const id=crypto.randomUUID();
+        try{
+          await db.prepare('INSERT INTO event_signups(id,event_id,user_id,created_at) VALUES(?,?,?,?)')
+            .bind(id,eventId,userId,now).run();
+          return json({signup:{id,eventId,userId,createdAt:now}},201);
+        }catch{return json({error:'Signup unavailable or event full',code:'signup_conflict'},409)}
+      }
       if (path === '/api/admin/users') {
         if (request.method!=='GET') return json({error:'Method not allowed'},405);
         const sort=url.searchParams.get('sort')==='first'?'first_name':'last_name';
