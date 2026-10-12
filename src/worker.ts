@@ -359,8 +359,13 @@ async function legacyFetch(request: Request, env: Env): Promise<Response> {
         try{body=await bodyOf(request)}catch{return error()}
         const userId=body.userId;
         if(typeof userId!=='string'||!/^[0-9a-f-]{36}$/.test(userId))return json({error:'Invalid attendee'},422);
-        const target=await db.prepare('SELECT id FROM users WHERE id=?').bind(userId).first();
+        const target=await db.prepare(`SELECT id,email,first_name,last_name,date_of_birth,email_verified_at,
+          terms_accepted_at,accepted_terms_version,accepted_privacy_version,is_stub FROM users WHERE id=?`)
+          .bind(userId).first<UserRow & {is_stub:number}>();
         if(!target)return json({error:'Attendee not found'},404);
+        if(request.method==='POST'&&target.is_stub!==1&&
+            !(target.email_verified_at&&profileReady(target)&&agreementReady(target,policyVersions(env))))
+          return json({error:'Attendee account not eligible'},403);
         if(request.method==='DELETE'){
           const result=await db.prepare('UPDATE event_signups SET deleted_at=? WHERE event_id=? AND user_id=? AND deleted_at IS NULL')
             .bind(now,eventId,userId).run();
