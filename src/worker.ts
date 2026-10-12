@@ -197,6 +197,51 @@ async function legacyFetch(request: Request, env: Env): Promise<Response> {
       ).bind(now).all<{ id: string; title: string; location: string; timezone: string; start_at: number; end_at: number; version: number }>();
       return json({ view, events: events.results });
     }
+    // SDDW-006 participation: all decisions are rechecked at the write instant.
+    if (path === '/api/me/signups' || /^\/api\/events\/[0-9a-f-]{36}\/signups$/.test(path)) {
+      if (!env.AUTH_DB || !env.AUTH_PEPPER) return json({error:'Service unavailable'},503);
+      const subject=await sessionSubject(request,env);
+      if (!subject) return json({error:'Authentication required'},401);
+      if (!privilegeReady(subject,env)) return json({error:'Profile or current agreement required',code:'account_completion_required'},403);
+      const db=env.AUTH_DB, now=Date.now();
+      if (path === '/api/me/signups') {
+        if (request.method!=='GET') return json({error:'Method not allowed'},405);
+        const rows=await db.prepare(`SELECT s.id,s.event_id,s.created_at,s.deleted_at,e.title,e.start_at,e.end_at
+          FROM event_signups s JOIN events e ON e.id=s.event_id WHERE s.user_id=?
+          ORDER BY s.created_at DESC,s.id DESC`).bind(subject.user.id).all();
+        return json({signups:rows.results});
+      }
+      const eventId=path.slice('/api/events/'.length,-'/signups'.length);
+      const event=await db.prepare('SELECT id,start_at,deleted_at,capacity FROM events WHERE id=?').bind(eventId)
+        .first<{id:string;start_at:number;deleted_at:number|null;capacity:number|null}>();
+      if (!event || event.deleted_at!==null) return json({error:'Event not found'},404);
+      if (request.method==='GET') {
+        const record=await db.prepare('SELECT id,created_at FROM event_signups WHERE event_id=? AND user_id=? AND deleted_at IS NULL')
+          .bind(eventId,subject.user.id).first();
+        return json({signup:record});
+      }
+      if (request.method!=='POST' && request.method!=='DELETE') return json({error:'Method not allowed'},405);
+      if (!originOk(request) || request.headers.get('sec-fetch-site')==='cross-site') return error();
+      if (now>=event.start_at) return json({error:'Signups are closed'},409);
+      if (request.method==='DELETE') {
+        const removed=await db.prepare('UPDATE event_signups SET deleted_at=? WHERE event_id=? AND user_id=? AND deleted_at IS NULL')
+          .bind(now,eventId,subject.user.id).run();
+        return json({withdrawn:removed.meta.changes===1});
+      }
+      const existing=await db.prepare('SELECT id FROM event_signups WHERE event_id=? AND user_id=? AND deleted_at IS NULL')
+        .bind(eventId,subject.user.id).first();
+      if (existing) return json({error:'Already signed up',code:'already_signed_up'},409);
+      try {
+        // A single INSERT, guarded by database triggers and the partial unique
+        // index, serializes capacity and duplicate checks across Worker requests.
+        const id=crypto.randomUUID();
+        await db.prepare('INSERT INTO event_signups(id,event_id,user_id,created_at) VALUES(?,?,?,?)')
+          .bind(id,eventId,subject.user.id,now).run();
+        return json({signup:{id,eventId,createdAt:now}},201);
+      } catch {
+        return json({error:'Signup unavailable or event full',code:'signup_conflict'},409);
+      }
+    }
     // Canonical event details remain anonymously accessible.
     if (path.startsWith('/api/events/')) {
       if (request.method !== 'GET') return json({error:'Method not allowed'},405);
