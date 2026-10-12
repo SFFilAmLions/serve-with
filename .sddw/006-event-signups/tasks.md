@@ -63,3 +63,21 @@ The SDDW milestone completes only when requirements and design are reconciled, a
 - Verify SQLite/D1 conditional-insert concurrency behavior rather than assuming the uniqueness index prevents capacity races.
 - Determine minimal stub DB transition schema based on current user constraints and existing email login.
 - Confirm detailed admin API paths and what provider metrics/limits are genuinely available for this account.
+
+## Approved OpenAPI bulk batch — implementation record
+
+The user authorized T001–T009 in one batch. **Commits and draft PR updates are authorized; merges, staging deployments, production deployments, database migrations, new paid services and credential changes are not.**
+
+| Tasks | Implementation now in the branch | Remaining acceptance gate |
+| --- | --- | --- |
+| T001 | Static route inventory and existing route/auth characterization tests | Confirm parity for all methods and statuses, including obscure authorization errors |
+| T002 | The YAML now declares all **17 currently inventoried Worker methods** | Audit precise response schemas, optional query inputs, format semantics and per-operation security/status accuracy |
+| T003 | Generated operation registry used by actual Worker; normalized event-create requests checked with generated schema after existing auth/business validation | Extend schema runtime validation consistently to remaining JSON operations, complete status parity and robust Worker integration tests |
+| T004 | Design records YAML-first generators, generated routing and known limitations | Approve final validation/toolchain tradeoffs and resolve all schema mismatches |
+| T005–T007 | Build generates typed client, server registry, validators; React event list/detail, session and Turnstile reads use generated client | Migrate remaining admin mutations, authentication and user/profile interactions; eliminate handwritten endpoint DTO duplication |
+| T008 | Build generates `public/api/openapi.json`; Scalar reference page at `public/api/docs/index.html`; Worker redirects `/api/docs` to `/api/docs/` | Verify deployed assets and documentation interactively **after separately approved deployment** |
+| T009 | Structural test suite, generation as part of build/test, schema/asset tests and baseline path/status CI gate | Verify deterministic generated artifact drift and stronger schema-level breaking-change comparison |
+
+The generated request validator intentionally supports only the JSON Schema keywords used by current request bodies. It is **not a complete OpenAPI 3.1 / JSON Schema 2020-12 validator**; ordinary Worker handlers still enforce business rules. These tasks should not be checked complete solely because CI passes the intermediate integration work.
+
+**Scope rule:** This remains a draft branch. No merge or deployment without separate user authorization.
