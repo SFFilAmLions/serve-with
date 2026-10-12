@@ -14,3 +14,10 @@ CREATE TABLE user_stubs (
 CREATE INDEX idx_user_stubs_name ON user_stubs(last_name,first_name,id);
 CREATE TRIGGER user_stubs_created_at_immutable BEFORE UPDATE OF created_at ON user_stubs
 WHEN NEW.created_at!=OLD.created_at BEGIN SELECT RAISE(ABORT,'created_at is immutable'); END;
+
+CREATE TRIGGER stubs_no_registered_email BEFORE INSERT ON user_stubs
+WHEN NEW.email IS NOT NULL AND EXISTS(SELECT 1 FROM users WHERE email=NEW.email AND id!=NEW.id)
+BEGIN SELECT RAISE(ABORT,'Email belongs to registered account'); END;
+CREATE TRIGGER users_no_other_stub_email BEFORE INSERT ON users
+WHEN EXISTS(SELECT 1 FROM user_stubs WHERE email=NEW.email AND id!=NEW.id)
+BEGIN SELECT RAISE(ABORT,'Email belongs to another stub identity'); END;
