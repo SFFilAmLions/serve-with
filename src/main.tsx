@@ -276,7 +276,7 @@ function EventDetail({id,admin,me}:{id:string;admin:boolean;me:Me}){
  };
  useEffect(()=>{let active=true;setError('');void refresh().catch(e=>{if(active)setError(e instanceof Error?e.message:'Unable to load event')});return()=>{active=false}},[id,eligible]);
  const act=async(action:'signup'|'withdraw')=>{
-   if(!me.authenticated){sessionStorage.setItem('pending-signup-event',id);go('/login');return;}
+   if(!me.authenticated){localStorage.setItem('servewith-pending-signup',JSON.stringify({id,expiresAt:Date.now()+3600000}));go('/login');return;}
    if(!eligible){go('/login');return;}
    if(busy)return;
    setBusy(true);setError('');setNotice('');
@@ -291,6 +291,20 @@ function EventDetail({id,admin,me}:{id:string;admin:boolean;me:Me}){
    }catch(e){setError(e instanceof Error?e.message:'Unable to update signup');}
    finally{setBusy(false);}
  };
+ useEffect(()=>{
+  if(!eligible||!event)return;
+  const raw=localStorage.getItem('servewith-pending-signup');
+  if(!raw)return;
+  try{
+   const pending=JSON.parse(raw) as {id?:string;expiresAt?:number};
+   if(!pending.expiresAt||pending.expiresAt<Date.now()){localStorage.removeItem('servewith-pending-signup');return;}
+   if(pending.id!==id)return;
+   localStorage.removeItem('servewith-pending-signup');
+   if(event.start_at<=Date.now()){setError('Signups closed when the event started.');return;}
+   if(event.spots_available===0){setError('This event is full.');return;}
+   if(!signup)void act('signup');
+  }catch{localStorage.removeItem('servewith-pending-signup');}
+ },[id,eligible,event?.id]);
  if(error&&!event)return <Alert severity="error" role="alert">{error}</Alert>;
  if(!event)return <Skeleton height={200}/>;
  const closed=Date.now()>=event.start_at;
@@ -392,6 +406,17 @@ function RoutedApp(){
  const refresh=async()=>{try{setMe(await api('me'))}catch{setMe({authenticated:false})}};
  useEffect(()=>{const fn=()=>setPath(location.pathname);addEventListener('popstate',fn);void refresh();return()=>removeEventListener('popstate',fn)},[]);
  const admin=path.startsWith('/admin'),canAdmin=Boolean(me.privileged&&me.administratorEligible);
+ useEffect(()=>{
+  if(!me.authenticated||!me.profileComplete||!me.agreementCurrent||path!=='/login')return;
+  const raw=localStorage.getItem('servewith-pending-signup');
+  if(!raw)return;
+  try{
+   const pending=JSON.parse(raw) as {id?:string;expiresAt?:number};
+   if(pending.expiresAt&&pending.expiresAt>Date.now()&&pending.id&&/^[0-9a-f-]{36}$/.test(pending.id))
+    go('/events/'+pending.id);
+   else localStorage.removeItem('servewith-pending-signup');
+  }catch{localStorage.removeItem('servewith-pending-signup');}
+ },[me.authenticated,me.profileComplete,me.agreementCurrent,path]);
  const userRoute=path.match(/^\/users\/([0-9a-f-]{36})(\/edit)?$/);
  const eventRoute=path.match(/^\/events\/([0-9a-f-]{36})$/);
  const editRoute=path.match(/^\/admin\/events\/([0-9a-f-]{36})\/edit$/);
