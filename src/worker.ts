@@ -239,9 +239,15 @@ async function legacyFetch(request: Request, env: Env): Promise<Response> {
       if (!originOk(request) || request.headers.get('sec-fetch-site')==='cross-site') return error();
       if (now>=event.start_at) return json({error:'Signups are closed'},409);
       if (request.method==='DELETE') {
-        const removed=await db.prepare('UPDATE event_signups SET deleted_at=? WHERE event_id=? AND user_id=? AND deleted_at IS NULL')
-          .bind(now,eventId,subject.user.id).run();
-        return json({withdrawn:removed.meta.changes===1});
+        try {
+          const removed=await db.prepare('UPDATE event_signups SET deleted_at=? WHERE event_id=? AND user_id=? AND deleted_at IS NULL')
+            .bind(now,eventId,subject.user.id).run();
+          return json({withdrawn:removed.meta.changes===1});
+        } catch {
+          // The D1 cutoff trigger can reject an in-flight write after our
+          // precheck. Return an explicit conflict instead of an unhandled error.
+          return json({error:'Withdrawals are closed',code:'withdrawal_conflict'},409);
+        }
       }
       const existing=await db.prepare('SELECT id FROM event_signups WHERE event_id=? AND user_id=? AND deleted_at IS NULL')
         .bind(eventId,subject.user.id).first();
@@ -377,9 +383,13 @@ async function legacyFetch(request: Request, env: Env): Promise<Response> {
             !(target?.email_verified_at&&profileReady(target)&&agreementReady(target,policyVersions(env))))
           return json({error:'Attendee account not eligible'},403);
         if(request.method==='DELETE'){
-          const result=await db.prepare('UPDATE event_signups SET deleted_at=? WHERE event_id=? AND user_id=? AND deleted_at IS NULL')
-            .bind(now,eventId,userId).run();
-          return json({withdrawn:result.meta.changes===1});
+          try {
+            const result=await db.prepare('UPDATE event_signups SET deleted_at=? WHERE event_id=? AND user_id=? AND deleted_at IS NULL')
+              .bind(now,eventId,userId).run();
+            return json({withdrawn:result.meta.changes===1});
+          } catch {
+            return json({error:'Withdrawals are closed',code:'withdrawal_conflict'},409);
+          }
         }
         const existing=await db.prepare('SELECT id FROM event_signups WHERE event_id=? AND user_id=? AND deleted_at IS NULL')
           .bind(eventId,userId).first();
