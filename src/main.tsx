@@ -5,7 +5,7 @@ import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { TimePicker } from '@mui/x-date-pickers/TimePicker';
-import { AppBar, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Alert, Autocomplete, Snackbar, Checkbox, FormControlLabel, Container, CssBaseline, Stack, TextField, ThemeProvider, Typography, useMediaQuery, IconButton, Menu, MenuItem, ListItemButton, Divider, Tooltip, Skeleton, Card, CardContent, CardActions, Chip, SvgIcon, Avatar, ToggleButtonGroup, ToggleButton } from '@mui/material';
+import { AppBar, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Alert, Autocomplete, Snackbar, Checkbox, FormControlLabel, Container, CssBaseline, Stack, TextField, ThemeProvider, Typography, useMediaQuery, IconButton, Menu, MenuItem, ListItemButton, Divider, Tooltip, Skeleton, Card, CardContent, CardActions, Chip, Avatar, ToggleButtonGroup, ToggleButton } from '@mui/material';
 import './style.css';
 import policyMetadata from './generated/policy-versions.json';
 import privacyPolicy from '../policies/privacy/approved-draft.md?raw';
@@ -16,24 +16,17 @@ import { type Draft, timeZones, validateDraft, emptyDraft, localInput } from './
 
 type EventRecord = { id:string; title:string; location:string; timezone:string; start_at:number; end_at:number; version:number; capacity?:number|null; signups_count?:number; spots_available?:number|null };
 type View = 'upcoming'|'past';
-function Glyph({type}:{type:'sun'|'moon'|'system'|'person'|'swap'|'logout'|'login'|'pin'|'back'|'save'|'edit'|'copy'|'trash'|'github'}) {
- const paths:{[key:string]:string}={
- sun:'M12 3v2m0 14v2M3 12h2m14 0h2M5.6 5.6 7 7m10 10 1.4 1.4M5.6 18.4 7 17m10-10 1.4-1.4M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8',
- moon:'M20 15.5A8 8 0 0 1 8.5 4a8.2 8.2 0 1 0 11.5 11.5',
- system:'M3 4h18v13H3zM8 21h8m-4-4v4M12 6v9a4 4 0 0 0 0-9',
- person:'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8M4 21a8 8 0 0 1 16 0',
- swap:'M4 7h16m-4-4 4 4-4 4M20 17H4m4-4-4 4 4 4',
- logout:'M4 4h8v16H4M10 12h11m-4-4 4 4-4 4',
- login:'M4 4h8v16H4M10 12h11m-4-4 4 4-4 4',
- pin:'M12 22s7-7 7-13a7 7 0 0 0-14 0c0 6 7 13 7 13Zm0-10a3 3 0 1 0 0-6 3 3 0 0 0 0 6',
- back:'M20 12H4m7-7-7 7 7 7',
- save:'M5 12l5 5L20 7',
- edit:'M4 20h4l11-11-4-4L4 16v4',
- copy:'M8 4h12v14H8zM4 8v12h12',
- trash:'M4 7h16M10 4h4M7 7l1 14h8l1-14M10 11v6m4-6v6',
- github:'M9 19c-4 1-4-2-6-2m13 2v-3a4 4 0 0 0-1-3c3 0 6-1 6-6a5 5 0 0 0-1-3 4 4 0 0 0 0-3s-2 0-4 2a15 15 0 0 0-8 0C6 1 4 1 4 1v3a5 5 0 0 0-1 3c0 5 3 6 6 6a4 4 0 0 0-1 3v3'
- };
- return <SvgIcon fontSize="small"><path d={paths[type]} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></SvgIcon>;
+function Glyph({type,size=20}:{type:'sun'|'moon'|'system'|'person'|'swap'|'logout'|'login'|'pin'|'back'|'save'|'edit'|'copy'|'trash'|'github';size?:18|20|24}) {
+ const symbols={
+  sun:'light_mode',moon:'dark_mode',system:'settings_brightness',
+  person:'person',swap:'swap_horiz',logout:'logout',login:'login',
+  pin:'location_on',back:'arrow_back',save:'save',edit:'edit',
+  copy:'content_copy',trash:'delete',github:'code'
+ } as const;
+ return <Box component="span" className="material-symbols-rounded" aria-hidden="true"
+  sx={{fontFamily:'Material Symbols Rounded',fontSize:size,lineHeight:1,
+    fontWeight:400,fontStyle:'normal',display:'inline-flex',fontFeatureSettings:'liga',
+    fontVariationSettings:"'FILL' 0,'wght' 400,'GRAD' 0,'opsz' 20"}}>{symbols[type]}</Box>;
 }
 function AccountAvatar({email,name}:{email?:string;name?:string}) {
  const [src,setSrc]=useState('');
