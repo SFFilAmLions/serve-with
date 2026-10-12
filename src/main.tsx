@@ -11,6 +11,7 @@ import policyMetadata from './generated/policy-versions.json';
 import privacyPolicy from '../policies/privacy/approved-draft.md?raw';
 import termsPolicy from '../policies/terms/approved-draft.md?raw';
 import { createClubTheme } from './theme';
+import { eventRelativeLabel } from './event-relative';
 import { createApiClient } from './generated/openapi-client';
 import { type Draft, timeZones, validateDraft, emptyDraft, localInput } from './event-form';
 
@@ -249,6 +250,8 @@ function EventDetail({id,admin,me}:{id:string;admin:boolean;me:Me}){
  const [event,setEvent]=useState<EventRecord|null>(null),[error,setError]=useState(''),[notice,setNotice]=useState('');
  const [signup,setSignup]=useState<{id:string}|null>(null),[participants,setParticipants]=useState<{name:string}[]>([]);
  const [busy,setBusy]=useState(false);
+ const [clockNow,setClockNow]=useState(Date.now());
+ useEffect(()=>{const interval=setInterval(()=>setClockNow(Date.now()),60000);return()=>clearInterval(interval)},[]);
  const eligible=Boolean(me.authenticated&&me.profileComplete&&me.agreementCurrent);
  const refresh=async()=>{
    const response=await generatedApi.getEvent({id});
@@ -305,6 +308,7 @@ function EventDetail({id,admin,me}:{id:string;admin:boolean;me:Me}){
   <Button size="small" startIcon={<Glyph type="back"/>} sx={{alignSelf:"flex-start"}} onClick={()=>go(admin?"/admin/events":"/")}>Back to events</Button>
   <Typography variant="h4">{event.title}</Typography>
   <EventWhen event={event}/>
+  <Typography variant="body2" color="text.secondary">{eventRelativeLabel(event.start_at,event.end_at,clockNow)}</Typography>
   {error&&<Alert severity="error" role="alert">{error}</Alert>}
   {notice&&<Alert severity="success" role="status">{notice}</Alert>}
   {!closed&&(!full||signup)&&<Button variant="contained" disabled={busy} sx={{alignSelf:'flex-start'}} onClick={()=>void act(signup?'withdraw':'signup')}>
