@@ -383,3 +383,31 @@ test('self signup API enforces identity, capacity, withdrawal history and origin
   assert.equal(h.sqlite.prepare('SELECT COUNT(*) n FROM event_signups WHERE event_id=? AND deleted_at IS NULL').get(eventId).n,1);
  }finally{h.sqlite.close();}
 });
+
+test('admin delegated signup allows explicit attendee selection and preserves history',async()=>{
+ const h=harness();
+ try{
+  const eventId='123e4567-e89b-42d3-a456-426614174989', now=Date.now();
+  h.insert(eventId,now+300000,now+600000);
+  const targetId='22222222-2222-4222-8222-222222222222';
+  h.sqlite.prepare('INSERT INTO users(id,email,first_name,last_name,created_at,updated_at) VALUES(?,?,?,?,?,?)')
+   .run(targetId,'attendee@example.org','Alex','Volunteer',1,1);
+  const path='/api/admin/events/'+eventId+'/signups';
+  assert.equal((await h.req(path,'GET')).status,401);
+  const token='a'.repeat(64);
+  const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode('test:'+token))),b=>b.toString(16).padStart(2,'0')).join('');
+  h.sqlite.prepare('INSERT INTO sessions(token_hash,email,expires_at,created_at) VALUES(?,?,?,?)')
+    .run(hash,'lionaugust@icloud.com',now+600000,now);
+  const cookie='__Host-sw_session='+token;
+  assert.equal((await h.req(path,'POST',{userId:targetId},cookie)).status,201);
+  assert.equal((await h.req(path,'POST',{userId:targetId},cookie)).status,409);
+  const roster=await (await h.req(path,'GET',undefined,cookie)).json();
+  assert.equal(roster.signups.length,1);
+  assert.equal(roster.signups[0].email,'attendee@example.org');
+  assert.equal((await h.req(path,'DELETE',{userId:targetId},cookie)).status,200);
+  assert.equal((await h.req(path,'POST',{userId:targetId},cookie)).status,201);
+  assert.equal(h.sqlite.prepare('SELECT COUNT(*) n FROM event_signups WHERE event_id=?').get(eventId).n,2);
+  h.sqlite.prepare('UPDATE events SET start_at=? WHERE id=?').run(Date.now()-1,eventId);
+  assert.equal((await h.req(path,'DELETE',{userId:targetId},cookie)).status,409);
+ }finally{h.sqlite.close();}
+});
