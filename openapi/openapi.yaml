@@ -1329,3 +1329,38 @@ paths:
           description: Profile or consent incomplete
         '409':
           description: Event already started
+
+  /api/events/{id}/participants:
+    get:
+      operationId: getEventParticipants
+      tags: [Events]
+      summary: Current attendee names, visible only to an active participant
+      security:
+        - SessionCookie: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: {type: string, format: uuid}
+      responses:
+        '200':
+          description: Active participant names only; no email, DOB or history
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [participants]
+                properties:
+                  participants:
+                    type: array
+                    items:
+                      type: object
+                      required: [name]
+                      properties:
+                        name: {type: string}
+        '401':
+          description: Sign-in required
+        '403':
+          description: Active participation required
+        '404':
+          description: Event missing or deleted
