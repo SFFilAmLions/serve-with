@@ -106,3 +106,42 @@ test('event creation and editing contracts preserve optional capacity semantics'
   assert.equal(value.minimum,0,kind+' cannot allow a negative capacity');
  }
 });
+
+test('operation IDs stay unique and public event reads remain anonymous', () => {
+ const seen=new Set();
+ for(const [path,item] of Object.entries(spec.paths)){
+  for(const [method,op] of Object.entries(item)){
+   if(!['get','post','put','patch','delete'].includes(method))continue;
+   assert.ok(op.operationId,method.toUpperCase()+' '+path+' is missing an operation ID');
+   assert.ok(!seen.has(op.operationId),'Duplicate operation ID: '+op.operationId);
+   seen.add(op.operationId);
+  }
+ }
+ for(const path of ['/api/events','/api/events/{id}']){
+  assert.deepEqual(spec.paths[path].get.security,[],path+' must remain anonymously readable');
+ }
+});
+
+test('usage metrics distinguish unavailable from zero and deny anonymous requests', () => {
+ const op=spec.paths['/api/admin/usage'].get;
+ assert.deepEqual(op.security,[{SessionCookie:[]}]);
+ assert.ok(op.responses['401']);
+ assert.ok(op.responses['403']);
+ const schema=op.responses['200'].content['application/json'].schema;
+ const provider=schema.properties.providers.items;
+ assert.deepEqual(provider.properties.status.enum,['available','stale','unavailable']);
+ for(const key of ['used','limit','remaining']){
+  assert.ok(provider.required.includes(key),key+' must be explicit');
+  assert.ok(provider.properties[key].type.includes('null'),key+' must allow unknown');
+ }
+});
+
+test('participant roster documents names-only output and active-participant authorization', () => {
+ const op=spec.paths['/api/events/{id}/participants'].get;
+ assert.deepEqual(op.security,[{SessionCookie:[]}]);
+ assert.ok(op.responses['401']);
+ assert.ok(op.responses['403']);
+ const entry=op.responses['200'].content['application/json'].schema.properties.participants.items;
+ assert.deepEqual(entry.required,['name']);
+ assert.deepEqual(Object.keys(entry.properties),['name']);
+});
