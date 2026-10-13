@@ -169,3 +169,14 @@ test('self signup contract requires authentication and origin on every mutation'
   assert.ok(op.responses['409'],'capacity and cutoff conflict must be documented');
  }
 });
+
+test('delegated signup mutations require admin sessions and explicit CSRF origin', () => {
+ const route=spec.paths['/api/admin/events/{id}/signups'];
+ for(const method of ['post','delete']){
+  const op=route[method];
+  assert.deepEqual(op.security,[{SessionCookie:[]}],method+' cannot be anonymous');
+  for(const status of ['401','403','409'])assert.ok(op.responses[status],method+' must document '+status);
+  const parameters=[...(route.parameters||[]),...(op.parameters||[])];
+  assert.ok(parameters.some(p=>p.in==='header'&&p.name==='Origin'&&p.required),method+' must require origin');
+ }
+});
