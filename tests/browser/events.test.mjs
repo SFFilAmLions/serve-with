@@ -196,3 +196,20 @@ test('existing attendee on full event is not signed up twice',async()=>{
   assert.equal(posts,0);
  }finally{await browser.close()}
 });
+
+test('full event never offers anonymous signup or reveals roster',async()=>{
+ const event={...example,capacity:1,signups_count:1,spots_available:0};
+ const {browser,page}=await context(anonymous,[event]);
+ try{
+  await page.route('**/api/events/'+eventId,r=>r.fulfill({json:{event}}));
+  let rosterCalls=0,signupPosts=0;
+  await page.route('**/api/events/'+eventId+'/participants',r=>{rosterCalls++;return r.fulfill({status:401,json:{error:'Unauthorized'}})});
+  await page.route('**/api/events/'+eventId+'/signups',r=>{if(r.request().method()==='POST')signupPosts++;return r.fulfill({status:401,json:{error:'Unauthorized'}})});
+  await page.goto(base+'/events/'+eventId);
+  await page.getByText('This event is full.').waitFor();
+  assert.equal(await page.getByRole('button',{name:'Sign up',exact:true}).count(),0);
+  assert.equal(await page.getByRole('heading',{name:'Participants'}).count(),0);
+  assert.equal(rosterCalls,0);
+  assert.equal(signupPosts,0);
+ }finally{await browser.close()}
+});
