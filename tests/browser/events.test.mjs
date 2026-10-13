@@ -242,3 +242,19 @@ test('unauthorized administrator usage page does not fetch private provider metr
   assert.equal(calls,0);
  }finally{await browser.close()}
 });
+
+test('non-admin event management deep link redirects without fetching private roster',async()=>{
+ const attendee={...admin,administratorEligible:false,privileged:false,email:'member@example.org',userId:'77777777-7777-4777-8777-777777777777'};
+ const {browser,page}=await context(attendee,[example]);
+ let adminCalls=0;
+ try{
+  await page.route('**/api/events/'+eventId,r=>r.fulfill({json:{event:example}}));
+  await page.route('**/api/events/'+eventId+'/signups',r=>r.fulfill({json:{signup:null}}));
+  await page.route('**/api/admin/events/'+eventId+'/signups',r=>{adminCalls++;return r.fulfill({status:403,json:{error:'Forbidden'}})});
+  await page.goto(base+'/admin/events/'+eventId);
+  await page.getByRole('heading',{name:'Service day'}).waitFor();
+  assert.equal(new URL(page.url()).pathname,'/events/'+eventId);
+  await page.getByText(/don't have access to the administrator event page/).waitFor();
+  assert.equal(adminCalls,0,'public redirect must not request administrator roster');
+ }finally{await browser.close()}
+});
