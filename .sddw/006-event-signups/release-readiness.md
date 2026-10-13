@@ -73,3 +73,9 @@ The following regression additions are committed to the feature branch, but must
 **Privacy/security boundaries:** public endpoints expose aggregate signup numbers, not identities; participant names require active participation; administrator actions require authorization; verified email, profile completion, age and policy gates remain mandatory; capacity/cutoff must be checked server-side. Unknown provider quotas must not be reported as zero.
 
 **Before release:** close remaining branch tests and review precise OpenAPI response/status parity; prove atomic capacity-one races and schema integrity against authorized isolated Cloudflare D1; run browser, accessibility, stub claiming and provider failure checks against an approved staging deployment; record authorization, backup/restore proof and release signoff. No migrations, merge or deployment authorized by this record.
+
+## Contract authorization guardrails — October 13, 2026
+
+Additional branch checks in `tests/openapi-contract.test.mjs` assert that the unclaimed-user creation operation is administrator-authenticated, requires names, allows an absent email, explicitly documents collision and validation errors, and does not expose consent or privilege fields as accepted named input properties. They also assert that self-signup POST and withdrawal DELETE document session authentication, a required Origin header, and 401/403/409 outcomes.
+
+These are **contract-shape tests only**; `additionalProperties` and runtime handler validation must still be assessed before describing unexpected-input rejection as guaranteed. Runtime enforcement, cross-account identity claiming, and real Cloudflare D1 concurrency remain separate acceptance gates. This section records intended test coverage; verify the exact HEAD in CI before claiming it passed.
