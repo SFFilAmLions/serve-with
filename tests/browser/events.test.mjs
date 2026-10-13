@@ -213,3 +213,32 @@ test('full event never offers anonymous signup or reveals roster',async()=>{
   assert.equal(signupPosts,0);
  }finally{await browser.close()}
 });
+
+test('administrator usage dashboard preserves unavailable and unknown metrics',async()=>{
+ const {browser,page}=await context(admin);
+ try{
+  await page.route('**/api/admin/usage',r=>r.fulfill({json:{
+   environment:'staging',collectedAt:'2026-10-13T00:00:00Z',
+   providers:[{name:'Cloudflare D1',scope:'staging database',status:'unavailable',used:null,limit:null,remaining:null,resetsAt:null,reason:'No authorized analytics token'}]
+  }}));
+  await page.goto(base+'/admin/usage');
+  await page.getByRole('heading',{name:'Usage & Quotas'}).waitFor();
+  await page.getByRole('heading',{name:'Cloudflare D1'}).waitFor();
+  await page.getByText('Usage: Unknown').waitFor();
+  await page.getByText('Limit: Unknown').waitFor();
+  await page.getByText('Remaining: Unknown').waitFor();
+  assert.equal(await page.getByText(/utilization \(/).count(),0);
+  await page.getByText('No authorized analytics token').waitFor();
+ }finally{await browser.close()}
+});
+
+test('unauthorized administrator usage page does not fetch private provider metrics',async()=>{
+ const {browser,page}=await context(anonymous);
+ let calls=0;
+ try{
+  await page.route('**/api/admin/usage',r=>{calls++;return r.fulfill({status:403,json:{error:'Forbidden'}})});
+  await page.goto(base+'/admin/usage');
+  await page.getByText(/Complete your profile and current agreement to access administrator tools/).waitFor();
+  assert.equal(calls,0);
+ }finally{await browser.close()}
+});
