@@ -145,3 +145,27 @@ test('participant roster documents names-only output and active-participant auth
  assert.deepEqual(entry.required,['name']);
  assert.deepEqual(Object.keys(entry.properties),['name']);
 });
+
+test('unclaimed user creation requires admin rights and never accepts consent fields', () => {
+ const op=spec.paths['/api/admin/users'].post;
+ assert.deepEqual(op.security,[{SessionCookie:[]}]);
+ for(const status of ['201','401','403','409','422'])assert.ok(op.responses[status],status+' must be documented');
+ const body=op.requestBody.content['application/json'].schema;
+ assert.deepEqual(body.required,['firstName','lastName']);
+ assert.ok(body.properties.email.type.includes('null'),'email must be optional or null for unclaimed stubs');
+ for(const forbidden of ['agreementCurrent','consentAccepted','emailVerified','administratorEligible','privileged']){
+  assert.equal(Object.hasOwn(body.properties,forbidden),false,'admin stub input must not explicitly authorize '+forbidden);
+ }
+});
+
+test('self signup contract requires authentication and origin on every mutation', () => {
+ const operations=spec.paths['/api/events/{id}/signups'];
+ for(const method of ['post','delete']){
+  const op=operations[method];
+  assert.deepEqual(op.security,[{SessionCookie:[]}]);
+  assert.ok(op.parameters.some(p=>p.in==='header'&&p.name==='Origin'&&p.required),method+' must document origin');
+  assert.ok(op.responses['401'],'unauthenticated access must be documented');
+  assert.ok(op.responses['403'],'profile and consent gates must be documented');
+  assert.ok(op.responses['409'],'capacity and cutoff conflict must be documented');
+ }
+});
