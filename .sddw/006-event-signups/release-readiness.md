@@ -57,3 +57,19 @@ Do not interpret these SQLite-backed tests as actual parallel D1 request proof. 
 9. To recover a failed **staging** migration, stop test traffic, retain the failed DB image and logs, restore the verified pre-migration export into a **new nonproduction database**, run integrity and FK checks, then redirect only staging test bindings once separately approved. Do not roll back by deleting records or mutating the live database. Prepare a corrective forward migration if partially applied state requires remediation.
 
 **Exit criteria:** each step has an owner, evidence artifact, exact commit and database identity, with zero FK errors, zero overbooking, no cross-user roster access, no compromised consent and no unreviewed production or staging changes. Missing evidence is a failing gate, not implied approval.
+
+## Non-deployment finishing batch — October 13, 2026
+
+The following regression additions are committed to the feature branch, but must not be described as passing until CI completes on their exact revision:
+
+- `tests/openapi-contract.test.mjs`: unique operation IDs, anonymous event read contracts, names-only participant roster contract, and authenticated admin usage metrics with nullable unknown values and explicit 401/403 cases.
+- `tests/browser/events.test.mjs`: a full event shown to an anonymous viewer has no actionable signup or participant roster and issues neither roster reads nor signup POSTs.
+- Prior verified baseline: [CI #470](https://github.com/SFFilAmLions/serve-with/actions/runs/38237670036) passed at `d7e43df`; it predates the above new tests.
+
+### Draft release notes — not yet a release announcement
+
+**Features proposed:** event capacity and signup/withdrawal with preserved history; personal signup history and participant names-only views; administrator delegated signups and unclaimed-user onboarding; OpenAPI-derived client/Worker contracts and API documentation; administrator Usage & Quotas unavailable-state dashboard; Material UI enhancements.
+
+**Privacy/security boundaries:** public endpoints expose aggregate signup numbers, not identities; participant names require active participation; administrator actions require authorization; verified email, profile completion, age and policy gates remain mandatory; capacity/cutoff must be checked server-side. Unknown provider quotas must not be reported as zero.
+
+**Before release:** close remaining branch tests and review precise OpenAPI response/status parity; prove atomic capacity-one races and schema integrity against authorized isolated Cloudflare D1; run browser, accessibility, stub claiming and provider failure checks against an approved staging deployment; record authorization, backup/restore proof and release signoff. No migrations, merge or deployment authorized by this record.
