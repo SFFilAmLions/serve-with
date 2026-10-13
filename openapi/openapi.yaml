@@ -1435,6 +1435,11 @@ paths:
       operationId: adminSignUpAttendee
       tags: [Administration]
       summary: Register a chosen attendee subject to capacity and event-start cutoff
+      parameters:
+        - in: header
+          name: Origin
+          required: true
+          schema: {type: string, format: uri}
       security:
         - SessionCookie: []
       requestBody:
@@ -1463,6 +1468,11 @@ paths:
       operationId: adminWithdrawAttendee
       tags: [Administration]
       summary: Withdraw selected attendee before event start
+      parameters:
+        - in: header
+          name: Origin
+          required: true
+          schema: {type: string, format: uri}
       security:
         - SessionCookie: []
       requestBody:
