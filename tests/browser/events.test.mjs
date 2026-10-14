@@ -276,3 +276,35 @@ test('expired pending signup intent is discarded without any mutation',async()=>
   assert.equal(posts,0,'expired intent must not create a signup');
  }finally{await browser.close()}
 });
+
+test('valid pending signup continues once after login and clears intent',async()=>{
+ const event={...example,capacity:2,signups_count:0,spots_available:2};
+ const {browser,page}=await context(admin,[event]);
+ let posts=0,signedUp=false;
+ try{
+  await page.route('**/api/events/'+eventId,r=>r.fulfill({json:{event}}));
+  await page.route('**/api/events/'+eventId+'/signups',r=>{
+   if(r.request().method()==='GET')return r.fulfill({json:{signup:signedUp?{id:'completed-signup'}:null}});
+   if(r.request().method()==='POST'){
+    posts++;signedUp=true;
+    return r.fulfill({status:201,json:{signup:{id:'completed-signup'}}});
+   }
+   return r.fulfill({status:405,json:{error:'Method not allowed'}});
+  });
+  await page.route('**/api/events/'+eventId+'/participants',r=>r.fulfill({json:{participants:[{name:'Admin Example'}]}}));
+  await page.addInitScript(id=>{
+   if(!sessionStorage.getItem('continuation-seeded')){
+    localStorage.setItem('servewith-pending-signup',JSON.stringify({id,expiresAt:Date.now()+60000}));
+    sessionStorage.setItem('continuation-seeded','yes');
+   }
+  },eventId);
+  await page.goto(base+'/events/'+eventId);
+  await page.getByText('You have signed up for this event.').waitFor();
+  assert.equal(posts,1);
+  assert.equal(await page.evaluate(()=>localStorage.getItem('servewith-pending-signup')),null);
+  await page.reload();
+  await page.getByRole('heading',{name:'Service day'}).waitFor();
+  await page.getByRole('button',{name:/Withdraw/}).waitFor();
+  assert.equal(posts,1,'refresh must not replay completed signup');
+ }finally{await browser.close()}
+});
