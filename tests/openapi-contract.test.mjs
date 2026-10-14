@@ -217,3 +217,24 @@ test('public event response contracts preserve capacity aggregates without roste
  assert.equal(detail.$ref,'#/components/schemas/EventDetail');
  assert.ok(spec.components.schemas.EventDetail.properties.event,'detail must wrap event');
 });
+
+test('all documented signup success bodies use JSON and exclude credential fields',()=>{
+ const routes=['/api/me/signups','/api/events/{id}/signups','/api/events/{id}/participants','/api/admin/events/{id}/signups'];
+ for(const path of routes){
+  const item=spec.paths[path];
+  assert.ok(item,path+' should exist');
+  for(const method of ['get','post','delete']){
+   const op=item[method];
+   if(!op)continue;
+   for(const [status,response] of Object.entries(op.responses)){
+    if(!/^2\\d\\d$/.test(status)||status==='204')continue;
+    const schema=response.content?.['application/json']?.schema;
+    assert.ok(schema,method.toUpperCase()+' '+path+' '+status+' must return documented JSON');
+    const keys=Object.keys(schema.properties||{});
+    for(const forbidden of ['password','session','token','date_of_birth']){
+     assert.ok(!keys.includes(forbidden),method.toUpperCase()+' '+path+' must not directly return '+forbidden);
+    }
+   }
+  }
+ }
+});
