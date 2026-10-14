@@ -1400,10 +1400,22 @@ paths:
                         name: {type: string}
         '401':
           description: Sign-in required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '403':
           description: Active participation required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '404':
           description: Event missing or deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 
   /api/admin/events/{id}/signups:
     parameters:
