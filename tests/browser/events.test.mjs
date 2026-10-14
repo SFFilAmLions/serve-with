@@ -512,3 +512,40 @@ test('roster is not fetched or displayed after session expires on navigation',as
   assert.equal(rosterCalls,1,'anonymous revisit must not fetch the roster');
  }finally{await browser.close()}
 });
+
+test('signup denial keeps visitor unenrolled and communicates failure accessibly',async()=>{
+ const event={...example,capacity:3,signups_count:0,spots_available:3};
+ const {browser,page}=await context(admin,[event]);
+ let posts=0,rosters=0;
+ try{
+  await page.route('**/api/events/'+eventId,r=>r.fulfill({json:{event}}));
+  await page.route('**/api/events/'+eventId+'/signups',r=>{
+   if(r.request().method()==='GET')return r.fulfill({json:{signup:null}});
+   posts++;return r.fulfill({status:403,json:{error:'Current agreement required'}});
+  });
+  await page.route('**/api/events/'+eventId+'/participants',r=>{rosters++;return r.fulfill({json:{participants:[{name:'Private Person'}]}})});
+  await page.goto(base+'/events/'+eventId);
+  await page.getByRole('button',{name:'Sign up as Admin'}).click();
+  await page.getByRole('alert').getByText('Current agreement required').waitFor();
+  assert.equal(await page.getByRole('button',{name:'Sign up as Admin'}).count(),1);
+  assert.equal(await page.getByRole('heading',{name:'Participants'}).count(),0);
+  assert.equal(posts,1);
+  assert.equal(rosters,0,'denied signup must not fetch participant identities');
+ }finally{await browser.close()}
+});
+
+test('existing enrollment displays names without exposing profile data in roster DOM',async()=>{
+ const event={...example,capacity:3,signups_count:1,spots_available:2};
+ const {browser,page}=await context(admin,[event]);
+ try{
+  await page.route('**/api/events/'+eventId,r=>r.fulfill({json:{event}}));
+  await page.route('**/api/events/'+eventId+'/signups',r=>r.fulfill({json:{signup:{id:'already-enrolled'}}}));
+  await page.route('**/api/events/'+eventId+'/participants',r=>r.fulfill({json:{participants:[{name:'Example Volunteer'}]}}));
+  await page.goto(base+'/events/'+eventId);
+  await page.getByText('Example Volunteer').waitFor();
+  const section=page.getByRole('heading',{name:'Participants'}).locator('..');
+  assert.ok((await section.innerText()).includes('Example Volunteer'));
+  assert.equal((await section.innerText()).includes('admin@example.org'),false);
+  assert.equal(await page.getByRole('button',{name:'Withdraw'}).count(),1);
+ }finally{await browser.close()}
+});
