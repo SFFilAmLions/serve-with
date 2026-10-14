@@ -52,3 +52,14 @@ This batch consolidates pending automatable scenarios rather than treating each 
 | Runtime response/schema parity | Actual Worker public list, detail, and unauthenticated roster response structures checked against OpenAPI required fields/types | Added in `6132dcc`; require CI; remaining operation-specific response schemas still need validation |
 
 **Not claimed:** comprehensive OpenAPI 3.1 / JSON Schema semantics, full client-server failure-injection matrix, real browser-and-email cross-device continuation, independent keyboard/screen-reader audit, provider-permission live checks, real D1 concurrency and migration/restore drill. These remain release/staging gates. No staging or production action is approved here.
+
+## Consolidated additional CI test batch — October 14, 2026
+
+A single batch adds browser cases for malformed pending-signup JSON (clear intent, no mutation), keyboard-based withdrawal (accessible confirmation and roster removal), and a provider usage HTTP 503 (visible error, refresh retry, no fabricated usage). Real-Worker tests now also exercise anonymous 401 JSON error envelopes for participant names, signup state/history, delegated administration and usage metrics, checking them against the documented OpenAPI Error schema.
+
+| Added change | Evidence status |
+| --- | --- |
+| `52ac0cf` browser failure recovery / keyboard / provider outage | Check CI at final HEAD before sign-off |
+| `ae7072f` Worker anonymous error status and OpenAPI schema parity | Check CI at final HEAD before sign-off |
+
+These are isolated unit/Playwright runs, not live Cloudflare D1, external provider account access or a complete WCAG assistive-technology audit. Live D1 races, schema restore, real Resend mail delivery, and independent screen-reader verification remain separate gates requiring explicit permission and/or human review.
