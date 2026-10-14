@@ -328,3 +328,69 @@ test('pending signup for a different event never signs up the current event',asy
   assert.equal(intent.id,newEventId,'unrelated event page must not replace the intended target');
  }finally{await browser.close()}
 });
+
+test('pending signup capacity conflict reports failure and is not replayed',async()=>{
+ const event={...example,capacity:1,signups_count:0,spots_available:1};
+ const {browser,page}=await context(admin,[event]);
+ let posts=0;
+ try{
+  await page.route('**/api/events/'+eventId,r=>r.fulfill({json:{event}}));
+  await page.route('**/api/events/'+eventId+'/signups',r=>{
+   if(r.request().method()==='GET')return r.fulfill({json:{signup:null}});
+   posts++;return r.fulfill({status:409,json:{error:'Event is full'}});
+  });
+  await page.addInitScript(id=>{
+   if(!sessionStorage.getItem('seeded-conflict')){
+    localStorage.setItem('servewith-pending-signup',JSON.stringify({id,expiresAt:Date.now()+60000}));
+    sessionStorage.setItem('seeded-conflict','yes');
+   }
+  },eventId);
+  await page.goto(base+'/events/'+eventId);
+  await page.getByRole('alert').getByText('Event is full').waitFor();
+  assert.equal(posts,1);
+  assert.equal(await page.evaluate(()=>localStorage.getItem('servewith-pending-signup')),null);
+  await page.reload();
+  await page.getByRole('heading',{name:'Service day'}).waitFor();
+  assert.equal(posts,1,'failed continuation must not replay on reload');
+ }finally{await browser.close()}
+});
+
+test('started event cancels pending signup before any POST',async()=>{
+ const event={...example,start_at:Date.now()-60000,end_at:Date.now()+600000,spots_available:5,capacity:5};
+ const {browser,page}=await context(admin,[event]);
+ let posts=0;
+ try{
+  await page.route('**/api/events/'+eventId,r=>r.fulfill({json:{event}}));
+  await page.route('**/api/events/'+eventId+'/signups',r=>{
+   if(r.request().method()==='GET')return r.fulfill({json:{signup:null}});
+   posts++;return r.fulfill({status:500,json:{error:'Unexpected signup'}});
+  });
+  await page.addInitScript(id=>localStorage.setItem('servewith-pending-signup',JSON.stringify({id,expiresAt:Date.now()+60000})),eventId);
+  await page.goto(base+'/events/'+eventId);
+  await page.getByText('Signups closed when the event started.').waitFor();
+  await page.waitForFunction(()=>localStorage.getItem('servewith-pending-signup')===null);
+  assert.equal(posts,0);
+  assert.equal(await page.getByRole('button',{name:/Sign up/}).count(),0);
+ }finally{await browser.close()}
+});
+
+test('signup action is keyboard operable and success has an accessible status',async()=>{
+ const event={...example,capacity:3,spots_available:3,signups_count:0};
+ const {browser,page}=await context(admin,[event]);
+ let active=false,posts=0;
+ try{
+  await page.route('**/api/events/'+eventId,r=>r.fulfill({json:{event}}));
+  await page.route('**/api/events/'+eventId+'/signups',r=>{
+   if(r.request().method()==='GET')return r.fulfill({json:{signup:active?{id:'signup-keyboard'}:null}});
+   posts++;active=true;return r.fulfill({status:201,json:{signup:{id:'signup-keyboard'}}});
+  });
+  await page.route('**/api/events/'+eventId+'/participants',r=>r.fulfill({json:{participants:[{name:'Admin Example'}]}}));
+  await page.goto(base+'/events/'+eventId);
+  const signup=page.getByRole('button',{name:'Sign up as Admin'});
+  await signup.focus();
+  await page.keyboard.press('Enter');
+  await page.getByRole('status').getByText('You have signed up for this event.').waitFor();
+  await page.getByRole('button',{name:'Withdraw'}).waitFor();
+  assert.equal(posts,1);
+ }finally{await browser.close()}
+});
