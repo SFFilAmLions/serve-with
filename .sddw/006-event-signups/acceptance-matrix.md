@@ -37,3 +37,18 @@ Commit [`4f4e942`](https://github.com/SFFilAmLions/serve-with/commit/4f4e9425f31
 ## Runtime roster privacy proof — October 14, 2026
 
 The Worker/SQLite test in commit `633bf02` verifies that an eligible participant receives only a names-only roster: `[{name:'Ordinary Member'}]`, without email or date of birth, while a signed-in nonparticipant of another event is denied. This test is pending CI on its own revision as of this entry. **Remaining:** Browser keyboard/screen reader validation, deployed cross-user security checks, and simultaneous roster/withdrawal behavior on approved staging.
+
+## Consolidated pre-staging acceptance tests — October 14, 2026
+
+This batch consolidates pending automatable scenarios rather than treating each test as a separate milestone:
+
+| Test | Scope | Evidence status |
+| --- | --- | --- |
+| Expired and cross-event pending signup | No signup POST or intent replacement for stale/wrong-event targets | Existing passing CI at `28b2811` |
+| Successful signup continuation | Exactly-once POST, accessible confirmation, no duplicate on reload | Existing passing CI at `a391f40` |
+| Capacity conflict during continuation | HTTP 409 error visibly reported and pending intent cleared, no automatic replay | Added in `557c768`; require CI on exact HEAD |
+| Event-start cutoff | Started event cancels pending intent without a POST | Added in `557c768`; require CI |
+| Keyboard-operated signup | Focus + Enter triggers one request; success uses live-region status | Added in `557c768`; require CI and later human assistive-technology review |
+| Runtime response/schema parity | Actual Worker public list, detail, and unauthenticated roster response structures checked against OpenAPI required fields/types | Added in `6132dcc`; require CI; remaining operation-specific response schemas still need validation |
+
+**Not claimed:** comprehensive OpenAPI 3.1 / JSON Schema semantics, full client-server failure-injection matrix, real browser-and-email cross-device continuation, independent keyboard/screen-reader audit, provider-permission live checks, real D1 concurrency and migration/restore drill. These remain release/staging gates. No staging or production action is approved here.
