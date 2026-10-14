@@ -33,3 +33,7 @@ The new `tests/events-public.test.mjs` regression at `62bd93c` exercises an isol
 ## Verified Worker claim CI — October 14, 2026
 
 Commit [`4f4e942`](https://github.com/SFFilAmLions/serve-with/commit/4f4e9425f311be472278e6bb5a34f902c5a7c3fa) passed [CI run 38527443900](https://github.com/SFFilAmLions/serve-with/actions/runs/38527443900), OpenAPI generation and PR-title validation. The isolated Worker magic-link claim test passes with the existing `0002_auth_rate_limits.sql` table included in its in-memory test harness. The claim preserves signup identity/history, does not grant policy consent, enforces eligibility and rejects replay. This clears the isolated Worker-claim regression only; external email delivery, deployed browser continuation and real D1 are still unverified.
+
+## Runtime roster privacy proof — October 14, 2026
+
+The Worker/SQLite test in commit `633bf02` verifies that an eligible participant receives only a names-only roster: `[{name:'Ordinary Member'}]`, without email or date of birth, while a signed-in nonparticipant of another event is denied. This test is pending CI on its own revision as of this entry. **Remaining:** Browser keyboard/screen reader validation, deployed cross-user security checks, and simultaneous roster/withdrawal behavior on approved staging.
