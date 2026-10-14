@@ -722,3 +722,30 @@ test('real Worker public responses satisfy OpenAPI required fields and JSON type
   }
  }finally{h.sqlite.close()}
 });
+
+test('real Worker denial responses conform to documented OpenAPI error shapes',async()=>{
+ const h=harness();
+ try{
+  const spec=YAML.parse(readFileSync('openapi/openapi.yaml','utf8'));
+  const id='123e4567-e89b-42d3-a456-426614174101',now=Date.now();
+  h.insert(id,now+600000,now+900000);
+  const cases=[
+   ['/api/events/'+id+'/participants','/api/events/{id}/participants','get'],
+   ['/api/events/'+id+'/signups','/api/events/{id}/signups','get'],
+   ['/api/me/signups','/api/me/signups','get'],
+   ['/api/admin/events/'+id+'/signups','/api/admin/events/{id}/signups','get'],
+   ['/api/admin/usage','/api/admin/usage','get']
+  ];
+  for(const [url,path,method] of cases){
+   const response=await h.req(url);
+   assert.equal(response.status,401,'anonymous access should be rejected at '+url);
+   assert.match(response.headers.get('content-type')||'',/application\/json/);
+   const payload=await response.json();
+   assert.equal(typeof payload.error,'string',url+' must carry a readable error');
+   const schema=spec.paths[path][method].responses['401']?.content?.['application/json']?.schema;
+   assert.ok(schema,url+' should describe its JSON 401 error response');
+   const shape=schema.$ref?spec.components.schemas[schema.$ref.split('/').at(-1)]:schema;
+   for(const key of shape.required||[])assert.ok(Object.hasOwn(payload,key),url+' error missing '+key);
+  }
+ }finally{h.sqlite.close()}
+});
