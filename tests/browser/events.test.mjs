@@ -308,3 +308,23 @@ test('valid pending signup continues once after login and clears intent',async()
   assert.equal(posts,1,'refresh must not replay completed signup');
  }finally{await browser.close()}
 });
+
+test('pending signup for a different event never signs up the current event',async()=>{
+ const event={...example,capacity:2,signups_count:0,spots_available:2};
+ const {browser,page}=await context(admin,[event]);
+ let posts=0;
+ try{
+  await page.route('**/api/events/'+eventId,r=>r.fulfill({json:{event}}));
+  await page.route('**/api/events/'+eventId+'/signups',r=>{
+   if(r.request().method()==='GET')return r.fulfill({json:{signup:null}});
+   posts++;return r.fulfill({status:500,json:{error:'Unexpected cross-event signup'}});
+  });
+  await page.addInitScript(id=>localStorage.setItem('servewith-pending-signup',JSON.stringify({id,expiresAt:Date.now()+60000})),newEventId);
+  await page.goto(base+'/events/'+eventId);
+  await page.getByRole('heading',{name:'Service day'}).waitFor();
+  await page.getByRole('button',{name:'Sign up as Admin'}).waitFor();
+  assert.equal(posts,0,'pending intent for another event must never submit on this event');
+  const intent=await page.evaluate(()=>JSON.parse(localStorage.getItem('servewith-pending-signup')));
+  assert.equal(intent.id,newEventId,'unrelated event page must not replace the intended target');
+ }finally{await browser.close()}
+});
