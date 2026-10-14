@@ -662,6 +662,8 @@ test('verified magic-link claim reuses stub enrollment identity without granting
   const linkHash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode('test:'+token))),b=>b.toString(16).padStart(2,'0')).join('');
   h.sqlite.prepare('INSERT INTO login_challenges(id,email,code_hash,link_hash,expires_at,created_at) VALUES(?,?,?,?,?,?)')
    .run('magic-claim-challenge',email,'unused',linkHash,now+600000,now);
+  assert.equal(h.sqlite.prepare('SELECT email FROM login_challenges WHERE link_hash=? AND expires_at>?').get(linkHash,Date.now())?.email,email,'fixture token matches live challenge');
+  assert.equal(h.sqlite.prepare('SELECT id FROM user_stubs WHERE email=?').get(email)?.id,stubId,'fixture email resolves to unclaimed stub');
   const sqlFailures=[];
   const prepare=h.adapter.prepare.bind(h.adapter);
   h.adapter.prepare=(statement)=>{
@@ -677,7 +679,7 @@ test('verified magic-link claim reuses stub enrollment identity without granting
    return wrapped;
   };
   const verified=await h.req('/api/auth/magic','POST',{token});
-  assert.equal(verified.status,200,'a claimant must verify email via the normal magic link: '+JSON.stringify(sqlFailures));
+  assert.equal(verified.status,200,'a claimant must verify email via the normal magic link: '+JSON.stringify({sqlFailures,challenge:h.sqlite.prepare('SELECT consumed_at,attempts FROM login_challenges WHERE link_hash=?').get(linkHash),users:h.sqlite.prepare('SELECT COUNT(*) n FROM users WHERE email=?').get(email).n,rates:h.sqlite.prepare('SELECT COUNT(*) n FROM auth_rate_limits').get().n}));
   const cookieHeader=verified.headers.get('set-cookie')||'';
   const session=cookieHeader.match(/__Host-sw_session=([a-f0-9]{64})/)?.[0];
   assert.ok(session,'verified claim should create a session');
