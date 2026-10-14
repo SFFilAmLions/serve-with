@@ -452,3 +452,43 @@ test('usage provider failure is an accessible error and refresh remains availabl
   assert.equal(await page.getByText('Current usage').count(),0,'failure must not render a fabricated reading');
  }finally{await browser.close()}
 });
+
+test('usage retries successfully after transient provider failure',async()=>{
+ const {browser,page}=await context(admin);
+ let calls=0;
+ try{
+  await page.route('**/api/admin/usage',r=>{
+   calls++;
+   if(calls===1)return r.fulfill({status:503,json:{error:'Temporary metrics outage'}});
+   return r.fulfill({json:{environment:'staging',collectedAt:'2026-10-14T00:00:00Z',providers:[{name:'Cloudflare D1',scope:'staging database',status:'unavailable',used:null,limit:null,remaining:null,resetsAt:null,reason:'No authorized metrics'}]}});
+  });
+  await page.goto(base+'/admin/usage');
+  await page.getByRole('alert').getByText('Temporary metrics outage').waitFor();
+  await page.getByRole('button',{name:'Refresh status'}).click();
+  await page.getByRole('heading',{name:'Cloudflare D1'}).waitFor();
+  await page.getByText('Usage: Unknown').waitFor();
+  assert.equal(await page.getByRole('alert').count(),0);
+  assert.equal(calls,2);
+ }finally{await browser.close()}
+});
+
+test('withdrawal conflict leaves participation unchanged and gives an accessible error',async()=>{
+ const event={...example,capacity:2,signups_count:1,spots_available:1};
+ const {browser,page}=await context(admin,[event]);
+ let deletes=0;
+ try{
+  await page.route('**/api/events/'+eventId,r=>r.fulfill({json:{event}}));
+  await page.route('**/api/events/'+eventId+'/signups',r=>{
+   if(r.request().method()==='GET')return r.fulfill({json:{signup:{id:'existing'}}});
+   if(r.request().method()==='DELETE'){deletes++;return r.fulfill({status:409,json:{error:'Withdrawal cutoff has passed'}})}
+   return r.fulfill({status:405,json:{error:'Unexpected method'}});
+  });
+  await page.route('**/api/events/'+eventId+'/participants',r=>r.fulfill({json:{participants:[{name:'Admin Example'}]}}));
+  await page.goto(base+'/events/'+eventId);
+  await page.getByRole('button',{name:'Withdraw'}).click();
+  await page.getByRole('alert').getByText('Withdrawal cutoff has passed').waitFor();
+  assert.equal(await page.getByRole('button',{name:'Withdraw'}).count(),1);
+  assert.equal(await page.getByRole('heading',{name:'Participants'}).count(),1);
+  assert.equal(deletes,1);
+ }finally{await browser.close()}
+});
