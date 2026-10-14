@@ -200,3 +200,20 @@ test('signup success response envelopes match documented client expectations',()
   assert.ok(schema.properties?.[key],method+' '+route+' must define '+key);
  }
 });
+
+test('public event response contracts preserve capacity aggregates without roster identities',()=>{
+ const list=spec.paths['/api/events'].get.responses['200'].content['application/json'].schema;
+ assert.deepEqual(list.required,['view','events']);
+ assert.equal(list.properties.events.type,'array');
+ assert.equal(list.properties.events.items.$ref,'#/components/schemas/Event');
+ const event=spec.components.schemas.Event;
+ for(const key of ['signups_count','spots_available','capacity']){
+  assert.ok(event.properties[key],'public event schema missing '+key);
+ }
+ for(const forbidden of ['email','date_of_birth','participants','signups']){
+  assert.equal(Object.hasOwn(event.properties,forbidden),false,'public event must not directly expose '+forbidden);
+ }
+ const detail=spec.paths['/api/events/{id}'].get.responses['200'].content['application/json'].schema;
+ assert.equal(detail.$ref,'#/components/schemas/EventDetail');
+ assert.ok(spec.components.schemas.EventDetail.properties.event,'detail must wrap event');
+});
