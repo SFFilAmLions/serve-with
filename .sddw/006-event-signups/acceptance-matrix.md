@@ -25,3 +25,7 @@
 2. Audit generated contract's successful and error response schemas against actual Worker outputs for all API operations; fix mismatches or document intentional legacy compatibility.
 3. Record CI for exact HEAD and perform a final accessibility/privacy review.
 4. Seek **separate** staging-only approval before any D1 clone, migration execution, live concurrency probe or deployment.
+
+## October 14 Worker claim verification addition
+
+The new `tests/events-public.test.mjs` regression at `62bd93c` exercises an isolated real-Worker magic-link token claim against the SQLite adapter. It asserts stable participation identity, retained signup, no fabricated policy acceptance, a gated incomplete account, and token replay rejection. CI on the exact test revision must pass before the evidence is marked verified. This does not test live Resend delivery, cross-device user-interface continuation, or Cloudflare D1.
