@@ -180,3 +180,23 @@ test('delegated signup mutations require admin sessions and explicit CSRF origin
   assert.ok(parameters.some(p=>p.in==='header'&&p.name==='Origin'&&p.required),method+' must require origin');
  }
 });
+
+test('signup success response envelopes match documented client expectations',()=>{
+ const cases=[
+  ['/api/events/{id}/signups','get','200','signup'],
+  ['/api/events/{id}/signups','post','201','signup'],
+  ['/api/events/{id}/signups','delete','200','withdrawn'],
+  ['/api/admin/events/{id}/signups','get','200','signups'],
+  ['/api/admin/events/{id}/signups','post','201','signup'],
+  ['/api/admin/events/{id}/signups','delete','200','withdrawn'],
+  ['/api/me/signups','get','200','signups']
+ ];
+ for(const [route,method,status,key] of cases){
+  const op=spec.paths[route]?.[method];
+  assert.ok(op,method+' '+route+' is missing');
+  const schema=op.responses[status]?.content?.['application/json']?.schema;
+  assert.ok(schema,method+' '+route+' lacks JSON '+status+' response schema');
+  assert.ok(schema.required?.includes(key),method+' '+route+' must require '+key+' in '+status);
+  assert.ok(schema.properties?.[key],method+' '+route+' must define '+key);
+ }
+});
