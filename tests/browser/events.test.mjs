@@ -492,3 +492,23 @@ test('withdrawal conflict leaves participation unchanged and gives an accessible
   assert.equal(deletes,1);
  }finally{await browser.close()}
 });
+
+test('roster is not fetched or displayed after session expires on navigation',async()=>{
+ const event={...example,capacity:2,signups_count:1,spots_available:1};
+ let me=admin,rosterCalls=0;
+ const {browser,page}=await context(()=>me,[event]);
+ try{
+  await page.route('**/api/events/'+eventId,r=>r.fulfill({json:{event}}));
+  await page.route('**/api/events/'+eventId+'/signups',r=>r.fulfill({json:{signup:me.authenticated?{id:'existing'}:null}}));
+  await page.route('**/api/events/'+eventId+'/participants',r=>{rosterCalls++;return r.fulfill({json:{participants:[{name:'Private Attendee'}]}})});
+  await page.goto(base+'/events/'+eventId);
+  await page.getByText('Private Attendee').waitFor();
+  assert.equal(rosterCalls,1);
+  me=anonymous;
+  await page.reload();
+  await page.getByRole('heading',{name:'Service day'}).waitFor();
+  await page.getByRole('button',{name:'Sign up',exact:true}).waitFor();
+  assert.equal(await page.getByText('Private Attendee').count(),0,'private roster must disappear when session expires');
+  assert.equal(rosterCalls,1,'anonymous revisit must not fetch the roster');
+ }finally{await browser.close()}
+});
