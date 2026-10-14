@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import ts from 'typescript';
+import YAML from 'yaml';
 
 const opSource = readFileSync('src/generated/openapi-operations.ts','utf8');
 const opJS = ts.transpileModule(opSource,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText;
@@ -682,5 +683,42 @@ test('verified magic-link claim reuses stub enrollment identity without granting
   assert.equal(h.sqlite.prepare('SELECT COUNT(*) n FROM agreement_acceptances WHERE user_id=?').get(stubId).n,0);
   assert.equal((await h.req('/api/events/'+eventId+'/signups','POST',{},session)).status,403,'uncompleted profile and policies still gate signup');
   assert.notEqual((await h.req('/api/auth/magic','POST',{token})).status,200,'magic link must not be replayable');
+ }finally{h.sqlite.close()}
+});
+
+test('real Worker public responses satisfy OpenAPI required fields and JSON types',async()=>{
+ const h=harness();
+ try{
+  const spec=YAML.parse(readFileSync('openapi/openapi.yaml','utf8'));
+  const check=(value,schema,location)=>{
+   if(schema.$ref){
+    const key=schema.$ref.split('/').at(-1);
+    return check(value,spec.components.schemas[key],location);
+   }
+   if(Array.isArray(schema.type)){
+    assert.ok(schema.type.some(type=>type==='null'?value===null:type==='integer'?Number.isInteger(value):type==='array'?Array.isArray(value):typeof value===type),location+' type mismatch');
+   }else if(schema.type==='object')assert.ok(value!==null&&typeof value==='object'&&!Array.isArray(value),location+' must be an object');
+   else if(schema.type==='array')assert.ok(Array.isArray(value),location+' must be an array');
+   else if(schema.type==='integer')assert.ok(Number.isInteger(value),location+' must be integer');
+   else if(schema.type==='string')assert.equal(typeof value,'string',location+' must be string');
+   if(schema.required)for(const key of schema.required)assert.ok(Object.hasOwn(value,key),location+' missing '+key);
+   if(value!==null&&schema.properties)for(const [key,shape] of Object.entries(schema.properties)){
+    if(Object.hasOwn(value,key))check(value[key],shape,location+'.'+key);
+   }
+   if(Array.isArray(value)&&schema.items)for(const [index,item] of value.entries())check(item,schema.items,location+'['+index+']');
+  };
+  const id='123e4567-e89b-42d3-a456-426614174100',now=Date.now();
+  h.insert(id,now+600000,now+900000);
+  for(const [url,operation] of [
+   ['/api/events',spec.paths['/api/events'].get],
+   ['/api/events/'+id,spec.paths['/api/events/{id}'].get],
+   ['/api/events/'+id+'/participants',spec.paths['/api/events/{id}/participants'].get]
+  ]){
+   const response=await h.req(url);
+   const status=String(response.status);
+   const schema=operation.responses[status]?.content?.['application/json']?.schema;
+   assert.ok(schema,'missing documented status '+status+' on '+url);
+   check(await response.json(),schema,url+' '+status);
+  }
  }finally{h.sqlite.close()}
 });
