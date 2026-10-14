@@ -749,3 +749,27 @@ test('real Worker denial responses conform to documented OpenAPI error shapes',a
   }
  }finally{h.sqlite.close()}
 });
+
+test('anonymous signup mutations document their actual JSON 401 envelopes',async()=>{
+ const h=harness();
+ try{
+  const spec=YAML.parse(readFileSync('openapi/openapi.yaml','utf8'));
+  const id='123e4567-e89b-42d3-a456-426614174102',now=Date.now();
+  h.insert(id,now+600000,now+900000);
+  for(const [path,method,body] of [
+   ['/api/events/{id}/signups','POST',{}],
+   ['/api/events/{id}/signups','DELETE',{}],
+   ['/api/admin/events/{id}/signups','POST',{userId:'11111111-1111-4111-8111-111111111111'}],
+   ['/api/admin/events/{id}/signups','DELETE',{userId:'11111111-1111-4111-8111-111111111111'}]
+  ]){
+   const url=path.replace('{id}',id);
+   const response=await h.req(url,method,body);
+   assert.equal(response.status,401,method+' '+path+' must deny anonymous access');
+   assert.match(response.headers.get('content-type')||'',/application\/json/);
+   const payload=await response.json();
+   assert.equal(typeof payload.error,'string');
+   const declared=spec.paths[path][method.toLowerCase()].responses['401'].content?.['application/json']?.schema;
+   assert.equal(declared?.$ref,'#/components/schemas/Error',method+' '+path+' must document error payload');
+  }
+ }finally{h.sqlite.close()}
+});
