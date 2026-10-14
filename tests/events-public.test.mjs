@@ -643,7 +643,12 @@ test('a signed-in nonparticipant cannot read another event roster or administrat
   assert.equal((await h.req('/api/admin/events/'+eventA+'/signups','GET',undefined,cookie)).status,403);
   assert.equal((await h.req('/api/admin/events/'+eventA+'/signups','POST',{userId:attendeeId},cookie)).status,403);
   assert.equal((await h.req('/api/events/'+eventB+'/signups','POST',{},cookie)).status,201);
-  assert.equal((await h.req('/api/events/'+eventB+'/participants','GET',undefined,cookie)).status,200);
+  const ownRosterResponse=await h.req('/api/events/'+eventB+'/participants','GET',undefined,cookie);
+  assert.equal(ownRosterResponse.status,200);
+  const ownRoster=await ownRosterResponse.json();
+  assert.deepEqual(ownRoster.participants,[{name:'Ordinary Member'}]);
+  assert.ok(!JSON.stringify(ownRoster).includes(email),'participant roster must not leak account email');
+  assert.ok(!JSON.stringify(ownRoster).includes('1990-01-01'),'participant roster must not leak date of birth');
   assert.equal((await h.req('/api/events/'+eventA+'/participants','GET',undefined,cookie)).status,403,'membership in another event does not reveal this roster');
   assert.equal(h.sqlite.prepare('SELECT COUNT(*) n FROM event_signups WHERE event_id=?').get(eventA).n,1,'forbidden admin mutation did not write');
  }finally{h.sqlite.close()}
