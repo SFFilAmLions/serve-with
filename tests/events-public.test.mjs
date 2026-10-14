@@ -647,3 +647,32 @@ test('a signed-in nonparticipant cannot read another event roster or administrat
   assert.equal(h.sqlite.prepare('SELECT COUNT(*) n FROM event_signups WHERE event_id=?').get(eventA).n,1,'forbidden admin mutation did not write');
  }finally{h.sqlite.close()}
 });
+
+test('verified magic-link claim reuses stub enrollment identity without granting consent',async()=>{
+ const h=harness();
+ try{
+  const now=Date.now(),eventId='123e4567-e89b-42d3-a456-426614174099',stubId='88888888-8888-4888-8888-888888888888';
+  const email='magic-claim@example.org',token='b'.repeat(64);
+  h.insert(eventId,now+600000,now+900000);
+  h.sqlite.prepare('INSERT INTO participation_identities(id) VALUES(?)').run(stubId);
+  h.sqlite.prepare('INSERT INTO user_stubs(id,email,first_name,last_name,created_at,updated_at) VALUES(?,?,?,?,?,?)')
+   .run(stubId,email,'Magic','Claim',now,now);
+  h.sqlite.prepare('INSERT INTO event_signups(id,event_id,user_id,created_at) VALUES(?,?,?,?)')
+   .run('magic-preclaim-signup',eventId,stubId,now);
+  const linkHash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode('test:'+token))),b=>b.toString(16).padStart(2,'0')).join('');
+  h.sqlite.prepare('INSERT INTO login_challenges(id,email,code_hash,link_hash,expires_at,created_at) VALUES(?,?,?,?,?,?)')
+   .run('magic-claim-challenge',email,'unused',linkHash,now+600000,now);
+  const verified=await h.req('/api/auth/magic','POST',{token});
+  assert.equal(verified.status,200,'a claimant must verify email via the normal magic link');
+  const cookieHeader=verified.headers.get('set-cookie')||'';
+  const session=cookieHeader.match(/__Host-sw_session=([a-f0-9]{64})/)?.[0];
+  assert.ok(session,'verified claim should create a session');
+  assert.equal(h.sqlite.prepare('SELECT id FROM users WHERE email=?').get(email).id,stubId,'verified claim reuses stub ID');
+  assert.equal(h.sqlite.prepare('SELECT user_id FROM sessions WHERE email=?').get(email).user_id,stubId);
+  assert.equal(h.sqlite.prepare('SELECT user_id FROM event_signups WHERE id=?').get('magic-preclaim-signup').user_id,stubId);
+  assert.equal(h.sqlite.prepare('SELECT terms_accepted_at FROM users WHERE id=?').get(stubId).terms_accepted_at,null,'verification is not consent');
+  assert.equal(h.sqlite.prepare('SELECT COUNT(*) n FROM agreement_acceptances WHERE user_id=?').get(stubId).n,0);
+  assert.equal((await h.req('/api/events/'+eventId+'/signups','POST',{},session)).status,403,'uncompleted profile and policies still gate signup');
+  assert.notEqual((await h.req('/api/auth/magic','POST',{token})).status,200,'magic link must not be replayable');
+ }finally{h.sqlite.close()}
+});
