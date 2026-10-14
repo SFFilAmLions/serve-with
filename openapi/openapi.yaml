@@ -1315,6 +1315,10 @@ paths:
                   signup: {type: [object, 'null']}
         '401':
           description: Not signed in
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
     post:
       operationId: signUpForEvent
       tags: [Events]
@@ -1338,6 +1342,10 @@ paths:
                   signup: {type: object}
         '401':
           description: Not signed in
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '403':
           description: Profile or consent incomplete
         '409':
@@ -1365,6 +1373,10 @@ paths:
                   withdrawn: {type: boolean}
         '401':
           description: Not signed in
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '403':
           description: Profile or consent incomplete
         '409':
@@ -1441,7 +1453,12 @@ paths:
                   signups:
                     type: array
                     items: {type: object, additionalProperties: true}
-        '401': {description: Sign-in required}
+        '401':
+          description: Sign-in required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '403': {description: Administrator permission required}
     post:
       operationId: adminSignUpAttendee
@@ -1473,7 +1490,12 @@ paths:
                 required: [signup]
                 properties:
                   signup: {type: object}
-        '401': {description: Sign-in required}
+        '401':
+          description: Sign-in required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '403': {description: Administrator permission required}
         '409': {description: Duplicate, full or cutoff}
     delete:
@@ -1506,7 +1528,12 @@ paths:
                 required: [withdrawn]
                 properties:
                   withdrawn: {type: boolean}
-        '401': {description: Sign-in required}
+        '401':
+          description: Sign-in required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '403': {description: Administrator permission required}
         '409': {description: Event already started}
 
@@ -1542,5 +1569,10 @@ paths:
                         remaining: {type: [number, 'null']}
                         resetsAt: {type: [string, 'null']}
                         reason: {type: string}
-        '401': {description: Not signed in}
+        '401':
+          description: Not signed in
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '403': {description: Administrator rights required}
