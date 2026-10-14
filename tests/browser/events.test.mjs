@@ -367,7 +367,7 @@ test('started event cancels pending signup before any POST',async()=>{
   });
   await page.addInitScript(id=>localStorage.setItem('servewith-pending-signup',JSON.stringify({id,expiresAt:Date.now()+60000})),eventId);
   await page.goto(base+'/events/'+eventId);
-  await page.getByText('Signups closed when the event started.').waitFor();
+  await page.getByText('Signups closed when the event started.').first().waitFor();
   await page.waitForFunction(()=>localStorage.getItem('servewith-pending-signup')===null);
   assert.equal(posts,0);
   assert.equal(await page.getByRole('button',{name:/Sign up/}).count(),0);
