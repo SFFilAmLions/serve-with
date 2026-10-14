@@ -394,3 +394,61 @@ test('signup action is keyboard operable and success has an accessible status',a
   assert.equal(posts,1);
  }finally{await browser.close()}
 });
+
+test('malformed pending signup intent is cleared without a mutation',async()=>{
+ const event={...example,capacity:2,signups_count:0,spots_available:2};
+ const {browser,page}=await context(admin,[event]);
+ let posts=0;
+ try{
+  await page.route('**/api/events/'+eventId,r=>r.fulfill({json:{event}}));
+  await page.route('**/api/events/'+eventId+'/signups',r=>{
+   if(r.request().method()==='GET')return r.fulfill({json:{signup:null}});
+   posts++;return r.fulfill({status:500,json:{error:'Unexpected POST'}});
+  });
+  await page.addInitScript(()=>localStorage.setItem('servewith-pending-signup','{not valid JSON'));
+  await page.goto(base+'/events/'+eventId);
+  await page.getByRole('button',{name:'Sign up as Admin'}).waitFor();
+  await page.waitForFunction(()=>localStorage.getItem('servewith-pending-signup')===null);
+  assert.equal(posts,0);
+ }finally{await browser.close()}
+});
+
+test('withdrawal is keyboard-operable and shows an accessible confirmation',async()=>{
+ const event={...example,capacity:2,signups_count:1,spots_available:1};
+ const {browser,page}=await context(admin,[event]);
+ let enrolled=true,deletes=0;
+ try{
+  await page.route('**/api/events/'+eventId,r=>r.fulfill({json:{event}}));
+  await page.route('**/api/events/'+eventId+'/signups',r=>{
+   if(r.request().method()==='GET')return r.fulfill({json:{signup:enrolled?{id:'existing'}:null}});
+   if(r.request().method()==='DELETE'){deletes++;enrolled=false;return r.fulfill({json:{withdrawn:true}})}
+   return r.fulfill({status:405,json:{error:'Unexpected method'}});
+  });
+  await page.route('**/api/events/'+eventId+'/participants',r=>r.fulfill({json:{participants:[{name:'Admin Example'}]}}));
+  await page.goto(base+'/events/'+eventId);
+  const withdraw=page.getByRole('button',{name:'Withdraw'});
+  await withdraw.focus();
+  await page.keyboard.press('Enter');
+  await page.getByRole('status').getByText('Your signup has been withdrawn.').waitFor();
+  await page.getByRole('button',{name:'Sign up as Admin'}).waitFor();
+  assert.equal(deletes,1);
+  assert.equal(await page.getByRole('heading',{name:'Participants'}).count(),0,'roster disappears after withdrawal');
+ }finally{await browser.close()}
+});
+
+test('usage provider failure is an accessible error and refresh remains available',async()=>{
+ const {browser,page}=await context(admin);
+ let calls=0;
+ try{
+  await page.route('**/api/admin/usage',r=>{
+   calls++;
+   return r.fulfill({status:503,json:{error:'Metrics provider unavailable'}});
+  });
+  await page.goto(base+'/admin/usage');
+  await page.getByRole('alert').getByText('Metrics provider unavailable').waitFor();
+  await page.getByRole('button',{name:'Refresh status'}).click();
+  await page.waitForFunction(()=>document.body.innerText.includes('Metrics provider unavailable'));
+  assert.equal(calls,2,'refresh retries when an upstream metrics call fails');
+  assert.equal(await page.getByText('Current usage').count(),0,'failure must not render a fabricated reading');
+ }finally{await browser.close()}
+});
