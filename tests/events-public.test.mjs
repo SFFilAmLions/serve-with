@@ -616,3 +616,27 @@ test('verified-email claim migration preserves stub signup identity and rejects 
   assert.equal(h.sqlite.prepare('SELECT terms_accepted_at FROM users WHERE id=?').get(stubId).terms_accepted_at,null,'claim does not forge user consent');
  }finally{h.sqlite.close()}
 });
+
+test('a signed-in nonparticipant cannot read another event roster or administrator history',async()=>{
+ const h=harness();
+ try{
+  const now=Date.now(),eventA='123e4567-e89b-42d3-a456-426614174097',eventB='123e4567-e89b-42d3-a456-426614174098';
+  h.insert(eventA,now+600000,now+900000);
+  h.insert(eventB,now+600000,now+900000);
+  const attendeeId='77777777-7777-4777-8777-777777777777',email='ordinary@example.org',token='7'.repeat(64);
+  const versions=JSON.parse(readFileSync('src/generated/policy-versions.json','utf8'));
+  h.sqlite.prepare('INSERT INTO users(id,email,first_name,last_name,date_of_birth,email_verified_at,created_at,updated_at,terms_accepted_at,accepted_terms_version,accepted_privacy_version) VALUES(?,?,?,?,?,?,?,?,?,?,?)')
+   .run(attendeeId,email,'Ordinary','Member','1990-01-01',now,now,now,now,versions.terms.version,versions.privacy.version);
+  const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode('test:'+token))),b=>b.toString(16).padStart(2,'0')).join('');
+  h.sqlite.prepare('INSERT INTO sessions(token_hash,email,expires_at,created_at) VALUES(?,?,?,?)').run(hash,email,now+600000,now);
+  const cookie='__Host-sw_session='+token;
+  h.sqlite.prepare('INSERT INTO event_signups(id,event_id,user_id,created_at) VALUES(?,?,?,?)').run('admin-on-event-a',eventA,'11111111-1111-4111-8111-111111111111',now);
+  assert.equal((await h.req('/api/events/'+eventA+'/participants','GET',undefined,cookie)).status,403);
+  assert.equal((await h.req('/api/admin/events/'+eventA+'/signups','GET',undefined,cookie)).status,403);
+  assert.equal((await h.req('/api/admin/events/'+eventA+'/signups','POST',{userId:attendeeId},cookie)).status,403);
+  assert.equal((await h.req('/api/events/'+eventB+'/signups','POST',{},cookie)).status,201);
+  assert.equal((await h.req('/api/events/'+eventB+'/participants','GET',undefined,cookie)).status,200);
+  assert.equal((await h.req('/api/events/'+eventA+'/participants','GET',undefined,cookie)).status,403,'membership in another event does not reveal this roster');
+  assert.equal(h.sqlite.prepare('SELECT COUNT(*) n FROM event_signups WHERE event_id=?').get(eventA).n,1,'forbidden admin mutation did not write');
+ }finally{h.sqlite.close()}
+});
