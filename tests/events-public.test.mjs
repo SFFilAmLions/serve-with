@@ -31,6 +31,7 @@ const worker = (await import('data:text/javascript;base64,' + Buffer.from(compil
 function harness() {
   const sqlite = new DatabaseSync(':memory:');
   sqlite.exec(readFileSync('migrations/0001_auth.sql','utf8'));
+  sqlite.exec(readFileSync('migrations/0002_auth_rate_limits.sql','utf8'));
   sqlite.exec(readFileSync('migrations/0003_events.sql','utf8'));
   sqlite.exec(readFileSync('migrations/0004_users_and_agreements.sql','utf8'));
   sqlite.exec(readFileSync('migrations/0005_event_signups.sql','utf8'));
@@ -664,22 +665,8 @@ test('verified magic-link claim reuses stub enrollment identity without granting
    .run('magic-claim-challenge',email,'unused',linkHash,now+600000,now);
   assert.equal(h.sqlite.prepare('SELECT email FROM login_challenges WHERE link_hash=? AND expires_at>?').get(linkHash,Date.now())?.email,email,'fixture token matches live challenge');
   assert.equal(h.sqlite.prepare('SELECT id FROM user_stubs WHERE email=?').get(email)?.id,stubId,'fixture email resolves to unclaimed stub');
-  const sqlFailures=[];
-  const prepare=h.adapter.prepare.bind(h.adapter);
-  h.adapter.prepare=(statement)=>{
-   const wrapped=prepare(statement),bind=wrapped.bind.bind(wrapped);
-   wrapped.bind=(...values)=>{
-    const op=bind(...values);
-    for(const method of ['first','all','run']){
-     const original=op[method].bind(op);
-     op[method]=async()=>{try{return await original()}catch(e){sqlFailures.push({statement,error:String(e)});throw e;}};
-    }
-    return op;
-   };
-   return wrapped;
-  };
   const verified=await h.req('/api/auth/magic','POST',{token});
-  assert.equal(verified.status,200,'a claimant must verify email via the normal magic link: '+JSON.stringify({sqlFailures,challenge:h.sqlite.prepare('SELECT consumed_at,attempts FROM login_challenges WHERE link_hash=?').get(linkHash),users:h.sqlite.prepare('SELECT COUNT(*) n FROM users WHERE email=?').get(email).n,rates:h.sqlite.prepare('SELECT COUNT(*) n FROM auth_rate_limits').get().n}));
+  assert.equal(verified.status,200,'a claimant must verify email via the normal magic link');
   const cookieHeader=verified.headers.get('set-cookie')||'';
   const session=cookieHeader.match(/__Host-sw_session=([a-f0-9]{64})/)?.[0];
   assert.ok(session,'verified claim should create a session');
