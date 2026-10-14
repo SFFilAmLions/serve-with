@@ -238,3 +238,19 @@ test('all documented signup success bodies use JSON and exclude credential field
   }
  }
 });
+
+test('signup response schemas reject undocumented top-level sensitive fields',()=>{
+ const responseCases=[
+  ['/api/events/{id}/participants','get','200',['participants']],
+  ['/api/events/{id}/signups','get','200',['signup']],
+  ['/api/admin/events/{id}/signups','get','200',['signups']],
+  ['/api/admin/usage','get','200',['environment','collectedAt','providers']]
+ ];
+ for(const [path,method,status,required] of responseCases){
+  const schema=spec.paths[path][method].responses[status].content['application/json'].schema;
+  for(const field of required)assert.ok(schema.required.includes(field),path+' missing required '+field);
+  for(const field of ['email','dateOfBirth','token','sessionId','password']){
+   assert.equal(Object.hasOwn(schema.properties,field),false,path+' exposes '+field+' at top level');
+  }
+ }
+});
