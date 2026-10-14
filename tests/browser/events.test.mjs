@@ -258,3 +258,21 @@ test('non-admin event management deep link redirects without fetching private ro
   assert.equal(adminCalls,0,'public redirect must not request administrator roster');
  }finally{await browser.close()}
 });
+
+test('expired pending signup intent is discarded without any mutation',async()=>{
+ const event={...example,capacity:2,signups_count:0,spots_available:2};
+ const {browser,page}=await context(admin,[event]);
+ let posts=0;
+ try{
+  await page.route('**/api/events/'+eventId,r=>r.fulfill({json:{event}}));
+  await page.route('**/api/events/'+eventId+'/signups',r=>{
+   if(r.request().method()==='GET')return r.fulfill({json:{signup:null}});
+   posts++;return r.fulfill({status:500,json:{error:'Unexpected signup'}});
+  });
+  await page.addInitScript(id=>localStorage.setItem('servewith-pending-signup',JSON.stringify({id,expiresAt:Date.now()-60000})),eventId);
+  await page.goto(base+'/events/'+eventId);
+  await page.getByRole('heading',{name:'Service day'}).waitFor();
+  await page.waitForFunction(()=>localStorage.getItem('servewith-pending-signup')===null);
+  assert.equal(posts,0,'expired intent must not create a signup');
+ }finally{await browser.close()}
+});
