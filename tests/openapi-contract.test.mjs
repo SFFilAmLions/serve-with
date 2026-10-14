@@ -227,7 +227,7 @@ test('all documented signup success bodies use JSON and exclude credential field
    const op=item[method];
    if(!op)continue;
    for(const [status,response] of Object.entries(op.responses)){
-    if(!/^2\\d\\d$/.test(status)||status==='204')continue;
+    if(!/^2[0-9][0-9]$/.test(status)||status==='204')continue;
     const schema=response.content?.['application/json']?.schema;
     assert.ok(schema,method.toUpperCase()+' '+path+' '+status+' must return documented JSON');
     const keys=Object.keys(schema.properties||{});
