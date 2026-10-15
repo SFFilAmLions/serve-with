@@ -802,7 +802,7 @@ test('delegated attendee payloads use canonical generated validation after authe
 
 function assertDocumentedJsonShape(value,raw,document,label){
  const schema=raw?.$ref
-  ?raw.$ref.split('/').slice(2).reduce((part,key)=>part?.[key],document)
+  ?raw.$ref.split('/').slice(1).reduce((part,key)=>part?.[key],document)
   :raw;
  assert.ok(schema,label+' schema must resolve');
  const choices=Array.isArray(schema.type)?schema.type:schema.type?[schema.type]:[];
