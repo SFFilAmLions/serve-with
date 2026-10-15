@@ -575,6 +575,11 @@ async function legacyFetch(request: Request, env: Env): Promise<Response> {
         if (!versions) return json({error:'Required policies unavailable'},503);
         if (body.accepted !== true || body.termsVersion !== versions.terms || body.privacyVersion !== versions.privacy)
           return json({error:'Current policy versions required', requiredVersions:versions},409);
+        // Check the canonical accepted versions against the generated body schema
+        // only after authenticated profile and current-policy consent checks.
+        if(!validateOperationBody('acceptAgreements',{
+          accepted:body.accepted,termsVersion:body.termsVersion,privacyVersion:body.privacyVersion
+        }))return json({error:'Invalid agreement request'},422);
         const now=Date.now(), id=crypto.randomUUID(), userId=subject.user.id;
         // D1 batch commits both statements transactionally or rolls both back.
         await db.batch([
