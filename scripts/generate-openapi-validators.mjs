@@ -13,7 +13,10 @@ for(const item of Object.values(document.paths??{})){
 const output=`// GENERATED FROM openapi/openapi.yaml. DO NOT EDIT.
 const operationSchemas: Record<string, unknown> = ${JSON.stringify(schemas,null,2)};
 const componentSchemas: Record<string, unknown> = ${JSON.stringify(document.components.schemas,null,2)};
-type Schema = {type?:string|string[];required?:string[];properties?:Record<string,Schema>;additionalProperties?:boolean|Schema;pattern?:string;minLength?:number;maxLength?:number;enum?:unknown[];$ref?:string;items?:Schema};
+type Schema = {type?:string|string[];required?:string[];properties?:Record<string,Schema>;additionalProperties?:boolean|Schema;pattern?:string;minLength?:number;maxLength?:number;minimum?:number;maximum?:number;exclusiveMinimum?:number;exclusiveMaximum?:number;minItems?:number;maxItems?:number;enum?:unknown[];$ref?:string;items?:Schema};
+function numericBounds(schema:Schema,value:number):boolean {
+ return (schema.minimum===undefined||value>=schema.minimum) && (schema.maximum===undefined||value<=schema.maximum) && (schema.exclusiveMinimum===undefined||value>schema.exclusiveMinimum) && (schema.exclusiveMaximum===undefined||value<schema.exclusiveMaximum);
+}
 function check(raw: unknown,value: unknown): boolean {
  const schema=raw as Schema;
  if(schema.$ref){
@@ -28,10 +31,10 @@ function check(raw: unknown,value: unknown): boolean {
   (schema.minLength===undefined||value.length>=schema.minLength) &&
   (schema.maxLength===undefined||value.length<=schema.maxLength) &&
   (!schema.pattern||new RegExp(schema.pattern).test(value));
- if(schema.type==='integer')return typeof value==='number'&&Number.isSafeInteger(value);
- if(schema.type==='number')return typeof value==='number'&&Number.isFinite(value);
+ if(schema.type==='integer')return typeof value==='number'&&Number.isSafeInteger(value) && numericBounds(schema,value);
+ if(schema.type==='number')return typeof value==='number'&&Number.isFinite(value)&&numericBounds(schema,value);
  if(schema.type==='boolean')return typeof value==='boolean';
- if(schema.type==='array')return Array.isArray(value)&&value.every(item=>check(schema.items??{},item));
+ if(schema.type==='array')return Array.isArray(value) && (schema.minItems===undefined||value.length>=schema.minItems) && (schema.maxItems===undefined||value.length<=schema.maxItems) && value.every(item=>check(schema.items??{},item));
  if(schema.type==='object') {
   if(!value||typeof value!=='object'||Array.isArray(value))return false;
   const object=value as Record<string,unknown>;
