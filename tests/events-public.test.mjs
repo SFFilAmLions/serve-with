@@ -799,3 +799,32 @@ test('delegated attendee payloads use canonical generated validation after authe
   assert.equal(h.sqlite.prepare('SELECT COUNT(*) AS n FROM event_signups WHERE event_id=?').get(id).n,0);
  }finally{h.sqlite.close()}
 });
+
+test('every OpenAPI operation status is characterized against an anonymous real Worker request',async()=>{
+ const h=harness();
+ try{
+  const spec=YAML.parse(readFileSync('openapi/openapi.yaml','utf8'));
+  const id='123e4567-e89b-42d3-a456-426614174106',now=Date.now();
+  h.insert(id,now+600000,now+900000);
+  let count=0;
+  for(const [template,methods] of Object.entries(spec.paths)){
+   for(const [method,operation] of Object.entries(methods)){
+    if(!operation?.operationId)continue;
+    const path=template.replaceAll('{id}',id),verb=method.toUpperCase();
+    const response=await h.req(path,verb,verb==='GET'?undefined:{});
+    const declared=operation.responses?.[String(response.status)];
+    assert.ok(declared,verb+' '+template+' returned undocumented status '+response.status);
+    if(response.status!==204){
+     assert.match(response.headers.get('content-type')||'',/application\/json/,verb+' '+template+' must return JSON');
+     const payload=await response.json();
+     const shape=declared.content?.['application/json']?.schema;
+     assert.ok(shape,verb+' '+template+' '+response.status+' needs a JSON schema');
+     const resolved=shape.$ref?spec.components.schemas[shape.$ref.split('/').at(-1)]:shape;
+     for(const key of resolved.required||[])assert.ok(Object.hasOwn(payload,key),verb+' '+template+' is missing '+key);
+    }
+    count++;
+   }
+  }
+  assert.ok(count>=27,'expected to characterize all documented Worker HTTP operations');
+ }finally{h.sqlite.close()}
+});
