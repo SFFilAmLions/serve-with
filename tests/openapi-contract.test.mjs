@@ -254,3 +254,24 @@ test('signup response schemas reject undocumented top-level sensitive fields',()
   }
  }
 });
+
+test('generated production dispatch recognizes every declared operation and isolates verbs', async()=>{
+ const ts=await import('typescript');
+ const source=readFileSync('src/generated/openapi-operations.ts','utf8');
+ const compiled=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText;
+ const registry=await import('data:text/javascript;base64,'+Buffer.from(compiled).toString('base64'));
+ const known=new Set();
+ for(const [path,methods] of Object.entries(spec.paths)){
+  const route=path.replace(/\\{[^}]+\\}/g,'11111111-1111-4111-8111-111111111111');
+  for(const [method,operation] of Object.entries(methods)){
+   if(!operation?.operationId)continue;
+   const match=registry.matchOperation(method.toUpperCase(),route);
+   assert.equal(match?.id,operation.operationId,method.toUpperCase()+' '+path+' has wrong production dispatch');
+   const key=method.toUpperCase()+' '+route;
+   assert.ok(!known.has(key),'duplicate operation registration '+key);
+   known.add(key);
+  }
+ }
+ assert.equal(registry.matchOperation('PATCH','/api/events/11111111-1111-4111-8111-111111111111'),null);
+ assert.equal(registry.matchOperation('GET','/api/events/11111111-1111-4111-8111-111111111111/participants/extra'),null);
+});
