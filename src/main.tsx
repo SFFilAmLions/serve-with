@@ -148,7 +148,7 @@ function EventList({admin}:{admin:boolean}){
 }
 function SignIn({onAuthChange}:{onAuthChange:(value:boolean)=>void}){
  const [email,setEmail]=useState(''),[code,setCode]=useState(''),[showCode,setShowCode]=useState(false),[message,setMessage]=useState(''),[signed,setSigned]=useState<string|null>(null),[busy,setBusy]=useState(false);
- const refresh=async()=>{try{const me=await api('me');if(me.authenticated){const check=await generatedApi.getAdminDashboard();const eligible=check.status===200;setSigned(eligible?me.email:null);onAuthChange(eligible)}else {setSigned(null);onAuthChange(false)}}catch{setSigned(null);onAuthChange(false)}};
+ const refresh=async()=>{try{const me=await api('me');if(me.authenticated){const check=await generatedApi.getAdminDashboard();const eligible=check.status===200;setSigned(eligible?(me.email??null):null);onAuthChange(eligible)}else {setSigned(null);onAuthChange(false)}}catch{setSigned(null);onAuthChange(false)}};
  useEffect(()=>{void refresh()},[]);
  const act=async (work:()=>Promise<unknown>)=>{setBusy(true);setMessage('');try{await work()}catch(e){setMessage(e instanceof Error?e.message:'Request failed')}finally{setBusy(false)}};
  return <Box component="section" aria-label="Administrator sign-in" sx={{my:3}}>
@@ -233,7 +233,7 @@ function UserView({id,edit}:{id:string;edit:boolean}){
 }
 function UsersDirectory(){
  const [people,setPeople]=useState<any[]>([]),[query,setQuery]=useState(()=>sessionStorage.getItem('sw-users-q')||''),[sort,setSort]=useState<'first'|'last'>(()=>sessionStorage.getItem('sw-users-sort')==='first'?'first':'last'),[direction,setDirection]=useState<'asc'|'desc'>(()=>sessionStorage.getItem('sw-users-direction')==='desc'?'desc':'asc'),[offset,setOffset]=useState(0),[more,setMore]=useState(false),[error,setError]=useState('');
- const load=async(next=0)=>{try{const params=new URLSearchParams({q:query,sort,direction,offset:String(next)});const response=await generatedApi.listAdminUsers({q:query,sort,direction,offset:next});if(response.status!==200)throw Error((response.data as {error?:string}).error||'Directory unavailable');const data=response.data as {users:typeof people;hasMore:boolean;nextOffset:number};setPeople(old=>next?[...old,...data.users]:data.users);setMore(data.hasMore);setOffset(data.nextOffset);setError('')}catch(e){setError(String(e))}};
+ const load=async(next=0)=>{try{const response=await generatedApi.listAdminUsers({q:query,sort,direction,offset:next});if(response.status!==200)throw Error((response.data as {error?:string}).error||'Directory unavailable');const data=response.data as {users:typeof people;hasMore:boolean;nextOffset:number};setPeople(old=>next?[...old,...data.users]:data.users);setMore(data.hasMore);setOffset(data.nextOffset);setError('')}catch(e){setError(String(e))}};
  useEffect(()=>{sessionStorage.setItem('sw-users-q',query);sessionStorage.setItem('sw-users-sort',sort);sessionStorage.setItem('sw-users-direction',direction);void load(0)},[query,sort,direction]);
  const sortBy=(v:'first'|'last')=>{if(sort===v)setDirection(d=>d==='asc'?'desc':'asc');else{setSort(v);setDirection('asc')}};
  const gridColumns={xs:'minmax(0,1fr)',sm:'minmax(0,1fr) minmax(0,1fr)',lg:'minmax(0,1fr) minmax(0,1fr) minmax(0,2fr)'};
@@ -460,7 +460,7 @@ function AdminEventSignups({id}:{id:string}){
  useEffect(()=>{void load().catch(e=>setError(e instanceof Error?e.message:'Unable to load roster'))},[id]);
  const search=async()=>{
   setError('');
-  try{const response=await generatedApi.listAdminUsers({q:query});if(response.status!==200)throw Error((response.data as {error?:string}).error||'Unable to find users');setPeople((response.data as {users:typeof people}).users);}
+  try{const response=await generatedApi.listAdminUsers({q:query});if(response.status!==200)throw Error((response.data as {error?:string}).error||'Unable to find users');setPeople((response.data as unknown as {users:typeof people}).users);}
   catch(e){setError(e instanceof Error?e.message:'Unable to find users');}
  };
  const act=async(kind:'signup'|'withdraw',userId:string)=>{
