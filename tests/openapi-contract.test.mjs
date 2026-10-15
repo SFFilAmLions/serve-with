@@ -362,3 +362,18 @@ test('OpenAPI generation is byte-for-byte deterministic across repeated runs',()
  assert.equal(regenerated.status,0,regenerated.stderr||regenerated.stdout);
  for(const [index,path] of files.entries())assert.equal(readFileSync(path,'utf8'),before[index],path+' drifted between consecutive runs');
 });
+
+test('generated validator checks UUID/email formats and schema composition without changing legacy business gates',async()=>{
+ const ts=await import('typescript');
+ const source=readFileSync('src/generated/openapi-validators.ts','utf8');
+ const compiled=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText;
+ const {validateOperationBody:validate}=await import('data:text/javascript;base64,'+Buffer.from(compiled).toString('base64'));
+ const id='11111111-1111-4111-8111-111111111111';
+ assert.equal(validate('adminSignUpAttendee',{userId:id}),true);
+ assert.equal(validate('adminSignUpAttendee',{userId:'bad-uuid'}),false);
+ assert.equal(validate('requestSignIn',{email:'helper@example.org'}),true);
+ assert.equal(validate('requestSignIn',{email:'not an email'}),false);
+ assert.equal(validate('createAdminUserStub',{firstName:'Alex',lastName:'Volunteer',email:null,dateOfBirth:null}),true);
+ assert.equal(validate('createAdminUserStub',{firstName:'Alex',lastName:'Volunteer',email:'test@example.org'}),true);
+ assert.equal(validate('createAdminUserStub',{firstName:'Alex',lastName:'Volunteer',email:43}),false);
+});
