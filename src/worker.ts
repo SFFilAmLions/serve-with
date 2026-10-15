@@ -557,6 +557,9 @@ async function legacyFetch(request: Request, env: Env): Promise<Response> {
         if (!subject || !subject.user.email_verified_at) return json({ error:'Authentication required' },401);
         if (!validName(body.firstName) || !validName(body.lastName) || !validDob(body.dateOfBirth))
           return json({ error:'Invalid profile' },422);
+        if(!validateOperationBody('completeProfile',{
+          firstName:(body.firstName as string).trim(),lastName:(body.lastName as string).trim(),dateOfBirth:body.dateOfBirth
+        }))return json({error:'Invalid profile'},422);
         const now=Date.now(), u=subject.user;
         // Initial DOB is write-once here; later admin correction is a separate audited workflow.
         const result=await db.prepare('UPDATE users SET first_name=?,last_name=?,date_of_birth=?,updated_at=? WHERE id=? AND date_of_birth IS NULL')
