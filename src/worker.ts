@@ -605,6 +605,11 @@ async function legacyFetch(request: Request, env: Env): Promise<Response> {
         const now = Date.now();
         const withinRate = await withinLimits(request, db, env.AUTH_PEPPER, email || 'invalid', 'request', now);
         if (!withinRate || !await loginEligible(email,env,db)) return generic;
+        // Invalid sign-in requests receive the same generic response as unknown
+        // accounts; schema details must never become an enumeration signal.
+        if(!validateOperationBody('requestSignIn',{
+          email,...(typeof body.turnstileToken==='string'?{turnstileToken:body.turnstileToken}:{})
+        }))return generic;
         if (!env.RESEND_API_KEY || !env.AUTH_FROM_EMAIL) return json({error:'Email service unavailable'},503);
         const count = await db.prepare('SELECT COUNT(*) AS n FROM login_challenges WHERE email=? AND created_at>?').bind(email, now - 3600000).first<{ n: number }>();
         if ((count?.n || 0) >= 5) return generic;
