@@ -776,3 +776,22 @@ test('anonymous signup mutations document their actual JSON 401 envelopes',async
   }
  }finally{h.sqlite.close()}
 });
+
+test('delegated attendee payloads use canonical generated validation after authentication',async()=>{
+ const h=harness();
+ try{
+  const now=Date.now(),id='123e4567-e89b-42d3-a456-426614174103',token='c'.repeat(64);
+  h.insert(id,now+600000,now+900000);
+  const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode('test:'+token))),b=>b.toString(16).padStart(2,'0')).join('');
+  h.sqlite.prepare('INSERT INTO sessions(token_hash,email,expires_at,created_at) VALUES(?,?,?,?)').run(hash,'lionaugust@icloud.com',now+600000,now);
+  const cookie='__Host-sw_session='+token;
+  for(const method of ['POST','DELETE']){
+   for(const userId of [null,'not-a-uuid','']){
+    const response=await h.req('/api/admin/events/'+id+'/signups',method,{userId},cookie);
+    assert.equal(response.status,422,method+' must reject malformed delegated attendee');
+    assert.equal(typeof (await response.json()).error,'string');
+   }
+  }
+  assert.equal(h.sqlite.prepare('SELECT COUNT(*) AS n FROM event_signups WHERE event_id=?').get(id).n,0);
+ }finally{h.sqlite.close()}
+});
