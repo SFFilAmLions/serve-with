@@ -627,6 +627,10 @@ async function legacyFetch(request: Request, env: Env): Promise<Response> {
         const code = typeof body.code === 'string' ? body.code : '';
         const token = typeof body.token === 'string' ? body.token : '';
         if (isMagic ? !/^[a-f0-9]{64}$/.test(token) : (!await loginEligible(submittedEmail,env,db) || !/^\d{8}$/.test(code))) return error();
+        // Validate canonical credentials after the existing generic, non-enumerating
+        // failure gates; never expose schema details for login attempts.
+        if (!validateOperationBody(isMagic?'verifyMagicLink':'verifyCode',
+          isMagic?{token}:{email:submittedEmail,code})) return error();
         const now = Date.now();
         const hashed = await digest(isMagic ? token : submittedEmail + ':' + code, env.AUTH_PEPPER);
         // A magic link is a bearer credential: find the account by its token hash,
