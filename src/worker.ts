@@ -417,6 +417,11 @@ async function legacyFetch(request: Request, env: Env): Promise<Response> {
             return json({error:'Invalid email'},422);
           const dobValue=body.dateOfBirth===undefined||body.dateOfBirth===null||body.dateOfBirth===''?null:body.dateOfBirth;
           if(dobValue!==null&&!validDob(dobValue))return json({error:'Invalid date of birth'},422);
+          // Validate normalized legacy-compatible input, never unauthenticated raw input.
+          if(!validateOperationBody('createAdminUserStub',{
+            firstName:(body.firstName as string).trim(),lastName:(body.lastName as string).trim(),
+            email:emailValue,dateOfBirth:dobValue
+          }))return json({error:'Invalid user'},422);
           const id=crypto.randomUUID(),now=Date.now();
           try{
             if(emailValue!==null){
