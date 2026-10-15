@@ -466,6 +466,10 @@ test('admin creates email-optional unverified user without consent or login',asy
    .run(hash,'lionaugust@icloud.com',now+600000,now);
   const cookie='__Host-sw_session='+token;
   assert.equal((await h.req(path,'POST',{firstName:'',lastName:'Volunteer'},cookie)).status,422);
+  const normalized=await h.req(path,'POST',{firstName:'  Casey  ',lastName:'  Helper ',ignoredLegacyField:'safe'},cookie);
+  assert.equal(normalized.status,201,'normalized legacy stub input must remain accepted');
+  assert.equal((await normalized.json()).user.firstName,'Casey');
+  assert.equal((await h.req(path,'POST',{firstName:'A'.repeat(101),lastName:'Volunteer'},cookie)).status,422,'schema rejects names exceeding documented max length');
   const response=await h.req(path,'POST',{firstName:'Alex',lastName:'Volunteer'},cookie);
   assert.equal(response.status,201);
   const created=(await response.json()).user;
