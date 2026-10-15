@@ -850,7 +850,14 @@ paths:
                 properties:
                   users:
                     type: array
-                    items: {type: object}
+                    items:
+                      type: object
+                      required: [id, first_name, last_name, email]
+                      properties:
+                        id: {type: string, format: uuid}
+                        first_name: {type: [string, 'null']}
+                        last_name: {type: [string, 'null']}
+                        email: {type: [string, 'null']}
                   hasMore:
                     type: boolean
                   nextOffset:
