@@ -377,3 +377,15 @@ test('generated validator checks UUID/email formats and schema composition witho
  assert.equal(validate('createAdminUserStub',{firstName:'Alex',lastName:'Volunteer',email:'test@example.org'}),true);
  assert.equal(validate('createAdminUserStub',{firstName:'Alex',lastName:'Volunteer',email:43}),false);
 });
+
+test('generated validator honors enums for nullable union schemas',async()=>{
+ const ts=await import('typescript');
+ const source=readFileSync('src/generated/openapi-validators.ts','utf8')+
+  '\nexport const checkUnionEnum = (value: unknown) => check({type:["string","null"],enum:["approved",null]},value);';
+ const compiled=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText;
+ const {checkUnionEnum}=await import('data:text/javascript;base64,'+Buffer.from(compiled).toString('base64'));
+ assert.equal(checkUnionEnum('approved'),true);
+ assert.equal(checkUnionEnum(null),true);
+ assert.equal(checkUnionEnum('unapproved'),false);
+ assert.equal(checkUnionEnum(0),false);
+});
