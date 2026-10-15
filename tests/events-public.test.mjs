@@ -526,7 +526,10 @@ test('admin event capacity edits retain unlimited, reject overfull and stale ver
   const cookie='__Host-sw_session='+token, path='/api/admin/events/'+id;
   const payload={title:'Capacity test',location:'Park',timezone:'America/Los_Angeles',start:'2026-11-14T09:00',end:'2026-11-14T12:00'};
   const update=(capacity,version)=>h.req(path,'PUT',{...payload,capacity,version},cookie);
-  assert.equal((await update(1,1)).status,200);
+  // Legacy callers can supply extra keys/whitespace; canonical generated
+  // validation must run after the existing normalization, not reject them.
+  assert.equal((await h.req(path,'PUT',{...payload,title:'  Capacity test  ',ignoredLegacyKey:true,capacity:1,version:1},cookie)).status,200);
+  assert.equal(h.sqlite.prepare('SELECT title FROM events WHERE id=?').get(id).title,'Capacity test');
   assert.equal(h.sqlite.prepare('SELECT capacity,version FROM events WHERE id=?').get(id).capacity,1);
   assert.equal((await update(2,1)).status,409,'stale editor cannot overwrite a newer revision');
   h.sqlite.prepare('INSERT INTO event_signups(id,event_id,user_id,created_at) VALUES(?,?,?,?)')
