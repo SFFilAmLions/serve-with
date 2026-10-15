@@ -34,8 +34,8 @@ function check(raw: unknown,value: unknown): boolean {
  if(schema.anyOf&&!schema.anyOf.some(item=>check(item,value)))return false;
  if(schema.oneOf&&schema.oneOf.filter(item=>check(item,value)).length!==1)return false;
  if(schema.const!==undefined&&!Object.is(value,schema.const))return false;
+ if(schema.enum && !schema.enum.some(candidate=>Object.is(candidate,value)))return false;
  if(Array.isArray(schema.type))return schema.type.some(t=>check({...schema,type:t},value));
- if(schema.enum && !schema.enum.includes(value))return false;
  if(schema.type==='null')return value===null;
  if(schema.type==='string')return typeof value==='string' &&
   (schema.minLength===undefined||value.length>=schema.minLength) &&
