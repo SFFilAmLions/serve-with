@@ -354,3 +354,11 @@ test('all nonempty API responses document their JSON envelope',()=>{
   }
  }
 });
+
+test('OpenAPI generation is byte-for-byte deterministic across repeated runs',()=>{
+ const files=['src/generated/openapi-client.ts','src/generated/openapi-operations.ts','src/generated/openapi-validators.ts','public/api/openapi.json'];
+ const before=files.map(path=>readFileSync(path,'utf8'));
+ const regenerated=spawnSync('npm',['run','generate:openapi'],{encoding:'utf8'});
+ assert.equal(regenerated.status,0,regenerated.stderr||regenerated.stdout);
+ for(const [index,path] of files.entries())assert.equal(readFileSync(path,'utf8'),before[index],path+' drifted between consecutive runs');
+});
