@@ -324,3 +324,20 @@ test('generated Worker request validator enforces event capacity and optimistic 
  assert.equal(check('deleteAdminEvent',{version:0}),false);
  assert.equal(check('updateAdminEvent',{...update,version:1.5}),false);
 });
+
+test('all state-changing JSON request contracts have a production Worker validation boundary',()=>{
+ const worker=readFileSync('src/worker.ts','utf8');
+ const documented=[];
+ for(const [path,item] of Object.entries(spec.paths)){
+  for(const [method,operation] of Object.entries(item)){
+   if(!['post','put','patch','delete'].includes(method)||!operation?.operationId)continue;
+   if(operation.requestBody?.content?.['application/json']?.schema)documented.push(operation.operationId);
+  }
+ }
+ const noSemanticBody=new Set(['logout']);
+ for(const id of documented){
+  if(noSemanticBody.has(id))continue;
+  assert.ok(worker.includes("'"+id+"'"),id+' lacks any Worker generated validator call');
+ }
+ assert.ok(documented.length>=13,'mutation coverage audit unexpectedly shrank');
+});
