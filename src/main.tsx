@@ -82,7 +82,7 @@ const api = async (path:string,body?:Record<string,string>) => {
   :null;
  if(!result)throw Error('Unknown authentication operation');
  if(result.status<200||result.status>=300){const error=result.data as {error?:string};throw Error(error?.error||'Request failed');}
- return result.data;
+ return result.data as Me & {message:string};
 };
 function Editor({event,onClose,onSaved,onReload}:{event:EventRecord|null;onClose:()=>void;onSaved:()=>void;onReload:()=>void}){
  const original=React.useMemo<Draft>(()=>event?{title:event.title,location:event.location,timezone:event.timezone,start:localInput(event.start_at,event.timezone),end:localInput(event.end_at,event.timezone),capacity:event.capacity??null}:emptyDraft(),[event]);
