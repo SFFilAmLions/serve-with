@@ -74,9 +74,15 @@ function BuildFooter() {
 const magic = new URL(location.href).searchParams.get('magic');
 if (magic) history.replaceState(null,'','/login');
 const api = async (path:string,body?:Record<string,string>) => {
- if(path==='me'&&!body){const result=await generatedApi.getCurrentSession();if(result.status!==200)throw Error('Could not read session');return result.data;}
- const r=await fetch('/api/auth/'+path,{method:body?'POST':'GET',headers:body?{'content-type':'application/json'}:{},body:body?JSON.stringify(body):undefined,credentials:'same-origin',cache:'no-store'});
- const data=await r.json();if(!r.ok)throw new Error(data.error||'Request failed');return data;
+ const result=path==='me'&&!body?await generatedApi.getCurrentSession()
+  :path==='request'?await generatedApi.requestSignIn({body:{email:body?.email??''}})
+  :path==='verify'?await generatedApi.verifyCode({body:{email:body?.email??'',code:body?.code??''}})
+  :path==='magic'?await generatedApi.verifyMagicLink({body:{token:body?.token??''}})
+  :path==='logout'?await generatedApi.logout({body:{}})
+  :null;
+ if(!result)throw Error('Unknown authentication operation');
+ if(result.status<200||result.status>=300){const error=result.data as {error?:string};throw Error(error?.error||'Request failed');}
+ return result.data;
 };
 function Editor({event,onClose,onSaved,onReload}:{event:EventRecord|null;onClose:()=>void;onSaved:()=>void;onReload:()=>void}){
  const original=React.useMemo<Draft>(()=>event?{title:event.title,location:event.location,timezone:event.timezone,start:localInput(event.start_at,event.timezone),end:localInput(event.end_at,event.timezone),capacity:event.capacity??null}:emptyDraft(),[event]);
