@@ -1313,7 +1313,15 @@ paths:
                     type: array
                     items:
                       type: object
-                      additionalProperties: true
+                      required: [id, event_id, created_at, deleted_at, title, start_at, end_at]
+                      properties:
+                        id: {type: string}
+                        event_id: {type: string, format: uuid}
+                        created_at: {type: integer}
+                        deleted_at: {type: [integer, 'null']}
+                        title: {type: string}
+                        start_at: {type: integer}
+                        end_at: {type: integer}
         '401':
           description: Not signed in
           content:
@@ -1503,7 +1511,17 @@ paths:
                 properties:
                   signups:
                     type: array
-                    items: {type: object, additionalProperties: true}
+                    items:
+                      type: object
+                      required: [id, user_id, created_at, deleted_at, first_name, last_name, email]
+                      properties:
+                        id: {type: string}
+                        user_id: {type: string, format: uuid}
+                        created_at: {type: integer}
+                        deleted_at: {type: [integer, 'null']}
+                        first_name: {type: [string, 'null']}
+                        last_name: {type: [string, 'null']}
+                        email: {type: [string, 'null']}
         '401':
           description: Sign-in required
           content:
