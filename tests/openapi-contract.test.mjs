@@ -341,3 +341,16 @@ test('all state-changing JSON request contracts have a production Worker validat
  }
  assert.ok(documented.length>=13,'mutation coverage audit unexpectedly shrank');
 });
+
+test('all nonempty API responses document their JSON envelope',()=>{
+ for(const [path,item] of Object.entries(spec.paths)){
+  for(const [method,operation] of Object.entries(item)){
+   if(!operation?.operationId)continue;
+   for(const [status,response] of Object.entries(operation.responses||{})){
+    if(status==='204'||status==='304')continue;
+    assert.ok(response.content?.['application/json']?.schema,
+      method.toUpperCase()+' '+path+' '+status+' must specify JSON schema');
+   }
+  }
+ }
+});
