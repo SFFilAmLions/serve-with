@@ -823,10 +823,30 @@ paths:
                 required: [user]
                 properties:
                   user: {type: object}
-        '401': {description: Sign-in required}
-        '403': {description: Administrator rights required}
-        '409': {description: Email collision}
-        '422': {description: Invalid form data}
+        '401':
+          description: Sign-in required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Administrator rights required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Email collision
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          description: Invalid form data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
     get:
       operationId: listAdminUsers
       tags: [Administration]
@@ -1363,8 +1383,16 @@ paths:
                 $ref: '#/components/schemas/Error'
         '403':
           description: Profile or consent incomplete
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '409':
           description: Closed, full or duplicate
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
     delete:
       operationId: withdrawFromEvent
       tags: [Events]
@@ -1394,9 +1422,17 @@ paths:
                 $ref: '#/components/schemas/Error'
         '403':
           description: Profile or consent incomplete
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '409':
           description: Event already started
 
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/events/{id}/participants:
     get:
       operationId: getEventParticipants
@@ -1474,7 +1510,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-        '403': {description: Administrator permission required}
+        '403':
+          description: Administrator permission required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
     post:
       operationId: adminSignUpAttendee
       tags: [Administration]
@@ -1511,8 +1552,18 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-        '403': {description: Administrator permission required}
-        '409': {description: Duplicate, full or cutoff}
+        '403':
+          description: Administrator permission required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Duplicate, full or cutoff
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
     delete:
       operationId: adminWithdrawAttendee
       tags: [Administration]
@@ -1549,9 +1600,18 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-        '403': {description: Administrator permission required}
-        '409': {description: Event already started}
-
+        '403':
+          description: Administrator permission required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Event already started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/admin/usage:
     get:
       operationId: getAdminUsage
@@ -1590,4 +1650,9 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-        '403': {description: Administrator rights required}
+        '403':
+          description: Administrator rights required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
