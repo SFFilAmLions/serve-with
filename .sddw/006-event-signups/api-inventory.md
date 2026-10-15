@@ -1,6 +1,6 @@
 # SDDW-006 — API Inventory and Generator Spike
 
-**Status:** Initial static inventory against `main/src/worker.ts`; no runtime characterization or generator execution yet.
+**Status:** Original main-branch inventory retained below for historical comparison. The current feature branch declares 27 generated OpenAPI operation bindings and runs actual Worker/SQLite route characterization, frontend browser tests and CI generator checks. Detailed status/error-schema parity remains open; do not treat this inventory alone as complete audit or staging verification.
 
 ## Existing route inventory
 
@@ -62,3 +62,9 @@ The authoritative YAML now defines `listEvents`, `getEvent` and `createAdminEven
 **Source notes:** OpenAPI Backend documentation supports operationId dispatch, request validation and OpenAPI 3.1, but explicitly says it does **not generate code**. openapi-fetch uses types emitted by openapi-typescript; its output alone is a client rather than a Worker server implementation. The Cloudflare Worker runtime is Fetch-API-native.
 
 **Execution gate remains open:** No package dependency has been installed or pinned; no generated output has been built into a Worker and no runtime tests have passed. Choose only after running a signed-in POST and a public GET with real generated server bindings, request validation and CSRF checks.
+
+## Current branch inventory verification (October 15, 2026)
+
+The generated operation registry comes from `openapi/openapi.yaml`; `tests/openapi-contract.test.mjs` checks each method/path against `matchOperation()` and its operation ID. Real Worker handler tests check authentication, Origin/CSRF, HTTP status and JSON envelopes for representative public, auth, admin and signup routes. The UI now calls the generated client for all API requests. The historical inventory table above describes the pre-feature branch and is not an exhaustive list of the 27 current operations.
+
+**Outstanding:** reconcile every documented input/output field and all success/error statuses for legacy account and administrative endpoints, independently review stricter validation against preexisting callers, and verify generated `/api/openapi.json` plus `/api/docs/` on an authorized staging deployment. Do not infer deployed runtime behavior from generated source files alone.
