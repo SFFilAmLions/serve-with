@@ -800,6 +800,26 @@ test('delegated attendee payloads use canonical generated validation after authe
  }finally{h.sqlite.close()}
 });
 
+function assertDocumentedJsonShape(value,raw,document,label){
+ const schema=raw?.$ref
+  ?raw.$ref.split('/').slice(2).reduce((part,key)=>part?.[key],document)
+  :raw;
+ assert.ok(schema,label+' schema must resolve');
+ const choices=Array.isArray(schema.type)?schema.type:schema.type?[schema.type]:[];
+ const validType=type=>type==='null'?value===null:type==='integer'?Number.isSafeInteger(value):
+  type==='number'?typeof value==='number'&&Number.isFinite(value):
+  type==='array'?Array.isArray(value):type==='object'?value!==null&&typeof value==='object'&&!Array.isArray(value):typeof value===type;
+ if(choices.length)assert.ok(choices.some(validType),label+' expected '+choices.join('|')+' but received '+(value===null?'null':typeof value));
+ if(value===null)return;
+ for(const key of schema.required||[])assert.ok(Object.hasOwn(value,key),label+' missing '+key);
+ if(schema.properties&&typeof value==='object'&&!Array.isArray(value)){
+  for(const [key,child] of Object.entries(schema.properties))
+   if(Object.hasOwn(value,key))assertDocumentedJsonShape(value[key],child,document,label+'.'+key);
+ }
+ if(Array.isArray(value)&&schema.items)for(const [index,item] of value.entries())
+  assertDocumentedJsonShape(item,schema.items,document,label+'['+index+']');
+}
+
 test('every OpenAPI operation status is characterized against an anonymous real Worker request',async()=>{
  const h=harness();
  try{
@@ -819,8 +839,7 @@ test('every OpenAPI operation status is characterized against an anonymous real 
      const payload=await response.json();
      const shape=declared.content?.['application/json']?.schema;
      assert.ok(shape,verb+' '+template+' '+response.status+' needs a JSON schema');
-     const resolved=shape.$ref?spec.components.schemas[shape.$ref.split('/').at(-1)]:shape;
-     for(const key of resolved.required||[])assert.ok(Object.hasOwn(payload,key),verb+' '+template+' is missing '+key);
+     assertDocumentedJsonShape(payload,shape,spec,verb+' '+template+' '+response.status);
     }
     count++;
    }
@@ -852,8 +871,7 @@ test('all documented API operations map authenticated Worker responses to declar
      const payload=await response.json();
      const shape=declared.content?.['application/json']?.schema;
      assert.ok(shape,verb+' '+template+' '+response.status+' has no JSON schema');
-     const resolved=shape.$ref?spec.components.schemas[shape.$ref.split('/').at(-1)]:shape;
-     for(const field of resolved.required||[])assert.ok(Object.hasOwn(payload,field),verb+' '+template+' missing '+field);
+     assertDocumentedJsonShape(payload,shape,spec,verb+' '+template+' '+response.status);
     }
     checked++;
    }
