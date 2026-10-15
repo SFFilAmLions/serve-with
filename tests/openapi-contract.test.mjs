@@ -309,3 +309,18 @@ test('React UI uses generated API operations instead of manually composed fetch 
  for(const operation of ['requestSignIn','verifyCode','verifyMagicLink','completeProfile','acceptAgreements','createAdminEvent','updateAdminEvent','deleteAdminEvent','listAdminUsers','getUser','updateUser'])
   assert.ok(ui.includes('generatedApi.'+operation+'('),'missing generated operation '+operation);
 });
+
+test('generated Worker request validator enforces event capacity and optimistic version bounds',async()=>{
+ const ts=await import('typescript');
+ const source=readFileSync('src/generated/openapi-validators.ts','utf8');
+ const compiled=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText;
+ const {validateOperationBody:check}=await import('data:text/javascript;base64,'+Buffer.from(compiled).toString('base64'));
+ const update={title:'Cleanup',location:'Park',timezone:'America/Los_Angeles',start:'2026-11-14T09:00',end:'2026-11-14T12:00',version:1,capacity:2};
+ assert.equal(check('updateAdminEvent',update),true);
+ assert.equal(check('updateAdminEvent',{...update,capacity:null}),true,'unlimited capacity is valid');
+ assert.equal(check('updateAdminEvent',{...update,capacity:-1}),false,'capacity minimum is enforced');
+ assert.equal(check('updateAdminEvent',{...update,version:0}),false,'optimistic version must be positive');
+ assert.equal(check('deleteAdminEvent',{version:1}),true);
+ assert.equal(check('deleteAdminEvent',{version:0}),false);
+ assert.equal(check('updateAdminEvent',{...update,version:1.5}),false);
+});
