@@ -828,3 +828,36 @@ test('every OpenAPI operation status is characterized against an anonymous real 
   assert.ok(count>=27,'expected to characterize all documented Worker HTTP operations');
  }finally{h.sqlite.close()}
 });
+
+test('all documented API operations map authenticated Worker responses to declared statuses',async()=>{
+ const h=harness();
+ try{
+  const spec=YAML.parse(readFileSync('openapi/openapi.yaml','utf8'));
+  const id='123e4567-e89b-42d3-a456-426614174107',now=Date.now();
+  h.insert(id,now+600000,now+900000);
+  const token='7'.repeat(64);
+  const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode('test:'+token))),x=>x.toString(16).padStart(2,'0')).join('');
+  h.sqlite.prepare('INSERT INTO sessions(token_hash,email,expires_at,created_at) VALUES(?,?,?,?)').run(hash,'lionaugust@icloud.com',now+600000,now);
+  const cookie='__Host-sw_session='+token;
+  let checked=0;
+  for(const [template,methods] of Object.entries(spec.paths)){
+   for(const [method,operation] of Object.entries(methods)){
+    if(!operation?.operationId||operation.operationId==='logout')continue;
+    const verb=method.toUpperCase(),url=template.replaceAll('{id}',id);
+    const response=await h.req(url,verb,verb==='GET'?undefined:{},cookie);
+    const declared=operation.responses?.[String(response.status)];
+    assert.ok(declared,verb+' '+template+' returned undocumented authenticated status '+response.status);
+    if(response.status!==204){
+     assert.match(response.headers.get('content-type')||'',/application\/json/);
+     const payload=await response.json();
+     const shape=declared.content?.['application/json']?.schema;
+     assert.ok(shape,verb+' '+template+' '+response.status+' has no JSON schema');
+     const resolved=shape.$ref?spec.components.schemas[shape.$ref.split('/').at(-1)]:shape;
+     for(const field of resolved.required||[])assert.ok(Object.hasOwn(payload,field),verb+' '+template+' missing '+field);
+    }
+    checked++;
+   }
+  }
+  assert.ok(checked>=26);
+ }finally{h.sqlite.close()}
+});
