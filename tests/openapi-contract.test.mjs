@@ -302,3 +302,10 @@ test('OpenAPI compatibility gate catches response removals and newly required re
   assert.equal(unchanged.status,0,unchanged.stdout+unchanged.stderr);
  }finally{rmSync(dir,{recursive:true,force:true})}
 });
+
+test('React UI uses generated API operations instead of manually composed fetch requests',()=>{
+ const ui=readFileSync('src/main.tsx','utf8');
+ assert.doesNotMatch(ui,/\bfetch\s*\(/,'direct fetch calls reintroduce untyped route and cookie drift');
+ for(const operation of ['requestSignIn','verifyCode','verifyMagicLink','completeProfile','acceptAgreements','createAdminEvent','updateAdminEvent','deleteAdminEvent','listAdminUsers','getUser','updateUser'])
+  assert.ok(ui.includes('generatedApi.'+operation+'('),'missing generated operation '+operation);
+});
