@@ -373,6 +373,10 @@ async function legacyFetch(request: Request, env: Env): Promise<Response> {
         try{body=await bodyOf(request)}catch{return error()}
         const userId=body.userId;
         if(typeof userId!=='string'||!/^[0-9a-f-]{36}$/.test(userId))return json({error:'Invalid attendee'},422);
+        // Keep legacy input tolerance, but verify the canonical attendee selection
+        // with the same OpenAPI-derived schema used to generate the client.
+        if(!validateOperationBody(request.method==='POST'?'adminSignUpAttendee':'adminWithdrawAttendee',{userId}))
+          return json({error:'Invalid attendee'},422);
         const target=await db.prepare(`SELECT id,email,first_name,last_name,date_of_birth,email_verified_at,
           terms_accepted_at,accepted_terms_version,accepted_privacy_version FROM users WHERE id=?`)
           .bind(userId).first<UserRow>();
