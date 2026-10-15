@@ -373,6 +373,13 @@ test('generated validator checks UUID/email formats and schema composition witho
  assert.equal(validate('adminSignUpAttendee',{userId:'bad-uuid'}),false);
  assert.equal(validate('requestSignIn',{email:'helper@example.org'}),true);
  assert.equal(validate('requestSignIn',{email:'not an email'}),false);
+ assert.equal(validate('verifyCode',{email:'helper@example.org',code:'12345678'}),true);
+ assert.equal(validate('verifyCode',{email:'helper@example.org'}),false,'code required');
+ assert.equal(validate('verifyCode',{email:'helper@example.org',code:12345678}),false,'code must be a string');
+ assert.equal(validate('verifyMagicLink',{token:'a'.repeat(64)}),true);
+ assert.equal(validate('verifyMagicLink',{token:null}),false,'magic token cannot be null');
+ assert.equal(validate('acceptAgreements',{accepted:true,termsVersion:'v1',privacyVersion:'v1'}),true);
+ assert.equal(validate('acceptAgreements',{accepted:'true',termsVersion:'v1',privacyVersion:'v1'}),false,'acceptance must be boolean');
  assert.equal(validate('createAdminUserStub',{firstName:'Alex',lastName:'Volunteer',email:null,dateOfBirth:null}),true);
  assert.equal(validate('createAdminUserStub',{firstName:'Alex',lastName:'Volunteer',email:'test@example.org'}),true);
  assert.equal(validate('createAdminUserStub',{firstName:'Alex',lastName:'Volunteer',email:43}),false);
