@@ -86,11 +86,10 @@ function Editor({event,onClose,onSaved,onReload}:{event:EventRecord|null;onClose
  const set=(key:keyof Draft,value:string)=>{setForm(previous=>({...previous,[key]:value}));setErrors(previous=>({...previous,[key]:''}));};
  const save=async()=>{if(saving)return;const validation=validateDraft(form);if(Object.keys(validation).length){setErrors(validation);setMessage('Correct the highlighted fields before saving');return;}setSaving(true);setErrors({});setMessage('');
   try{
-   const response=await fetch(event?'/api/admin/events/'+encodeURIComponent(event.id):'/api/admin/events',{
-    method:event?'PUT':'POST',headers:{'content-type':'application/json'},credentials:'same-origin',
-    body:JSON.stringify({...form,...(event?{version:event.version}:{})})
-   });
-   if(!response.ok){const result=await response.json() as {error?:string;fields?:Record<string,string>};
+   const response=event
+    ?await generatedApi.updateAdminEvent({id:event.id,body:{...form,version:event.version}})
+    :await generatedApi.createAdminEvent({body:{...form}});
+   if(response.status<200||response.status>=300){const result=response.data as {error?:string;fields?:Record<string,string>};
      setErrors(result.fields||{});
      if(response.status===409)setConflict(true);
      setMessage(response.status===409?'Another administrator changed this event. Your edits are preserved.':result.error||'Unable to save event');
@@ -125,8 +124,8 @@ function EventList({admin}:{admin:boolean}){
  const closeDelete=()=>{setToDelete(null);restoreFocus(deleteTrigger)};
  const [editor,setEditor]=useState<{open:boolean;event:EventRecord|null}>({open:false,event:null}),[toDelete,setToDelete]=useState<EventRecord|null>(null),[deleting,setDeleting]=useState(false),[deleteError,setDeleteError]=useState(''),[notice,setNotice]=useState('');
  const remove=async()=>{if(!toDelete||deleting)return;setDeleting(true);setDeleteError('');
-  try{const response=await fetch('/api/admin/events/'+encodeURIComponent(toDelete.id),{method:'DELETE',credentials:'same-origin',headers:{'content-type':'application/json'},body:JSON.stringify({version:toDelete.version})});
-   if(!response.ok){setDeleteError(response.status===409?'This event was changed by another administrator. Refresh the list.':'Unable to delete event');return;}
+  try{const response=await generatedApi.deleteAdminEvent({id:toDelete.id,body:{version:toDelete.version}});
+   if(response.status<200||response.status>=300){setDeleteError(response.status===409?'This event was changed by another administrator. Refresh the list.':'Unable to delete event');return;}
    closeDelete();setNotice('Event deleted');reload(n=>n+1);
   }catch{setDeleteError('Could not reach the server')}finally{setDeleting(false)}
  };
@@ -143,7 +142,7 @@ function EventList({admin}:{admin:boolean}){
 }
 function SignIn({onAuthChange}:{onAuthChange:(value:boolean)=>void}){
  const [email,setEmail]=useState(''),[code,setCode]=useState(''),[showCode,setShowCode]=useState(false),[message,setMessage]=useState(''),[signed,setSigned]=useState<string|null>(null),[busy,setBusy]=useState(false);
- const refresh=async()=>{try{const me=await api('me');if(me.authenticated){const check=await fetch('/api/admin/dashboard',{credentials:'same-origin',cache:'no-store'});setSigned(check.ok?me.email:null);onAuthChange(check.ok)}else {setSigned(null);onAuthChange(false)}}catch{setSigned(null);onAuthChange(false)}};
+ const refresh=async()=>{try{const me=await api('me');if(me.authenticated){const check=await generatedApi.getAdminDashboard();const eligible=check.status===200;setSigned(eligible?me.email:null);onAuthChange(eligible)}else {setSigned(null);onAuthChange(false)}}catch{setSigned(null);onAuthChange(false)}};
  useEffect(()=>{void refresh()},[]);
  const act=async (work:()=>Promise<unknown>)=>{setBusy(true);setMessage('');try{await work()}catch(e){setMessage(e instanceof Error?e.message:'Request failed')}finally{setBusy(false)}};
  return <Box component="section" aria-label="Administrator sign-in" sx={{my:3}}>
