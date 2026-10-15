@@ -17,7 +17,7 @@
 
 - [ ] **T005** Author complete existing API contract in `openapi/openapi.yaml`; add shared schemas, errors, security and synthetic examples.
 - [ ] **T006** Add deterministic `api:generate`, pinned tooling, generated frontend client, generated Worker-side interfaces and runtime request validation adapter; migrate existing handlers incrementally.
-- [ ] **T007** Migrate React API calls to generated client without behavioral changes; preserve same-origin cookies/session semantics.
+- [x] **T007** Migrate React API calls to generated client without behavioral changes; preserve same-origin cookies/session semantics. **Branch-level implementation:** all React API requests use generated operation methods; `tests/openapi-contract.test.mjs` now guards against reintroducing direct fetch calls. Staging verification remains part of T024–T025.
 - [ ] **T008** Publish generated JSON and Scalar docs under `/api/openapi.json` and `/api/docs`, staging first. Ensure no auth bypass or accidental SPA HTML response.
 - [ ] **T009** CI: OpenAPI lint/validation, generation drift, TypeScript, contract tests, breaking-change review, browser tests.
 
@@ -124,3 +124,17 @@ The following checkboxes were closed after cross-checking source, migration file
 - **T017:** Event editor includes optional capacity; Worker accepts unlimited capacity and enforces stale-version/below-active-count conflicts; `tests/event-form.test.mjs`, `tests/events-public.test.mjs`, and `tests/signups-database.test.mjs` cover invalid edits, deleted/archived behavior and preserved history. Manual UI and true D1 race acceptance remain T018/T025.
 
 Other tasks remain unchecked because at least one stated deliverable or acceptance proof is missing; in particular generated API full parity, end-to-end signup/claim flows, provider access, and live D1 concurrency must not be inferred from local passing tests. No merge, migration execution or deployment was performed by this checklist update.
+
+## T001–T009 coordinated integration pass (October 15, 2026)
+
+- **T001 — partly verified:** The Worker already forwards declared operations through the generated dispatcher. Existing real-Worker SQLite characterization and browser tests cover principal event/auth/admin/signup routes. A full manual audit of every error status and deployed-route behavior is still outstanding; do not mark complete.
+- **T002 — complete:** Single YAML contract with generated registry/client/validators; structural validation and endpoint safety tests run in CI.
+- **T003 — partly verified:** The selected YAML-driven Fetch dispatcher and canonical request validator run in the production Worker. Selected mutations are validated following legacy-compatible normalization; the custom validator is explicitly not a complete OpenAPI 3.1/JSON Schema 2020-12 engine. Finish remaining operations before declaring full middleware migration.
+- **T004 — selected, review gate remains:** `design.md` records the incremental YAML-first route/operation naming and SPA compatibility strategy. Explicit final breaking-change and route-name review remains part of signoff.
+- **T005 — in progress:** Directory search parameters, nullable stub directory projections, authentication, event, participant and signup schemas are described and tested. Complete field-level schema parity for all 27 operations, not just core routes.
+- **T006 — in progress:** Deterministic generators produce typed client/Worker registry, validators and static OpenAPI/Scalar assets. Validation is integrated for the main event/admin/profile/consent/auth flows but not yet every JSON body.
+- **T007 — implementation complete on branch:** Event editor/deletion, administrator status/directory/user profiles, auth and signup flows use generated React API client. No direct `fetch()` remains in `src/main.tsx`; compatibility Playwright tests and explicit source guard cover this migration.
+- **T008 — generated, deployment gated:** `/api/openapi.json` and `/api/docs/` assets are generated and tested locally. They cannot be verified on staging without separate deployment approval.
+- **T009 — improved, partially complete:** Existing CI tests typecheck, build, browser/Worker behavior and OpenAPI generation. The baseline compatibility gate now checks operation IDs, security regressions, required request fields and response schema property/type regressions, with positive/negative fixtures. Full semantic schema-diff and released-client compatibility review remain manual gates.
+
+**Boundary:** No merge, migration execution, staging or production deployment, credential expansion or paid services authorized by this work. Checked implementation boxes do not imply staging acceptance or release signoff.
