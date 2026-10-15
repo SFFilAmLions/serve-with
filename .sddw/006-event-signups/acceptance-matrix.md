@@ -1,6 +1,6 @@
 # SDDW-006 acceptance evidence matrix
 
-**Status:** Branch-level evidence inventory, October 14, 2026. This is not staging or production signoff. All links/paths below identify tests to inspect; passing CI is necessary but is not proof of live Cloudflare behavior.
+**Status:** Branch-level evidence inventory, updated October 15, 2026. This is not staging or production signoff. All links/paths below identify tests to inspect; passing CI is necessary but is not proof of live Cloudflare behavior.
 
 | Area / tasks | Branch-level evidence | Open gate |
 | --- | --- | --- |
@@ -63,3 +63,17 @@ A single batch adds browser cases for malformed pending-signup JSON (clear inten
 | `ae7072f` Worker anonymous error status and OpenAPI schema parity | Check CI at final HEAD before sign-off |
 
 These are isolated unit/Playwright runs, not live Cloudflare D1, external provider account access or a complete WCAG assistive-technology audit. Live D1 races, schema restore, real Resend mail delivery, and independent screen-reader verification remain separate gates requiring explicit permission and/or human review.
+
+## Phase 1 consolidated audit and implementation closeout — October 15, 2026
+
+| Area | New evidence | Remaining acceptance |
+| --- | --- | --- |
+| All documented API routes | Actual Worker/SQLite authenticated and anonymous characterization tests cover all 27 OpenAPI operations (26 authenticated after excluding logout to retain test fixture); check status, JSON envelope, required keys and recursively declared JSON types | Non-sampled request permutations, live deployed response parity, manual semantic schema review |
+| Response contracts | Corrected 14 missing documented JSON 4xx envelopes, added delegated signup/roster 404/422 status contracts, and enforced JSON schemas on every nonempty declared HTTP response | Precision of loosely typed legacy payload objects and full OpenAPI 3.1 semantics |
+| Worker request validation | Added numeric and array bounds in generated validator, positive optimistic-version schema for event edit/delete, and a contract test ensuring all meaningful JSON mutations have a production Worker validation boundary | Full JSON Schema 2020-12 format/combinator support is not provided by the deliberately limited adapter |
+| Generator and toolchain | `api:generate` alias, lockfile-backed generators and byte-for-byte deterministic outputs, plus baseline breaking-change and protected operation tests | Public docs and assets must be verified in authorized staging |
+| Usage & Quotas | Release scope documented in `provider-metrics.md`: show unknown when account permissions or provider totals are unavailable; no new credentials or fake numeric limits | Verify staging UI/provider-isolation behavior; live analytics integration is deferred unless explicitly made a release blocker |
+
+The whole branch-level unit/build/Playwright test pipeline passed at [CI 38716713819](https://github.com/SFFilAmLions/serve-with/actions/runs/38716713819) on the pre-documentation implementation revision `f7c0068`. Record a successful CI check on the final documentation HEAD before calling this signoff evidence final. These tests remain isolated SQLite, not concurrent Cloudflare D1.
+
+**Release boundary:** Phase 1 implementation and contract-hardening changes do not authorize PR merge, staging migration/deployment, Cloudflare permission expansion, Resend full-access tokens, or production release. Stage-only and independent human-review requirements remain explicit.
