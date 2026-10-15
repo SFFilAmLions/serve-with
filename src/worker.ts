@@ -316,6 +316,10 @@ async function legacyFetch(request: Request, env: Env): Promise<Response> {
         const body=await bodyOf(request);
         if (!validName(body.firstName)||!validName(body.lastName)) return json({error:'Invalid name'},422);
         if ('dateOfBirth' in body && (!subject.admin || !validDob(body.dateOfBirth))) return json({error:'Invalid or unauthorized DOB correction'},403);
+        if(!validateOperationBody('updateUser',{
+          firstName:(body.firstName as string).trim(),lastName:(body.lastName as string).trim(),
+          ...('dateOfBirth' in body?{dateOfBirth:body.dateOfBirth}:{})
+        }))return json({error:'Invalid user'},422);
         const now=Date.now();
         if ('dateOfBirth' in body) {
           const old=target as {date_of_birth:string|null};
@@ -512,6 +516,8 @@ async function legacyFetch(request: Request, env: Env): Promise<Response> {
           if (updated.meta.changes !== 1) return json({ error: 'Event changed since you opened it', code: 'version_conflict' }, 409);
           return json({ event: { id,...event,capacity,version:(body.version as number)+1 } });
         }
+        if(!validateOperationBody('deleteAdminEvent',{version:body.version}))
+          return json({error:'Valid event version required'},422);
         const now = Date.now();
         const result = await env.AUTH_DB.prepare('UPDATE events SET deleted_at=?,updated_at=?,version=version+1 WHERE id=? AND version=? AND deleted_at IS NULL')
           .bind(now,now,id,body.version).run();
