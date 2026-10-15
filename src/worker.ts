@@ -483,6 +483,13 @@ async function legacyFetch(request: Request, env: Env): Promise<Response> {
           const validated = eventInput(body);
           if (!validated.event) return json({ error: 'Invalid event', fields: validated.errors }, 422);
           const event = validated.event;
+          // Preserve legacy event-input normalization while enforcing the generated
+          // canonical update schema after authorization and business validation.
+          if (!validateOperationBody('updateAdminEvent', {
+            title:event.title,location:event.location,timezone:event.timezone,
+            start:body.start,end:body.end,version:body.version,
+            ...(body.capacity===undefined?{}:{capacity:event.capacity})
+          })) return json({error:'Invalid event',fields:{}},422);
           const now = Date.now();
           const capacity=body.capacity===undefined?existing.capacity:event.capacity;
           let updated;
