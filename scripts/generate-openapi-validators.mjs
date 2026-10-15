@@ -13,7 +13,13 @@ for(const item of Object.values(document.paths??{})){
 const output=`// GENERATED FROM openapi/openapi.yaml. DO NOT EDIT.
 const operationSchemas: Record<string, unknown> = ${JSON.stringify(schemas,null,2)};
 const componentSchemas: Record<string, unknown> = ${JSON.stringify(document.components.schemas,null,2)};
-type Schema = {type?:string|string[];required?:string[];properties?:Record<string,Schema>;additionalProperties?:boolean|Schema;pattern?:string;minLength?:number;maxLength?:number;minimum?:number;maximum?:number;exclusiveMinimum?:number;exclusiveMaximum?:number;minItems?:number;maxItems?:number;enum?:unknown[];$ref?:string;items?:Schema};
+type Schema = {type?:string|string[];required?:string[];properties?:Record<string,Schema>;additionalProperties?:boolean|Schema;pattern?:string;minLength?:number;maxLength?:number;minimum?:number;maximum?:number;exclusiveMinimum?:number;exclusiveMaximum?:number;minItems?:number;maxItems?:number;enum?:unknown[];const?:unknown;format?:string;allOf?:Schema[];anyOf?:Schema[];oneOf?:Schema[];$ref?:string;items?:Schema};
+function formatOk(format:string,value:string):boolean {
+ if(format==='uuid')return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+ if(format==='email')return value.length<=254 && /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(value);
+ // Unknown formats are advisory: business handlers retain authoritative rules.
+ return true;
+}
 function numericBounds(schema:Schema,value:number):boolean {
  return (schema.minimum===undefined||value>=schema.minimum) && (schema.maximum===undefined||value<=schema.maximum) && (schema.exclusiveMinimum===undefined||value>schema.exclusiveMinimum) && (schema.exclusiveMaximum===undefined||value<schema.exclusiveMaximum);
 }
@@ -24,13 +30,18 @@ function check(raw: unknown,value: unknown): boolean {
   const ref=componentSchemas[name];
   return ref!==undefined && check(ref,value);
  }
+ if(schema.allOf&&!schema.allOf.every(item=>check(item,value)))return false;
+ if(schema.anyOf&&!schema.anyOf.some(item=>check(item,value)))return false;
+ if(schema.oneOf&&schema.oneOf.filter(item=>check(item,value)).length!==1)return false;
+ if(schema.const!==undefined&&!Object.is(value,schema.const))return false;
  if(Array.isArray(schema.type))return schema.type.some(t=>check({...schema,type:t},value));
  if(schema.enum && !schema.enum.includes(value))return false;
  if(schema.type==='null')return value===null;
  if(schema.type==='string')return typeof value==='string' &&
   (schema.minLength===undefined||value.length>=schema.minLength) &&
   (schema.maxLength===undefined||value.length<=schema.maxLength) &&
-  (!schema.pattern||new RegExp(schema.pattern).test(value));
+  (!schema.pattern||new RegExp(schema.pattern).test(value)) &&
+  (!schema.format||formatOk(schema.format,value));
  if(schema.type==='integer')return typeof value==='number'&&Number.isSafeInteger(value) && numericBounds(schema,value);
  if(schema.type==='number')return typeof value==='number'&&Number.isFinite(value)&&numericBounds(schema,value);
  if(schema.type==='boolean')return typeof value==='boolean';
