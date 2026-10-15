@@ -174,13 +174,20 @@ export function App(){
 }
 
 type Me = {requiredVersions?:{terms:string;privacy:string}|null;authenticated:boolean;email?:string;userId?:string;firstName?:string|null;lastName?:string|null;profileComplete?:boolean;agreementCurrent?:boolean;administratorEligible?:boolean;privileged?:boolean};
-const requestJson=async(path:string, options?:RequestInit)=>{
- const response=await fetch(path,{credentials:'same-origin',cache:'no-store',...options});
- const data=await response.json();
- if(!response.ok)throw new Error(data.error||'Request failed');
- return data;
+// Bridge existing login UI actions to generated, same-origin operation contracts.
+// Unknown paths fail closed instead of silently introducing handwritten APIs.
+const submitJson=async(path:string,body:Record<string,unknown>)=>{
+ const string=(key:string)=>typeof body[key]==='string'?body[key] as string:'';
+ const result: {status:number;data:unknown}=path==='/api/auth/request'
+  ?await generatedApi.requestSignIn({body:{email:string('email'),turnstileToken:string('turnstileToken')}})
+  :path==='/api/auth/magic'?await generatedApi.verifyMagicLink({body:{token:string('token')}})
+  :path==='/api/auth/verify'?await generatedApi.verifyCode({body:{email:string('email'),code:string('code')}})
+  :path==='/api/auth/profile'?await generatedApi.completeProfile({body:{firstName:string('firstName'),lastName:string('lastName'),dateOfBirth:string('dateOfBirth')}})
+  :path==='/api/auth/agreements'?await generatedApi.acceptAgreements({body:{accepted:body.accepted===true,termsVersion:string('termsVersion'),privacyVersion:string('privacyVersion')}})
+  :{status:400,data:{error:'Unknown API operation'}};
+ if(result.status<200||result.status>=300)throw Error((result.data as {error?:string}).error||'Request failed');
+ return result.data as {message:string};
 };
-const submitJson=(path:string,body:Record<string,unknown>,method='POST')=>requestJson(path,{method,headers:{'content-type':'application/json'},body:JSON.stringify(body)});
 const go=(path:string,state?:unknown)=>{history.pushState(state,'',path);window.dispatchEvent(new PopStateEvent('popstate'))};
 
 type TurnstileApi={render:(element:HTMLElement,options:{sitekey:string;action:string;callback:(token:string)=>void;'expired-callback':()=>void;'error-callback':()=>void})=>string;remove:(id:string)=>void};
