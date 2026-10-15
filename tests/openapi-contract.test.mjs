@@ -1,7 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { readFileSync, mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import YAML from 'yaml';
 
 const spec = YAML.parse(readFileSync(new URL('../openapi/openapi.yaml', import.meta.url), 'utf8'));
@@ -274,4 +276,29 @@ test('generated production dispatch recognizes every declared operation and isol
  }
  assert.equal(registry.matchOperation('PATCH','/api/events/11111111-1111-4111-8111-111111111111'),null);
  assert.equal(registry.matchOperation('GET','/api/events/11111111-1111-4111-8111-111111111111/participants/extra'),null);
+});
+
+test('OpenAPI compatibility gate catches response removals and newly required request fields',()=>{
+ 
+ const dir=mkdtempSync(join(tmpdir(),'sddw-006-contract-'));
+ try{
+  const before={openapi:'3.1.0',paths:{'/api/example':{post:{
+   operationId:'exampleOperation',security:[{SessionCookie:[]}],
+   requestBody:{content:{'application/json':{schema:{type:'object',required:['id'],properties:{id:{type:'string'},note:{type:'string'}}}}}},
+   responses:{'200':{content:{'application/json':{schema:{type:'object',required:['ok'],properties:{ok:{type:'boolean'},note:{type:'string'}}}}}}}
+  }}}};
+  const current=structuredClone(before);
+  current.paths['/api/example'].post.requestBody.content['application/json'].schema.required.push('note');
+  delete current.paths['/api/example'].post.responses['200'].content['application/json'].schema.properties.note;
+  const baseline=join(dir,'baseline.yaml'),updated=join(dir,'updated.yaml');
+  writeFileSync(baseline,YAML.stringify(before));
+  writeFileSync(updated,YAML.stringify(current));
+  const run=spawnSync(process.execPath,['scripts/check-openapi-compat.mjs','--baseline',baseline,'--current',updated],{encoding:'utf8'});
+  assert.equal(run.status,1,run.stdout+run.stderr);
+  assert.match(run.stderr,/Request added required field note/);
+  assert.match(run.stderr,/Response removed property note/);
+  writeFileSync(updated,YAML.stringify(before));
+  const unchanged=spawnSync(process.execPath,['scripts/check-openapi-compat.mjs','--baseline',baseline,'--current',updated],{encoding:'utf8'});
+  assert.equal(unchanged.status,0,unchanged.stdout+unchanged.stderr);
+ }finally{rmSync(dir,{recursive:true,force:true})}
 });
