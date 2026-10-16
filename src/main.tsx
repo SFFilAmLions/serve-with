@@ -252,7 +252,7 @@ function UserView({id,edit,backPath,canEditAvatar}:{id:string;edit:boolean;backP
  if(message&&!user)return <Alert severity="error">{message}</Alert>;
  if(!user)return <Skeleton height={240}/>;
  const u=user.user;
- return <Stack spacing={3} sx={{my:4,maxWidth:760}}><Button size="small" startIcon={<Glyph type="back"/>} sx={{alignSelf:"flex-start"}} onClick={()=>go(edit?'/users/'+id:backPath)}>{edit?'Back to profile':backPath==='/admin/users'?'Back to users':'Back to events'}</Button><Stack direction={{xs:'column',sm:'row'}} alignItems={{sm:'center'}} spacing={2}><Box sx={{position:'relative',width:96,height:96,flexShrink:0}}>
+ return <Stack spacing={3} sx={{my:4,maxWidth:760}}><Button size="small" startIcon={<Glyph type="back" size={24}/>} sx={{alignSelf:"flex-start"}} onClick={()=>go(edit?'/users/'+id:backPath)}>{edit?'Back to profile':backPath==='/admin/users'?'Back to users':'Back to events'}</Button><Stack direction={{xs:'column',sm:'row'}} alignItems={{sm:'center'}} spacing={2}><Box sx={{position:'relative',width:96,height:96,flexShrink:0}}>
   <AccountAvatar email={u.email||undefined} name={[u.first_name,u.last_name].filter(Boolean).join(' ')} size={96} revision={avatarRevision}/>
   {canEditAvatar&&u.email&&<Tooltip title={'Edit profile picture in Gravatar using '+u.email}>
    <IconButton onClick={()=>openAvatarEditor(u.email)} aria-label="Edit profile picture in Gravatar"
@@ -354,7 +354,7 @@ function EventDetail({id,admin,me}:{id:string;admin:boolean;me:Me}){
  const closed=Date.now()>=event.start_at;
  const full=event.spots_available===0;
  return <Stack spacing={2} sx={{my:4}}>
-  <Button size="small" startIcon={<Glyph type="back"/>} sx={{alignSelf:"flex-start"}} onClick={()=>go(admin?"/admin/events":"/")}>Back to events</Button>
+  <Button size="small" startIcon={<Glyph type="back" size={24}/>} sx={{alignSelf:"flex-start"}} onClick={()=>go(admin?"/admin/events":"/")}>Back to events</Button>
   <Typography variant="h4">{event.title}</Typography>
   <Box sx={{display:'grid',gridTemplateColumns:{xs:'minmax(0,1fr)',md:'minmax(0,2fr) minmax(240px,1fr)'},gap:3,alignItems:'start'}}>
    <Stack spacing={2} sx={{minWidth:0}}>
@@ -395,7 +395,7 @@ function EventPageEditor({id}:{id?:string}){
  const save=async()=>{const errors=validateDraft(draft);if(Object.keys(errors).length){setMessage(Object.values(errors).join('; '));return}setBusy(true);setMessage('');try{const result=id?await generatedApi.updateAdminEvent({id,body:{...draft,version}}):await generatedApi.createAdminEvent({body:draft});if(result.status!==200&&result.status!==201){const failure=result.data as {error?:string};throw Error(failure.error||'Unable to save event')}const saved=result.data as {event:{id:string}};go('/admin/events/'+saved.event.id)}catch(e){setMessage(e instanceof Error?e.message:'Save failed; draft retained')}finally{setBusy(false)}};
  const duration=draft.start&&draft.end?dayjs(draft.end).diff(dayjs(draft.start),'minute'):0;
  return <LocalizationProvider dateAdapter={AdapterDayjs}><Stack spacing={2} sx={{my:4,maxWidth:750}}>
- <Stack direction="row" alignItems="center" spacing={1}><Tooltip title="Back"><IconButton aria-label="Back" onClick={close}><Glyph type="back"/></IconButton></Tooltip><Typography variant="h4" sx={{flex:1}}>{id?'Edit event':'Create event'}</Typography></Stack>
+ <Stack direction="row" alignItems="center" spacing={1}><Tooltip title="Back"><IconButton aria-label="Back" onClick={close}><Glyph type="back" size={24}/></IconButton></Tooltip><Typography variant="h4" sx={{flex:1}}>{id?'Edit event':'Create event'}</Typography></Stack>
  {duplication&&!id&&<Alert severity="info">Duplicating {duplication.title}; saving creates a different event.</Alert>}
  {message&&<Alert severity="error">{message}</Alert>}
  <TextField required label="Event title" value={draft.title} onChange={e=>update('title',e.target.value)}/>
@@ -525,7 +525,7 @@ function AdminEventSignups({id}:{id:string}){
    ...(entry.deleted_at===null?[]:[{key:entry.id+'-withdraw',time:entry.deleted_at,name,action:'Withdrew',userId:entry.user_id}])];
  }).concat(eventDetails?.created_at!==undefined?[{key:'event-created',time:eventDetails.created_at,name:'',action:'Event created',userId:''}]:[]).sort((a,b)=>b.time-a.time);
  return <Stack spacing={3} sx={{my:4,pb:8}}>
-  <Button sx={{alignSelf:'flex-start'}} onClick={()=>go('/admin/events')}>Back to admin events</Button>
+  <Button startIcon={<Glyph type="back" size={24}/>} sx={{alignSelf:'flex-start'}} onClick={()=>go('/admin/events')}>Back to admin events</Button>
   <Typography variant="h4">{eventDetails?.title||'Event management'}</Typography>
   {error&&<Alert severity="error" role="alert">{error}</Alert>}
   {notice&&<Alert severity="success" role="status">{notice}</Alert>}
