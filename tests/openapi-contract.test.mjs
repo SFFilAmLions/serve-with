@@ -437,3 +437,17 @@ test('generated validator resolves only owned local component schema references'
  assert.equal(checkComponentRef('https://example.invalid/schemas/User',{}),false,'remote schemas are unsupported');
  assert.equal(checkComponentRef('#/components/schemas/Error/missing',{}),false,'nested pointers are unsupported');
 });
+
+
+test('generated JSON enum validation accepts structurally equal arrays and objects',async()=>{
+ const ts=await import('typescript');
+ const source=readFileSync('src/generated/openapi-validators.ts','utf8')+
+  '\nexport const checkComplexEnum=(value:unknown)=>check({enum:[{role:"member",active:true},[1,2],null]},value);';
+ const compiled=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText;
+ const {checkComplexEnum}=await import('data:text/javascript;base64,'+Buffer.from(compiled).toString('base64'));
+ assert.equal(checkComplexEnum({role:'member',active:true}),true);
+ assert.equal(checkComplexEnum([1,2]),true);
+ assert.equal(checkComplexEnum(null),true);
+ assert.equal(checkComplexEnum({role:'admin',active:true}),false);
+ assert.equal(checkComplexEnum([2,1]),false);
+});
