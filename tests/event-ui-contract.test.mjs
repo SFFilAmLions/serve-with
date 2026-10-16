@@ -101,4 +101,11 @@ test('profile picture edit uses an accessible pencil control only for the profil
  assert.match(source,/aria-label="Edit profile picture in Gravatar"/);
  assert.match(source,/position:'absolute',right:-4,bottom:-4/);
  assert.doesNotMatch(source,/>Edit profile picture in Gravatar<\/Button>/);
+ assert.match(source,/GravatarQuickEditorCore/);
+ assert.match(source,/scope:\['avatars'\]/);
+ assert.match(source,/email,scope:/);
+ assert.match(source,/onProfileUpdated:\(\)=>setAvatarRevision/);
+ assert.match(source,/revision=\{avatarRevision\}/);
+ const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
+ assert.match(html,/@gravatar-com\/quick-editor@0\.8\.0/);
 });
