@@ -12,6 +12,9 @@ interface Env {
   AUTH_DB?: D1Database;
   AUTH_PEPPER?: string;
   RESEND_API_KEY?: string;
+  // This key is intentionally separate from the send-only authentication key.
+  // Resend's usage endpoint requires a full-access key.
+  RESEND_USAGE_API_KEY?: string;
   AUTH_FROM_EMAIL?: string;
   ENVIRONMENT?: string;
   STAGING_REGISTRATION_EMAILS?: string;
@@ -19,6 +22,34 @@ interface Env {
   REQUIRED_PRIVACY_VERSION?: string;
   TURNSTILE_SITE_KEY?: string;
   TURNSTILE_SECRET_KEY?: string;
+}
+
+type UsageProvider = {
+  name:string; scope:string; status:'available'|'stale'|'unavailable';
+  used:number|null; limit:number|null; remaining:number|null; resetsAt:string|null; reason?:string;
+};
+const unavailableUsage=(name:string,scope:string,reason:string):UsageProvider=>({
+  name,scope,status:'unavailable',used:null,limit:null,remaining:null,resetsAt:null,reason
+});
+const recordOf=(value:unknown):Record<string,unknown>|null=>value!==null&&typeof value==='object'&&!Array.isArray(value)?value as Record<string,unknown>:null;
+const usageNumber=(value:unknown)=>typeof value==='number'&&Number.isFinite(value)&&value>=0?value:null;
+const usageTime=(value:unknown)=>typeof value==='string'&&Number.isFinite(Date.parse(value))?value:null;
+async function resendUsage(env:Env):Promise<UsageProvider>{
+  if(!env.RESEND_USAGE_API_KEY)return unavailableUsage('Resend','account','A dedicated full-access usage credential has not been configured');
+  try{
+    const response=await fetch('https://api.resend.com/usage',{headers:{authorization:'Bearer '+env.RESEND_USAGE_API_KEY}});
+    if(!response.ok)return unavailableUsage('Resend','account','The Resend usage service is currently unavailable');
+    const payload=recordOf(await response.json());
+    const emails=recordOf(payload?.emails),daily=recordOf(emails?.daily);
+    const used=usageNumber(daily?.used),limit=daily?.limit;
+    if(used===null||(limit!==null&&usageNumber(limit)===null))return unavailableUsage('Resend','account','The Resend usage response did not contain a usable daily email quota');
+    const confirmedLimit=limit===null?null:usageNumber(limit);
+    return {
+      name:'Resend',scope:'account · daily email quota',status:'available',used,limit:confirmedLimit,
+      remaining:confirmedLimit===null?null:Math.max(0,confirmedLimit-used),resetsAt:usageTime(daily?.resets_at),
+      reason:confirmedLimit===null?'No daily email cap on the current Resend plan':'Daily email usage across the Resend account'
+    };
+  }catch{return unavailableUsage('Resend','account','The Resend usage service could not be reached');}
 }
 
 async function verifyTurnstile(request:Request,env:Env,token:unknown):Promise<boolean>{
@@ -346,18 +377,19 @@ async function legacyFetch(request: Request, env: Env): Promise<Response> {
       const email = subject.user.email;
       if(path==='/api/admin/usage'){
         if(request.method!=='GET')return json({error:'Method not allowed'},405);
-        // No analytics credential exists within the approved scope. Do not
-        // reuse transactional Resend keys or invent limits/usage values.
         const environment=env.ENVIRONMENT==='production'?'production':env.ENVIRONMENT==='staging'?'staging':'unknown';
-        const providers=['Cloudflare Workers','Cloudflare D1','Resend','Turnstile'];
+        // Provider integrations must fail closed: never substitute zero for an
+        // unavailable reading, and never use deployment or sending credentials.
+        const providers:UsageProvider[]=[
+          unavailableUsage('Cloudflare Workers','staging Worker','A read-only Cloudflare analytics credential has not been configured'),
+          unavailableUsage('Cloudflare D1','staging database','A read-only Cloudflare analytics credential has not been configured'),
+          await resendUsage(env),
+          unavailableUsage('Turnstile','staging widget','No supported programmatic Turnstile quota endpoint is configured')
+        ];
         // Safe operational diagnostics: never log request cookies, credentials,
         // account IDs, emails, or provider response bodies.
-        console.info('usage-provider-status',JSON.stringify({environment,providerCount:providers.length,status:'unavailable',reason:'provider-analytics-not-configured'}));
-        return json({environment,collectedAt:new Date().toISOString(),providers:providers.map(name=>({
-          name,scope:name==='Resend'?'account':'unverified',status:'unavailable',
-          used:null,limit:null,remaining:null,resetsAt:null,
-          reason:'Analytics permissions and resource scope have not been verified'
-        }))});
+        console.info('usage-provider-status',JSON.stringify({environment,providerCount:providers.length,available:providers.filter(provider=>provider.status==='available').map(provider=>provider.name)}));
+        return json({environment,collectedAt:new Date().toISOString(),providers});
       }
 
       const adminSignupMatch=path.match(/^\/api\/admin\/events\/([0-9a-f-]{36})\/signups$/);

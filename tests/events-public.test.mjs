@@ -464,6 +464,24 @@ test('usage endpoint hides provider credentials and never fabricates limits',asy
  }finally{h.sqlite.close();}
 });
 
+test('usage endpoint reports Resend daily quota only with the dedicated usage key',async()=>{
+ const h=harness(),originalFetch=globalThis.fetch;
+ try{
+  const now=Date.now(),token='u'.repeat(64);
+  const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode('test:'+token))),b=>b.toString(16).padStart(2,'0')).join('');
+  h.sqlite.prepare('INSERT INTO sessions(token_hash,email,expires_at,created_at) VALUES(?,?,?,?)').run(hash,'lionaugust@icloud.com',now+600000,now);
+  globalThis.fetch=async(url,init)=>{
+   assert.equal(String(url),'https://api.resend.com/usage');
+   assert.equal(new Headers(init.headers).get('authorization'),'Bearer dedicated-usage-key');
+   return new Response(JSON.stringify({emails:{daily:{used:12,limit:100,resets_at:'2026-10-16T00:00:00.000Z'}}}),{status:200});
+  };
+  const response=await h.req('/api/admin/usage','GET',undefined,'__Host-sw_session='+token,{RESEND_USAGE_API_KEY:'dedicated-usage-key'});
+  assert.equal(response.status,200);
+  const resend=(await response.json()).providers.find(provider=>provider.name==='Resend');
+  assert.deepEqual(resend,{name:'Resend',scope:'account · daily email quota',status:'available',used:12,limit:100,remaining:88,resetsAt:'2026-10-16T00:00:00.000Z',reason:'Daily email usage across the Resend account'});
+ }finally{globalThis.fetch=originalFetch;h.sqlite.close();}
+});
+
 test('admin creates email-optional unverified user without consent or login',async()=>{
  const h=harness();try{
   const path='/api/admin/users';
