@@ -464,6 +464,49 @@ test('usage endpoint hides provider credentials and never fabricates limits',asy
  }finally{h.sqlite.close();}
 });
 
+test('usage endpoint reports Resend daily quota only with the dedicated usage key',async()=>{
+ const h=harness(),originalFetch=globalThis.fetch;
+ try{
+  const now=Date.now(),token='e'.repeat(64);
+  const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode('test:'+token))),b=>b.toString(16).padStart(2,'0')).join('');
+  h.sqlite.prepare('INSERT INTO sessions(token_hash,email,expires_at,created_at) VALUES(?,?,?,?)').run(hash,'lionaugust@icloud.com',now+600000,now);
+  globalThis.fetch=async(url,init)=>{
+   assert.equal(String(url),'https://api.resend.com/usage');
+   assert.equal(new Headers(init.headers).get('authorization'),'Bearer dedicated-usage-key');
+   return new Response(JSON.stringify({emails:{daily:{used:12,limit:100,resets_at:'2026-10-16T00:00:00.000Z'}}}),{status:200});
+  };
+  const response=await h.req('/api/admin/usage','GET',undefined,'__Host-sw_session='+token,{RESEND_USAGE_API_KEY:'dedicated-usage-key'});
+  assert.equal(response.status,200);
+  const resend=(await response.json()).providers.find(provider=>provider.name==='Resend');
+  assert.deepEqual(resend,{name:'Resend',scope:'account · daily email quota',status:'available',used:12,limit:100,remaining:88,resetsAt:'2026-10-16T00:00:00.000Z',reason:'Daily email usage across the Resend account'});
+ }finally{globalThis.fetch=originalFetch;h.sqlite.close();}
+});
+
+test('usage endpoint reports Cloudflare staging metrics only with scoped analytics configuration',async()=>{
+ const h=harness(),originalFetch=globalThis.fetch;
+ try{
+  const now=Date.now(),token='f'.repeat(64);
+  const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode('test:'+token))),b=>b.toString(16).padStart(2,'0')).join('');
+  h.sqlite.prepare('INSERT INTO sessions(token_hash,email,expires_at,created_at) VALUES(?,?,?,?)').run(hash,'lionaugust@icloud.com',now+600000,now);
+  let calls=0;
+  globalThis.fetch=async(url,init)=>{
+   calls++;
+   assert.equal(String(url),'https://api.cloudflare.com/client/v4/graphql');
+   assert.equal(new Headers(init.headers).get('authorization'),'Bearer scoped-analytics-key');
+   return new Response(JSON.stringify({data:{viewer:{accounts:[{workersInvocationsAdaptive:[{sum:{requests:21}}],d1AnalyticsAdaptiveGroups:[{sum:{readQueries:7,writeQueries:3}}]}]}}}),{status:200});
+  };
+  const settings={ENVIRONMENT:'staging',CLOUDFLARE_ANALYTICS_API_TOKEN:'scoped-analytics-key',USAGE_CLOUDFLARE_ACCOUNT_ID:'account',USAGE_D1_DATABASE_ID:'database',USAGE_WORKER_NAME:'serve-with-staging'};
+  const response=await h.req('/api/admin/usage','GET',undefined,'__Host-sw_session='+token,settings);
+  assert.equal(response.status,200);
+  const providers=(await response.json()).providers;
+  assert.equal(providers.find(provider=>provider.name==='Cloudflare Workers').used,21);
+  assert.equal(providers.find(provider=>provider.name==='Cloudflare D1').used,10);
+  assert.equal(providers.find(provider=>provider.name==='Cloudflare Workers').scope,'staging Worker · rolling 24h');
+  assert.equal((await h.req('/api/admin/usage','GET',undefined,'__Host-sw_session='+token,settings)).status,200);
+  assert.equal(calls,1,'a short-lived cache avoids a duplicate provider query');
+ }finally{globalThis.fetch=originalFetch;h.sqlite.close();}
+});
+
 test('admin creates email-optional unverified user without consent or login',async()=>{
  const h=harness();try{
   const path='/api/admin/users';

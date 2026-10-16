@@ -59,3 +59,33 @@ test('Turnstile UI requests a fresh token for each login email',()=>{
  assert.match(source,/setCaptchaRound\(n=>n\+1\)/);
  assert.match(source,/captchaReady/);
 });
+
+test('SDDW-006 navigation and registration controls retain contextual, accessible actions',()=>{
+ for(const label of ['Copy public event link','Copy link to ','Cancel registration as ','View events','My signups','Attendee sections','Administrator sections']){
+  assert.ok(source.includes(label),label);
+ }
+ assert.match(source,/workspaceSwitchPath=eventContextId/);
+ assert.match(source,/\/admin\/events\/'\+eventContextId/);
+ assert.match(source,/navigator\.clipboard\.writeText/);
+});
+
+test('SDDW-006 profile and admin event sections expose roster and activity history',()=>{
+ for(const label of ['Edit profile picture in Gravatar','Details','Roster (','History','Confirm signup','aria-label="Edit event"']){
+  assert.ok(source.includes(label),label);
+ }
+ assert.match(source,/active=entries\.filter\(entry=>entry\.deleted_at===null\)/);
+ assert.match(source,/timeline=entries\.flatMap/);
+ assert.match(source,/sort\(\(a,b\)=>b\.time-a\.time\)/);
+ assert.match(source,/component="ol"/);
+ assert.match(source,/component="section" aria-labelledby="admin-event-history-heading"/);
+ assert.match(source,/<Fab variant="extended"/);
+ assert.match(source,/maxWidth:480/);
+});
+
+test('staging builds show a prominent route to production without affecting production builds',()=>{
+ assert.match(source,/function StagingNotice/);
+ assert.match(source,/buildEnvironment!=='staging'/);
+ assert.match(source,/https:\/\/servewith\.sffilamlions\.org\//);
+ assert.match(source,/Main site/);
+ assert.match(source,/<StagingNotice\/>/);
+});

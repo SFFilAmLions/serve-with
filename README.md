@@ -61,6 +61,20 @@ Release Please maintains release proposals, version information and the changelo
 
 Staging and production use separate Worker/D1 resources; never apply staging migrations or data changes to production by default.
 
+## Usage dashboard configuration
+
+The administrator-only **Usage & Quotas** page reads provider metrics without exposing credentials. Configure each environment independently; do not copy secret values into `wrangler.jsonc`, GitHub, or this repository.
+
+| Setting | Type | Purpose |
+| --- | --- | --- |
+| `CLOUDFLARE_ANALYTICS_API_TOKEN` | encrypted Worker secret | A dedicated Cloudflare token with **Account Analytics: Read**, scoped to the club account. Use a separate token per environment. |
+| `RESEND_USAGE_API_KEY` | encrypted Worker secret | A dedicated Resend **Full access** key required by Resend's Usage API. Do not reuse the send-only authentication key. |
+| `USAGE_CLOUDFLARE_ACCOUNT_ID` | deployment variable | Cloudflare account containing the environment's Worker and D1 database. |
+| `USAGE_D1_DATABASE_ID` | deployment variable | The D1 database ID for that environment only. |
+| `USAGE_WORKER_NAME` | deployment variable | The Worker name for that environment only. |
+
+`wrangler.jsonc` contains only the non-secret per-environment identifiers. Add secrets in the Cloudflare Worker dashboard under **Settings → Runtime variables and secrets**. The analytics token must be read-only and account-scoped; the application filters all queries to the configured Worker and database. A provider that cannot be queried must remain unavailable rather than being shown as zero usage. Successful readings are cached in the active Worker isolate for five minutes; if a refresh fails, a previously confirmed reading may be labelled **stale** for up to fifteen minutes rather than misrepresented as current.
+
 ## Specifications and references
 
 - [SDDW 001 — Project Foundation](.sddw/001-project-foundation/requirements.md)

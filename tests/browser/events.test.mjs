@@ -112,7 +112,7 @@ test('anonymous canonical event detail renders and administrator sees contextual
  try{
   await page.route('**/api/events/'+eventId,r=>r.fulfill({json:{event:example}}));
   await page.goto(base);
-  await page.getByRole('button',{name:'Service day'}).click();
+  await page.getByRole('button',{name:'Service day',exact:true}).click();
   await page.getByRole('heading',{name:'Service day'}).waitFor();
   assert.equal(new URL(page.url()).pathname,'/events/'+eventId);
   assert.equal(await page.getByRole('button',{name:/Edit/}).count(),0);
@@ -304,7 +304,7 @@ test('valid pending signup continues once after login and clears intent',async()
   assert.equal(await page.evaluate(()=>localStorage.getItem('servewith-pending-signup')),null);
   await page.reload();
   await page.getByRole('heading',{name:'Service day'}).waitFor();
-  await page.getByRole('button',{name:/Withdraw/}).waitFor();
+  await page.getByRole('button',{name:'Cancel registration as Admin'}).waitFor();
   assert.equal(posts,1,'refresh must not replay completed signup');
  }finally{await browser.close()}
 });
@@ -390,7 +390,7 @@ test('signup action is keyboard operable and success has an accessible status',a
   await signup.focus();
   await page.keyboard.press('Enter');
   await page.getByRole('status').getByText('You have signed up for this event.').waitFor();
-  await page.getByRole('button',{name:'Withdraw'}).waitFor();
+  await page.getByRole('button',{name:'Cancel registration as Admin'}).waitFor();
   assert.equal(posts,1);
  }finally{await browser.close()}
 });
@@ -426,10 +426,10 @@ test('withdrawal is keyboard-operable and shows an accessible confirmation',asyn
   });
   await page.route('**/api/events/'+eventId+'/participants',r=>r.fulfill({json:{participants:[{name:'Admin Example'}]}}));
   await page.goto(base+'/events/'+eventId);
-  const withdraw=page.getByRole('button',{name:'Withdraw'});
+  const withdraw=page.getByRole('button',{name:'Cancel registration as Admin'});
   await withdraw.focus();
   await page.keyboard.press('Enter');
-  await page.getByRole('status').getByText('Your signup has been withdrawn.').waitFor();
+  await page.getByRole('status').getByText('Your registration has been cancelled.').waitFor();
   await page.getByRole('button',{name:'Sign up as Admin'}).waitFor();
   assert.equal(deletes,1);
   assert.equal(await page.getByRole('heading',{name:'Participants'}).count(),0,'roster disappears after withdrawal');
@@ -485,9 +485,9 @@ test('withdrawal conflict leaves participation unchanged and gives an accessible
   });
   await page.route('**/api/events/'+eventId+'/participants',r=>r.fulfill({json:{participants:[{name:'Admin Example'}]}}));
   await page.goto(base+'/events/'+eventId);
-  await page.getByRole('button',{name:'Withdraw'}).click();
+  await page.getByRole('button',{name:'Cancel registration as Admin'}).click();
   await page.getByRole('alert').getByText('Withdrawal cutoff has passed').waitFor();
-  assert.equal(await page.getByRole('button',{name:'Withdraw'}).count(),1);
+  assert.equal(await page.getByRole('button',{name:'Cancel registration as Admin'}).count(),1);
   assert.equal(await page.getByRole('heading',{name:'Participants'}).count(),1);
   assert.equal(deletes,1);
  }finally{await browser.close()}
@@ -546,6 +546,6 @@ test('existing enrollment displays names without exposing profile data in roster
   const section=page.getByRole('heading',{name:'Participants'}).locator('..');
   assert.ok((await section.innerText()).includes('Example Volunteer'));
   assert.equal((await section.innerText()).includes('admin@example.org'),false);
-  assert.equal(await page.getByRole('button',{name:'Withdraw'}).count(),1);
+  assert.equal(await page.getByRole('button',{name:'Cancel registration as Admin'}).count(),1);
  }finally{await browser.close()}
 });
