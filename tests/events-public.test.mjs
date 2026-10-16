@@ -52,11 +52,11 @@ function harness() {
     try{for(const stmt of statements)await stmt.run();sqlite.exec('COMMIT');}
     catch(e){sqlite.exec('ROLLBACK');throw e;}
   } };
-  const req = (path, method='GET', body, cookie) => worker.fetch(new Request('https://servewith-beta.sffilamlions.org' + path,{
+  const req = (path, method='GET', body, cookie, overrides={}) => worker.fetch(new Request('https://servewith-beta.sffilamlions.org' + path,{
     method, headers:{ origin:'https://servewith-beta.sffilamlions.org', 'content-type':'application/json', ...(cookie ? {cookie}:{}) },
     ...(body ? {body:JSON.stringify(body)}:{})
   }),{
-    AUTH_DB:adapter, AUTH_PEPPER:'test', REQUIRED_TERMS_VERSION:versionTerms, REQUIRED_PRIVACY_VERSION:versionPrivacy, ASSETS:{fetch:async()=>new Response('asset')}
+    AUTH_DB:adapter, AUTH_PEPPER:'test', REQUIRED_TERMS_VERSION:versionTerms, REQUIRED_PRIVACY_VERSION:versionPrivacy, ASSETS:{fetch:async()=>new Response('asset')},...overrides
   });
   const insert = (id,start,end,deleted=null) => sqlite.prepare(
     'INSERT INTO events (id,title,location,timezone,start_at,end_at,created_at,updated_at,deleted_at) VALUES (?,?,?,?,?,?,?,?,?)'
@@ -885,5 +885,20 @@ test('all documented API operations map authenticated Worker responses to declar
    }
   }
   assert.ok(checked>=26);
+ }finally{h.sqlite.close()}
+});
+
+
+test('staging excludes Usage & Quotas while retaining authenticated admin authorization',async()=>{
+ const h=harness();
+ try{
+  const token='d'.repeat(64),now=Date.now();
+  const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode('test:'+token))),b=>b.toString(16).padStart(2,'0')).join('');
+  h.sqlite.prepare('INSERT INTO sessions(token_hash,email,expires_at,created_at) VALUES(?,?,?,?)').run(hash,'lionaugust@icloud.com',now+600000,now);
+  const path='/api/admin/usage',staging={ENVIRONMENT:'staging'};
+  assert.equal((await h.req(path,'GET',undefined,undefined,staging)).status,401,'staging must still enforce authentication');
+  const response=await h.req(path,'GET',undefined,'__Host-sw_session='+token,staging);
+  assert.equal(response.status,404,'staging must not serve the Usage & Quotas endpoint');
+  assert.match((await response.json()).error,/not included in staging/);
  }finally{h.sqlite.close()}
 });
