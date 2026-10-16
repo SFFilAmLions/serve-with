@@ -423,3 +423,17 @@ test('generated validator does not treat prototype keys as declared JSON schema 
  assert.equal(checkReservedKeys(JSON.parse('{"constructor":"unexpected"}')),false,'constructor must not bypass additionalProperties:false');
  assert.equal(checkReservedKeys(JSON.parse('{"toString":"unexpected"}')),false,'inherited Object.prototype keys are not schema properties');
 });
+
+
+test('generated validator resolves only owned local component schema references',async()=>{
+ const ts=await import('typescript');
+ const source=readFileSync('src/generated/openapi-validators.ts','utf8')+
+  '\nexport const checkComponentRef=(ref:string,value:unknown)=>check({$ref:ref},value);';
+ const compiled=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText;
+ const {checkComponentRef}=await import('data:text/javascript;base64,'+Buffer.from(compiled).toString('base64'));
+ for(const name of ['constructor','toString','__proto__']){
+  assert.equal(checkComponentRef('#/components/schemas/'+name,{}),false,name+' is not a defined component');
+ }
+ assert.equal(checkComponentRef('https://example.invalid/schemas/User',{}),false,'remote schemas are unsupported');
+ assert.equal(checkComponentRef('#/components/schemas/Error/missing',{}),false,'nested pointers are unsupported');
+});
