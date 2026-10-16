@@ -159,3 +159,10 @@ test('admin users directory provides a create-user floating action button',()=>{
  assert.match(source,/<Fab variant="extended" color="primary" aria-label="Create user" onClick=\{\(\)=>go\('\/admin\/users\/new'\)\}/);
  assert.match(source,/position:'fixed',bottom:\{xs:24,sm:32\},right:\{xs:24,sm:32\}/);
 });
+
+test('all back navigation controls display a prominent arrow',()=>{
+ assert.match(source,/startIcon=\{<Glyph type="back" size=\{24\}\/>\}/);
+ assert.match(source,/<IconButton aria-label="Back" onClick=\{close\}><Glyph type="back" size=\{24\}\/><\/IconButton>/);
+ assert.match(source,/Back to admin events<\/Button>/);
+ assert.doesNotMatch(source,/startIcon=\{<Glyph type="back"\/>\}/);
+});
