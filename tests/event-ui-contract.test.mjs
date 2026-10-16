@@ -92,7 +92,7 @@ test('staging builds show a prominent route to production without affecting prod
 
 test('tab icons are present in the subsetted Google Material Symbols font',()=>{
  const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
- for(const icon of ['event','group','monitoring','how_to_reg'])assert.match(html,new RegExp('(?:,|=)'+icon+'(?:,|&amp;)'),icon);
+ for(const icon of ['event','group','monitoring','how_to_reg','link','schedule'])assert.match(html,new RegExp('(?:,|=)'+icon+'(?:,|&amp;)'),icon);
 });
 
 test('profile picture edit uses an accessible pencil control only for the profile owner',()=>{
@@ -164,4 +164,10 @@ test('all back navigation controls display a prominent arrow',()=>{
  assert.match(source,/<IconButton aria-label="Back" onClick=\{close\}><Glyph type="back" size=\{24\}\/><\/IconButton>/);
  assert.match(source,/Back to admin events<\/Button>/);
  assert.doesNotMatch(source,/startIcon=\{<Glyph type="back"\/>\}/);
+});
+
+test('event time displays a clock glyph instead of raw ligature text',()=>{
+ assert.match(source,/clock:'schedule'/);
+ assert.match(source,/<Glyph type="clock"\/>/);
+ assert.match(source,/link:'link'/);
 });
