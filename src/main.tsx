@@ -62,6 +62,7 @@ const repositoryUrl = 'https://github.com/SFFilAmLions/serve-with';
 const buildEnvironment = import.meta.env.VITE_DEPLOY_ENV;
 const buildSha = import.meta.env.VITE_COMMIT_SHA || '';
 const releaseTag = import.meta.env.VITE_RELEASE_TAG || '';
+const productionUrl = 'https://servewith.sffilamlions.org/';
 function BuildFooter() {
  const staged = buildEnvironment === 'staging' && /^[a-f0-9]{40}$/.test(buildSha);
  const released = buildEnvironment === 'production' && /^v\d+\.\d+\.\d+$/.test(releaseTag);
@@ -70,6 +71,10 @@ function BuildFooter() {
  return <Box component="footer" sx={{my:5,color:'text.secondary',fontSize:12,display:'flex',flexWrap:'wrap',gap:1,alignItems:'center'}}>
   <Chip component="a" clickable icon={<Glyph type="github"/>} label="GitHub" href={repositoryUrl} target="_blank" rel="noopener noreferrer" aria-label="Serve With GitHub repository" size="small" variant="outlined"/>{href?<Chip component="a" clickable label={label} href={href} target="_blank" rel="noopener noreferrer" size="small" variant="outlined"/>:<Chip label={label} size="small" variant="outlined"/>}
  </Box>;
+}
+function StagingNotice(){
+ if(buildEnvironment!=='staging')return null;
+ return <Alert severity="error" variant="filled" square icon={false} sx={{borderRadius:0,justifyContent:'center',fontWeight:700,'& .MuiAlert-message':{py:0.5}} action={<Button color="inherit" component="a" href={productionUrl} sx={{border:1,borderColor:'currentColor'}}>Go to main site</Button>}>You are viewing the staging site.</Alert>;
 }
 const magic = new URL(location.href).searchParams.get('magic');
 if (magic) history.replaceState(null,'','/login');
@@ -614,7 +619,7 @@ function RoutedApp(){
   onChange={(_,v:string|null)=>{if(v)go(v==='users'?'/admin/users':v==='usage'?'/admin/usage':'/admin/events')}}
   aria-label="Administrator sections" sx={{my:1,gap:1,'& .MuiToggleButton-root':{borderRadius:'24px !important',px:2}}}>
    <ToggleButton value="events">Events</ToggleButton><ToggleButton value="users">Users</ToggleButton><ToggleButton value="usage">Usage</ToggleButton>
-  </ToggleButtonGroup>}</Container></AppBar>
+  </ToggleButtonGroup>}</Container></AppBar><StagingNotice/>
  <Container maxWidth="lg" component="main">{path==='/terms'?<PolicyPage kind="terms"/>:path==='/privacy'?<PolicyPage kind="privacy"/>:path==='/login'?<AuthScreen me={me} refresh={refresh}/>:path==='/admin/events/new'&&canAdmin?<EventPageEditor/>:editRoute&&canAdmin?<EventPageEditor id={editRoute[1]}/>:adminEventRoute&&canAdmin?<AdminEventSignups id={adminEventRoute[1]}/>:userRoute?<UserView key={path} id={userRoute[1]} edit={!!userRoute[2]} backPath={userRoute[1]===me.userId?'/':'/admin/users'}/>:eventRoute?<EventDetail id={eventRoute[1]} admin={false} me={me}/>:path==='/admin/users'&&canAdmin?<UsersDirectory/>:path==='/admin/users/new'&&canAdmin?<AdminCreateUser/>:path==='/admin/usage'&&canAdmin?<UsageDashboard/>:path==='/my-signups'?<MySignups me={me}/>:path.startsWith('/admin')&&!canAdmin?<Alert severity="warning" sx={{mt:3}}>Complete your profile and current agreement to access administrator tools. <Button onClick={()=>go('/login')}>Account setup</Button></Alert>:<><Typography variant="h4" sx={{mt:4}}>{admin?'Manage events':'Serve With SF Fil-Am Lions'}</Typography><EventList admin={canAdmin&&admin}/></>}<BuildFooter/></Container></ThemeProvider>;
 }
 
