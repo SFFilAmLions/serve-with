@@ -412,20 +412,28 @@ test('admin delegated signup allows explicit attendee selection and preserves hi
   h.sqlite.prepare('INSERT INTO user_stubs(id,email,first_name,last_name,created_at,updated_at) VALUES(?,?,?,?,?,?)')
    .run(targetId,'attendee@example.org','Alex','Volunteer',1,1);
   const path='/api/admin/events/'+eventId+'/signups';
-  assert.equal((await h.req(path,'GET')).status,401);
+  const spec=YAML.parse(readFileSync('openapi/openapi.yaml','utf8'));
+  const contract=spec.paths['/api/admin/events/{id}/signups'];
+  const checkResponse=async(response,method)=>{
+   const status=String(response.status),schema=contract[method].responses[status]?.content?.['application/json']?.schema;
+   assert.ok(schema,method.toUpperCase()+' admin signup '+status+' must have a documented JSON response');
+   assertDocumentedJsonShape(await response.json(),schema,spec,method+' '+status);
+   return response.status;
+  };
+  assert.equal(await checkResponse(await h.req(path,'GET'),'get'),401);
   const token='a'.repeat(64);
   const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode('test:'+token))),b=>b.toString(16).padStart(2,'0')).join('');
   h.sqlite.prepare('INSERT INTO sessions(token_hash,email,expires_at,created_at) VALUES(?,?,?,?)')
     .run(hash,'lionaugust@icloud.com',now+600000,now);
   const cookie='__Host-sw_session='+token;
-  assert.equal((await h.req(path,'POST',{userId:targetId},cookie)).status,201);
-  assert.equal((await h.req(path,'POST',{userId:targetId},cookie)).status,409);
+  assert.equal(await checkResponse(await h.req(path,'POST',{userId:targetId},cookie),'post'),201);
+  assert.equal(await checkResponse(await h.req(path,'POST',{userId:targetId},cookie),'post'),409);
   assert.equal((await h.req(path,'POST',{userId:'not-a-uuid'},cookie)).status,422,'reject malformed delegated attendee IDs');
   assert.equal((await h.req(path,'POST',{userId:'44444444-4444-4444-8444-444444444444'},cookie)).status,404,'reject absent delegated attendee IDs');
   const roster=await (await h.req(path,'GET',undefined,cookie)).json();
   assert.equal(roster.signups.length,1);
   assert.equal(roster.signups[0].email,'attendee@example.org');
-  assert.equal((await h.req(path,'DELETE',{userId:targetId},cookie)).status,200);
+  assert.equal(await checkResponse(await h.req(path,'DELETE',{userId:targetId},cookie),'delete'),200);
   assert.equal((await h.req(path,'POST',{userId:targetId},cookie)).status,201);
   assert.equal(h.sqlite.prepare('SELECT COUNT(*) n FROM event_signups WHERE event_id=?').get(eventId).n,2);
   const completeRoster=await (await h.req(path,'GET',undefined,cookie)).json();
