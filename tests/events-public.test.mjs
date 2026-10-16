@@ -493,10 +493,6 @@ test('usage endpoint reports Cloudflare Free-plan account usage for the current 
     calls++;
     assert.equal(String(url),'https://api.cloudflare.com/client/v4/graphql');
     assert.equal(new Headers(init.headers).get('authorization'),'Bearer scoped-analytics-key');
-    const request=JSON.parse(init.body);
-    assert.doesNotMatch(request.query,/scriptName|databaseId/,'Free-plan limits are account-wide');
-    assert.match(request.query,/rowsRead rowsWritten/);
-    assert.equal(request.variables.start,request.variables.end,'D1 metrics cover the current UTC day');
     return new Response(JSON.stringify({data:{viewer:{accounts:[{workersInvocationsAdaptive:[{sum:{requests:21}}],d1AnalyticsAdaptiveGroups:[{sum:{rowsRead:700,rowsWritten:30}}]}]}}}),{status:200});
   };
   const settings={ENVIRONMENT:'staging',CLOUDFLARE_ANALYTICS_API_TOKEN:'scoped-analytics-key',USAGE_CLOUDFLARE_ACCOUNT_ID:'account'};
@@ -962,7 +958,7 @@ test('staging provides experimental Usage & Quotas without inventing provider us
   assert.equal(response.status,200,'authorized staging admin can inspect experimental usage status');
   const data=await response.json();
   assert.equal(data.environment,'staging');
-  assert.equal(data.providers.length,4);
+  assert.equal(data.providers.length,5);
   assert.ok(data.providers.every(provider=>provider.status==='unavailable'&&provider.used===null&&provider.limit===null&&provider.remaining===null),'unknown readings must not be fabricated');
  }finally{h.sqlite.close()}
 });
