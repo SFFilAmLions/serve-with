@@ -60,6 +60,8 @@ function EventWhen({event}:{event:EventRecord}){
 const generatedApi = createApiClient();
 const repositoryUrl = 'https://github.com/SFFilAmLions/serve-with';
 const buildEnvironment = import.meta.env.VITE_DEPLOY_ENV;
+// SDDW-006 staging rollout explicitly excludes the unfinished Usage & Quotas feature.
+const usageEnabled = buildEnvironment !== 'staging';
 const buildSha = import.meta.env.VITE_COMMIT_SHA || '';
 const releaseTag = import.meta.env.VITE_RELEASE_TAG || '';
 function BuildFooter() {
@@ -605,9 +607,9 @@ function RoutedApp(){
   value={path.startsWith('/admin/users')?'users':path.startsWith('/admin/usage')?'usage':'events'}
   onChange={(_,v:string|null)=>{if(v)go(v==='users'?'/admin/users':v==='usage'?'/admin/usage':'/admin/events')}}
   aria-label="Administrator sections" sx={{my:1,gap:1,'& .MuiToggleButton-root':{borderRadius:'24px !important',px:2}}}>
-   <ToggleButton value="events">Events</ToggleButton><ToggleButton value="users">Users</ToggleButton><ToggleButton value="usage">Usage</ToggleButton>
+   <ToggleButton value="events">Events</ToggleButton><ToggleButton value="users">Users</ToggleButton>{usageEnabled&&<ToggleButton value="usage">Usage</ToggleButton>}
   </ToggleButtonGroup>}</Container></AppBar>
- <Container maxWidth="lg" component="main">{path==='/terms'?<PolicyPage kind="terms"/>:path==='/privacy'?<PolicyPage kind="privacy"/>:path==='/login'?<AuthScreen me={me} refresh={refresh}/>:path==='/admin/events/new'&&canAdmin?<EventPageEditor/>:editRoute&&canAdmin?<EventPageEditor id={editRoute[1]}/>:adminEventRoute&&canAdmin?<AdminEventSignups id={adminEventRoute[1]}/>:userRoute?<UserView key={path} id={userRoute[1]} edit={!!userRoute[2]}/>:eventRoute?<EventDetail id={eventRoute[1]} admin={canAdmin} me={me}/>:path==='/admin/users'&&canAdmin?<UsersDirectory/>:path==='/admin/users/new'&&canAdmin?<AdminCreateUser/>:path==='/admin/usage'&&canAdmin?<UsageDashboard/>:path==='/my-signups'?<MySignups me={me}/>:path.startsWith('/admin')&&!canAdmin?<Alert severity="warning" sx={{mt:3}}>Complete your profile and current agreement to access administrator tools. <Button onClick={()=>go('/login')}>Account setup</Button></Alert>:<><Typography variant="h4" sx={{mt:4}}>{admin?'Manage events':'Serve With SF Fil-Am Lions'}</Typography><EventList admin={canAdmin&&admin}/></>}<BuildFooter/></Container></ThemeProvider>;
+ <Container maxWidth="lg" component="main">{path==='/terms'?<PolicyPage kind="terms"/>:path==='/privacy'?<PolicyPage kind="privacy"/>:path==='/login'?<AuthScreen me={me} refresh={refresh}/>:path==='/admin/events/new'&&canAdmin?<EventPageEditor/>:editRoute&&canAdmin?<EventPageEditor id={editRoute[1]}/>:adminEventRoute&&canAdmin?<AdminEventSignups id={adminEventRoute[1]}/>:userRoute?<UserView key={path} id={userRoute[1]} edit={!!userRoute[2]}/>:eventRoute?<EventDetail id={eventRoute[1]} admin={canAdmin} me={me}/>:path==='/admin/users'&&canAdmin?<UsersDirectory/>:path==='/admin/users/new'&&canAdmin?<AdminCreateUser/>:path==='/admin/usage'&&canAdmin&&usageEnabled?<UsageDashboard/>:path==='/my-signups'?<MySignups me={me}/>:path.startsWith('/admin')&&!canAdmin?<Alert severity="warning" sx={{mt:3}}>Complete your profile and current agreement to access administrator tools. <Button onClick={()=>go('/login')}>Account setup</Button></Alert>:<><Typography variant="h4" sx={{mt:4}}>{admin?'Manage events':'Serve With SF Fil-Am Lions'}</Typography><EventList admin={canAdmin&&admin}/></>}<BuildFooter/></Container></ThemeProvider>;
 }
 
 createRoot(document.getElementById('app')!).render(<RoutedApp/>);
