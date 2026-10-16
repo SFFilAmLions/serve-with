@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.5.0](https://github.com/SFFilAmLions/serve-with/compare/v0.4.0...v0.5.0) (2026-10-16)
+
+
+### Features
+
+* deliver SDDW-006 event signups for staging verification ([b3b1b89](https://github.com/SFFilAmLions/serve-with/commit/b3b1b89942e41a85230bf6f19f773efc68226b5a))
+* report account usage quotas ([#22](https://github.com/SFFilAmLions/serve-with/issues/22)) ([9cb7e71](https://github.com/SFFilAmLions/serve-with/commit/9cb7e717420db4b527b7e4fdf649f57e49475613))
+* report Resend usage quota ([#20](https://github.com/SFFilAmLions/serve-with/issues/20)) ([356a0d5](https://github.com/SFFilAmLions/serve-with/commit/356a0d5737e40ae0f1bc890b4b54a9ff5a968649))
+
+
+### Fixes
+
+* restore tab symbols and simplify Gravatar avatar editing ([#21](https://github.com/SFFilAmLions/serve-with/issues/21)) ([f740937](https://github.com/SFFilAmLions/serve-with/commit/f7409379b899dee9a7e76e0e92ed7d9d04861ad2))
+
 ## [0.4.0](https://github.com/SFFilAmLions/serve-with/compare/v0.3.1...v0.4.0) (2026-10-11)
 
 
