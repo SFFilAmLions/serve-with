@@ -580,6 +580,8 @@ function UsageDashboard(){
  const [data,setData]=useState<{environment:string;collectedAt:string;providers:{name:string;scope:string;status:string;used:number|null;limit:number|null;remaining:number|null;resetsAt:string|null;reason?:string}[]}|null>(null);
  const [error,setError]=useState(''),[loading,setLoading]=useState(true);
  const [diagnostic,setDiagnostic]=useState('No provider request has completed yet.');
+ const [clockNow,setClockNow]=useState(Date.now());
+ useEffect(()=>{const interval=setInterval(()=>setClockNow(Date.now()),60000);return()=>clearInterval(interval)},[]);
  const refresh=async()=>{
   setLoading(true);setError('');
   try{
@@ -603,6 +605,8 @@ function UsageDashboard(){
    <Box sx={{display:'grid',gridTemplateColumns:{xs:'1fr',md:'repeat(2,minmax(0,1fr))'},gap:2}}>
     {data.providers.map(provider=>{
      const fraction=provider.used!==null&&provider.limit!==null&&provider.limit>0?provider.used/provider.limit:null;
+     const resetAt=provider.resetsAt===null?null:Date.parse(provider.resetsAt);
+     const resetLabel=resetAt!==null&&Number.isFinite(resetAt)&&resetAt>clockNow?'Resets '+eventRelativeLabel(resetAt,resetAt+1,clockNow).toLowerCase():null;
      return <Card key={provider.name} variant="outlined"><CardContent>
       <Typography variant="h6">{provider.name}</Typography>
       <Typography variant="body2" color="text.secondary">Scope: {provider.scope}</Typography>
@@ -610,6 +614,8 @@ function UsageDashboard(){
       {provider.used!==null?<Typography>Used: {provider.used}</Typography>:<Typography>Usage: Unknown</Typography>}
       <Typography>Limit: {provider.limit===null?'Unknown':provider.limit}</Typography>
       <Typography>Remaining: {provider.remaining===null?'Unknown':provider.remaining}</Typography>
+      {fraction!==null&&<Box sx={{mt:1}}><LinearProgress variant="determinate" value={Math.min(100,Math.max(0,fraction*100))} color={fraction>=0.95?'error':fraction>=0.8?'warning':'primary'} aria-label={`Usage: ${provider.used} of ${provider.limit}`} sx={{height:8,borderRadius:4}}/><Typography variant="body2" color="text.secondary" sx={{mt:0.5}}>{Math.round(fraction*100)}% of quota used</Typography></Box>}
+      {resetLabel&&<Typography variant="body2" color="text.secondary" title={new Date(resetAt!).toLocaleString()}>{resetLabel}</Typography>}
       {fraction!==null&&fraction>=0.8&&<Alert severity={fraction>=0.95?'error':'warning'}>{fraction>=0.95?'Critical':'High'} utilization ({Math.round(fraction*100)}%)</Alert>}
       {provider.reason&&<Typography variant="body2" color="text.secondary">{provider.reason}</Typography>}
      </CardContent></Card>

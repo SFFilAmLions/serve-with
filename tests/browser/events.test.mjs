@@ -232,6 +232,21 @@ test('administrator usage dashboard preserves unavailable and unknown metrics',a
  }finally{await browser.close()}
 });
 
+test('usage dashboard visualizes measured quotas and their upcoming reset',async()=>{
+ const {browser,page}=await context(admin);
+ try{
+  await page.route('**/api/admin/usage',r=>r.fulfill({json:{
+   environment:'staging',collectedAt:'2026-10-16T00:00:00Z',
+   providers:[{name:'Resend',scope:'account · daily email quota',status:'available',used:25,limit:100,remaining:75,resetsAt:'2099-01-01T00:00:00.000Z',reason:'Daily email usage across the Resend account'}]
+  }}));
+  await page.goto(base+'/admin/usage');
+  await page.getByRole('heading',{name:'Resend'}).waitFor();
+  await page.getByRole('progressbar',{name:'Usage: 25 of 100'}).waitFor();
+  await page.getByText('25% of quota used').waitFor();
+  await page.getByText(/Resets in/).waitFor();
+ }finally{await browser.close()}
+});
+
 test('unauthorized administrator usage page does not fetch private provider metrics',async()=>{
  const {browser,page}=await context(anonymous);
  let calls=0;
