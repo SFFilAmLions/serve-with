@@ -89,3 +89,80 @@ test('staging builds show a prominent route to production without affecting prod
  assert.match(source,/Main site/);
  assert.match(source,/<StagingNotice\/>/);
 });
+
+test('tab icons are present in the subsetted Google Material Symbols font',()=>{
+ const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
+ for(const icon of ['event','group','monitoring','how_to_reg'])assert.match(html,new RegExp('(?:,|=)'+icon+'(?:,|&amp;)'),icon);
+});
+
+test('profile picture edit uses an accessible pencil control only for the profile owner',()=>{
+ assert.match(source,/canEditAvatar=\{userRoute\[1\]===me\.userId\}/);
+ assert.match(source,/canEditAvatar&&u\.email&&<Tooltip/);
+ assert.match(source,/aria-label="Edit profile picture in Gravatar"/);
+ assert.match(source,/position:'absolute',right:-4,bottom:-4/);
+ assert.doesNotMatch(source,/>Edit profile picture in Gravatar<\/Button>/);
+ assert.match(source,/GravatarQuickEditorCore/);
+ assert.match(source,/scope:\['avatars'\]/);
+ assert.match(source,/email,scope:/);
+ assert.match(source,/onProfileUpdated:\(\)=>setAvatarRevision/);
+ assert.match(source,/revision=\{avatarRevision\}/);
+ const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
+ assert.match(html,/@gravatar-com\/quick-editor@0\.8\.0/);
+});
+
+test('admin event details link and creation history remain available without redundant menu signup',()=>{
+ assert.match(source,/key:'event-created'/);
+ assert.match(source,/action:'Event created'/);
+ assert.match(source,/eventDetails\?\.created_at/);
+ assert.match(source,/new URL\('\/events\/'\+id,location\.origin\)/);
+ assert.match(source,/>Copy link<\/Button>/);
+ assert.doesNotMatch(source,/<MenuItem[^>]*>My signups<\/MenuItem>/);
+ assert.match(source,/<ToggleButton value="signups">/);
+});
+
+test('edit routes return to their owning detail screens, not generic event pages',()=>{
+ assert.match(source,/onClick=\{\(\)=>go\(edit\?'\/users\/'\+id:backPath\)\}/);
+ assert.match(source,/edit\?'Back to profile'/);
+ assert.match(source,/const editorReturnPath=id\?'\/admin\/events\/'\+id:'\/admin\/events'/);
+ assert.match(source,/go\('\/admin\/events\/'\+saved\.event\.id\)/);
+ assert.match(source,/onClick=\{\(\)=>go\(editorReturnPath\)\}>Discard changes/);
+ assert.match(source,/onClick=\{\(\)=>\{if\(!dirty\|\|confirm\('Discard changes\?'\)\)go\('\/users\/'\+id\)\}\}/);
+});
+
+test('My Signups mirrors the event grid and separates active, past and unrejoined withdrawals',()=>{
+ assert.match(source,/const activeEventIds=new Set\(items\.filter\(item=>item\.deleted_at===null\)/);
+ assert.match(source,/const latestByEvent=new Map<string,SignupHistoryItem>/);
+ assert.match(source,/view==='cancelled'\?!activeEventIds\.has\(item\.event_id\)&&item\.deleted_at!==null/);
+ assert.match(source,/view==='upcoming'\?item\.end_at>now:item\.end_at<=now/);
+ assert.match(source,/value="cancelled">Cancelled/);
+ assert.match(source,/gridTemplateColumns:\{xs:'1fr',md:'repeat\(2,minmax\(0,1fr\)\)'\}/);
+ assert.match(source,/<EventWhen event=\{event\}\/>/);
+});
+
+test('the GitHub build footer is placed after flex-growing main content',()=>{
+ assert.match(source,/minHeight:'100dvh',display:'flex',flexDirection:'column'/);
+ assert.match(source,/component="main" sx=\{\{flex:1,width:'100%'\}\}/);
+ assert.match(source,/<BuildFooter\/><\/Container><\/Box><\/ThemeProvider>/);
+});
+
+test('event listings and details show accessible visual cues without location chip',()=>{
+ assert.match(source,/<Glyph type="calendar"\/>/);
+ assert.match(source,/<Glyph type="pin"\/><Typography variant="body2"/);
+ assert.doesNotMatch(source,/<Chip icon=\{<Glyph type="pin"\/>\}/);
+ assert.match(source,/<Glyph type="attendance" size=\{24\}\/>/);
+ assert.match(source,/startIcon=\{<Glyph type=\{signup\?'withdraw':'signups'\}\/>\}/);
+ const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
+ for(const name of ['calendar_month','groups','person_remove'])assert.ok(html.includes(name),name);
+});
+
+test('admin users directory provides a create-user floating action button',()=>{
+ assert.match(source,/<Fab variant="extended" color="primary" aria-label="Create user" onClick=\{\(\)=>go\('\/admin\/users\/new'\)\}/);
+ assert.match(source,/position:'fixed',bottom:\{xs:24,sm:32\},right:\{xs:24,sm:32\}/);
+});
+
+test('all back navigation controls display a prominent arrow',()=>{
+ assert.match(source,/startIcon=\{<Glyph type="back" size=\{24\}\/>\}/);
+ assert.match(source,/<IconButton aria-label="Back" onClick=\{close\}><Glyph type="back" size=\{24\}\/><\/IconButton>/);
+ assert.match(source,/Back to admin events<\/Button>/);
+ assert.doesNotMatch(source,/startIcon=\{<Glyph type="back"\/>\}/);
+});

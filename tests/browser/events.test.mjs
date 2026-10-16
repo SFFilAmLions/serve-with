@@ -144,7 +144,7 @@ test('duplicate event prepopulates creation and saving requests a new event',asy
   await page.getByText(/Duplicating Service day/).waitFor();
   await page.getByRole('button',{name:'Save event'}).last().click();
   await page.getByRole('heading',{name:'Service day'}).waitFor();
-  assert.equal(new URL(page.url()).pathname,'/events/'+newEventId);
+  assert.equal(new URL(page.url()).pathname,'/admin/events/'+newEventId);
  }finally{await browser.close()}
 });
 
@@ -162,7 +162,7 @@ test('directory is paginated, searchable, sortable, and links to canonical profi
   await page.getByText('admin@example.org').first().click();
   assert.equal(new URL(page.url()).pathname,'/users/'+adminId);
   await page.getByRole('heading',{name:'Admin Example'}).waitFor();
-  await page.getByRole('button',{name:'Edit profile'}).click();
+  await page.getByRole('button',{name:'Edit profile',exact:true}).click();
   await page.getByLabel('Date of birth').waitFor();
  }finally{await browser.close()}
 });
@@ -543,7 +543,7 @@ test('existing enrollment displays names without exposing profile data in roster
   await page.route('**/api/events/'+eventId+'/participants',r=>r.fulfill({json:{participants:[{name:'Example Volunteer'}]}}));
   await page.goto(base+'/events/'+eventId);
   await page.getByText('Example Volunteer').waitFor();
-  const section=page.getByRole('heading',{name:'Participants'}).locator('..');
+  const section=page.getByRole('complementary',{name:'Event participants'});
   assert.ok((await section.innerText()).includes('Example Volunteer'));
   assert.equal((await section.innerText()).includes('admin@example.org'),false);
   assert.equal(await page.getByRole('button',{name:'Cancel registration as Admin'}).count(),1);

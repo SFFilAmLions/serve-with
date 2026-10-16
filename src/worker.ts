@@ -329,7 +329,8 @@ async function legacyFetch(request: Request, env: Env): Promise<Response> {
       const db=env.AUTH_DB, now=Date.now();
       if (path === '/api/me/signups') {
         if (request.method!=='GET') return json({error:'Method not allowed'},405);
-        const rows=await db.prepare(`SELECT s.id,s.event_id,s.created_at,s.deleted_at,e.title,e.start_at,e.end_at
+        const rows=await db.prepare(`SELECT s.id,s.event_id,s.created_at,s.deleted_at,e.title,e.start_at,e.end_at,e.location,e.timezone,e.capacity,
+          (SELECT COUNT(*) FROM event_signups active WHERE active.event_id=s.event_id AND active.deleted_at IS NULL) AS signups_count
           FROM event_signups s JOIN events e ON e.id=s.event_id WHERE s.user_id=?
           ORDER BY s.created_at DESC,s.id DESC`).bind(subject.user.id).all();
         return json({signups:rows.results});
@@ -401,7 +402,7 @@ async function legacyFetch(request: Request, env: Env): Promise<Response> {
       if (!env.AUTH_DB) return json({error:'Service unavailable'},503);
       const id=path.slice('/api/events/'.length);
       if (!/^[0-9a-f-]{36}$/.test(id)) return json({error:'Event not found'},404);
-      const event=await env.AUTH_DB.prepare(`SELECT e.id,e.title,e.location,e.timezone,e.start_at,e.end_at,e.version,e.capacity,
+      const event=await env.AUTH_DB.prepare(`SELECT e.id,e.title,e.location,e.timezone,e.start_at,e.end_at,e.version,e.capacity,e.created_at,
         (SELECT COUNT(*) FROM event_signups s WHERE s.event_id=e.id AND s.deleted_at IS NULL) AS signups_count
         FROM events e WHERE e.id=? AND e.deleted_at IS NULL`).bind(id)
         .first<{capacity:number|null;signups_count:number}>();

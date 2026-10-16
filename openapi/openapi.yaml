@@ -51,6 +51,10 @@ components:
           description: Unix epoch milliseconds
         version:
           type: integer
+        created_at:
+          type: integer
+          format: int64
+          description: Event creation time in Unix epoch milliseconds, when available
         capacity:
           type: [integer, 'null']
           minimum: 0
@@ -1322,6 +1326,10 @@ paths:
                         title: {type: string}
                         start_at: {type: integer}
                         end_at: {type: integer}
+                        location: {type: string}
+                        timezone: {type: string}
+                        capacity: {type: [integer, 'null'], minimum: 0}
+                        signups_count: {type: integer, minimum: 0}
         '401':
           description: Not signed in
           content:

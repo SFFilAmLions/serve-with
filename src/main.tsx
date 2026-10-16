@@ -15,31 +15,31 @@ import { eventRelativeLabel } from './event-relative';
 import { createApiClient } from './generated/openapi-client';
 import { type Draft, timeZones, validateDraft, emptyDraft, localInput } from './event-form';
 
-type EventRecord = { id:string; title:string; location:string; timezone:string; start_at:number; end_at:number; version:number; capacity?:number|null; signups_count?:number; spots_available?:number|null };
+type EventRecord = { id:string; title:string; location:string; timezone:string; start_at:number; end_at:number; version:number; created_at?:number; capacity?:number|null; signups_count?:number; spots_available?:number|null };
 type View = 'upcoming'|'past';
-function Glyph({type,size=20}:{type:'sun'|'moon'|'system'|'person'|'swap'|'logout'|'login'|'pin'|'back'|'save'|'edit'|'copy'|'link'|'trash'|'github'|'events'|'users'|'usage'|'signups';size?:18|20|24}) {
+function Glyph({type,size=20}:{type:'sun'|'moon'|'system'|'person'|'swap'|'logout'|'login'|'pin'|'back'|'save'|'edit'|'copy'|'link'|'trash'|'github'|'events'|'users'|'usage'|'signups'|'calendar'|'attendance'|'withdraw';size?:18|20|24}) {
  const symbols={
   sun:'light_mode',moon:'dark_mode',system:'settings_brightness',
   person:'person',swap:'swap_horiz',logout:'logout',login:'login',
   pin:'location_on',back:'arrow_back',save:'save',edit:'edit',
   copy:'content_copy',link:'link',trash:'delete',github:'code',
-  events:'event',users:'group',usage:'monitoring',signups:'how_to_reg'
+  events:'event',users:'group',usage:'monitoring',signups:'how_to_reg',calendar:'calendar_month',attendance:'groups',withdraw:'person_remove'
  } as const;
  return <Box component="span" className="material-symbols-rounded" aria-hidden="true"
   sx={{fontFamily:'Material Symbols Rounded',fontSize:size,lineHeight:1,
     fontWeight:400,fontStyle:'normal',display:'inline-flex',fontFeatureSettings:'liga',
     fontVariationSettings:"'FILL' 0,'wght' 400,'GRAD' 0,'opsz' 20"}}>{symbols[type]}</Box>;
 }
-function AccountAvatar({email,name,size=28}:{email?:string;name?:string;size?:number}) {
+function AccountAvatar({email,name,size=28,revision=0}:{email?:string;name?:string;size?:number;revision?:number}) {
  const [src,setSrc]=useState('');
  useEffect(()=>{
   let active=true;
   if(!email){setSrc('');return;}
   void crypto.subtle.digest('SHA-256',new TextEncoder().encode(email.trim().toLowerCase()))
-   .then(buf=>{if(active)setSrc('https://www.gravatar.com/avatar/'+Array.from(new Uint8Array(buf)).map(x=>x.toString(16).padStart(2,'0')).join('')+'?d=404&s=64')})
+   .then(buf=>{if(active)setSrc('https://www.gravatar.com/avatar/'+Array.from(new Uint8Array(buf)).map(x=>x.toString(16).padStart(2,'0')).join('')+'?d=404&s=64&t='+revision)})
    .catch(()=>setSrc(''));
   return()=>{active=false};
- },[email]);
+ },[email,revision]);
  const initials=(name||email?.split('@')[0]||'').split(/[\s._-]+/).filter(Boolean).slice(0,2).map(word=>word[0].toUpperCase()).join('')||'?';
  return <Avatar src={src||undefined} alt={name||'Profile picture'} sx={{width:size,height:size,fontSize:Math.max(12,Math.round(size*.42))}}>{initials}</Avatar>;
 }
@@ -53,7 +53,7 @@ function EventWhen({event,clockNow}:{event:EventRecord;clockNow?:number}){
  const time=(v:number)=>new Intl.DateTimeFormat('en-US',{hour:'numeric',minute:'2-digit',timeZone:event.timezone}).format(v);
  const start=date(event.start_at),end=date(event.end_at);
  const abbreviated=new Intl.DateTimeFormat('en-US',{timeZone:event.timezone,timeZoneName:'short'}).formatToParts(event.start_at).find(p=>p.type==='timeZoneName')?.value||event.timezone;
- return <Stack spacing={1}><Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap" useFlexGap><Typography>{start===end?start:start+' – '+end}</Typography>{clockNow!==undefined&&<Chip size="small" variant="outlined" label={eventRelativeLabel(event.start_at,event.end_at,clockNow)}/>}</Stack><Typography variant="body2" color="text.secondary">{time(event.start_at)} – {time(event.end_at)}</Typography><Stack direction="row" gap={1} flexWrap="wrap"><Chip icon={<Glyph type="pin"/>} size="small" label={event.location} variant="outlined"/>{timeZoneOffsetMinutes(event.start_at,event.timezone)!==timeZoneOffsetMinutes(event.start_at,Intl.DateTimeFormat().resolvedOptions().timeZone)&&<Tooltip title={event.timezone}><Chip size="small" variant="outlined" label={abbreviated}/></Tooltip>}</Stack>{event.signups_count!==undefined&&<Typography variant="body2" color="text.secondary">
+ return <Stack spacing={1}><Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap" useFlexGap><Stack direction="row" spacing={1} alignItems="center"><Glyph type="calendar"/><Typography>{start===end?start:start+' – '+end}</Typography></Stack>{clockNow!==undefined&&<Chip size="small" variant="outlined" label={eventRelativeLabel(event.start_at,event.end_at,clockNow)}/>}</Stack><Typography variant="body2" color="text.secondary">{time(event.start_at)} – {time(event.end_at)}</Typography><Stack direction="row" gap={1} flexWrap="wrap"><Stack direction="row" spacing={0.75} alignItems="center"><Glyph type="pin"/><Typography variant="body2" color="text.secondary">{event.location}</Typography></Stack>{timeZoneOffsetMinutes(event.start_at,event.timezone)!==timeZoneOffsetMinutes(event.start_at,Intl.DateTimeFormat().resolvedOptions().timeZone)&&<Tooltip title={event.timezone}><Chip size="small" variant="outlined" label={abbreviated}/></Tooltip>}</Stack>{event.signups_count!==undefined&&<Typography variant="body2" color="text.secondary">
   {event.signups_count} {event.signups_count===1?'spot taken':'spots taken'} · {event.capacity===null?'No max attendance limit':event.spots_available===undefined?'Capacity information unavailable':event.spots_available+' spots available'}
  </Typography>}{event.signups_count!==undefined&&typeof event.capacity==='number'&&event.capacity>=0&&<LinearProgress variant="determinate" value={event.capacity===0?100:Math.min(100,Math.max(0,event.signups_count/event.capacity*100))} aria-label={`Attendance: ${event.signups_count} of ${event.capacity} spots filled`} sx={{height:8,borderRadius:4}}/>}</Stack>;
 }
@@ -180,7 +180,7 @@ export function App(){
  const [admin,setAdmin]=useState(false);
  const dark=useMediaQuery('(prefers-color-scheme: dark)');
  const theme=React.useMemo(()=>createClubTheme(dark?'dark':'light'),[dark]);
- return <ThemeProvider theme={theme}><CssBaseline/><AppBar position="static" color="default" elevation={0}><Container><Box sx={{py:1.5,display:"flex",alignItems:"center",gap:1.5}}><Box component="img" src="/club-logo.png" alt="San Francisco Fil-Am Lions Club logo" sx={{width:48,height:48,objectFit:"contain"}}/><Typography variant="h6">Serve With Lions</Typography></Box></Container></AppBar><Container maxWidth="md" component="main"><Typography variant="h3" component="h1" sx={{mt:5}}>Serve With SF Fil-Am Lions</Typography><Typography color="text.secondary">Making it easier to serve together.</Typography><EventList admin={admin}/><SignIn onAuthChange={setAdmin}/><Box sx={{mt:3,display:'flex',gap:2}}><a href="/terms">Terms of Use</a><a href="/privacy">Privacy Policy</a></Box><BuildFooter/></Container></ThemeProvider>
+ return <ThemeProvider theme={theme}><CssBaseline/><Box sx={{minHeight:'100dvh',display:'flex',flexDirection:'column',width:'100%'}}><AppBar position="static" color="default" elevation={0}><Container><Box sx={{py:1.5,display:"flex",alignItems:"center",gap:1.5}}><Box component="img" src="/club-logo.png" alt="San Francisco Fil-Am Lions Club logo" sx={{width:48,height:48,objectFit:"contain"}}/><Typography variant="h6">Serve With Lions</Typography></Box></Container></AppBar><Container maxWidth="md" component="main"><Typography variant="h3" component="h1" sx={{mt:5}}>Serve With SF Fil-Am Lions</Typography><Typography color="text.secondary">Making it easier to serve together.</Typography><EventList admin={admin}/><SignIn onAuthChange={setAdmin}/><Box sx={{mt:3,display:'flex',gap:2}}><a href="/terms">Terms of Use</a><a href="/privacy">Privacy Policy</a></Box></Container><Container maxWidth="lg" component="div" sx={{width:'100%'}}><BuildFooter/></Container></Box></ThemeProvider>
 }
 
 type Me = {requiredVersions?:{terms:string;privacy:string}|null;authenticated:boolean;email?:string;userId?:string;firstName?:string|null;lastName?:string|null;profileComplete?:boolean;agreementCurrent?:boolean;administratorEligible?:boolean;privileged?:boolean};
@@ -238,13 +238,29 @@ function AuthScreen({me,refresh}:{me:Me;refresh:()=>Promise<void>}){
  {message&&<Alert role="status" severity="info">{message}</Alert>}
  </Stack>;
 }
-function UserView({id,edit,backPath}:{id:string;edit:boolean;backPath:string}){
+function UserView({id,edit,backPath,canEditAvatar}:{id:string;edit:boolean;backPath:string;canEditAvatar:boolean}){
  const [user,setUser]=useState<any>(null),[message,setMessage]=useState(''),[first,setFirst]=useState(''),[last,setLast]=useState(''),[dob,setDob]=useState(''),[dirty,setDirty]=useState(false);
+ const [avatarRevision,setAvatarRevision]=useState(0);
+ const openAvatarEditor=(email:string)=>{
+  const library=(window as Window & {Gravatar?:{GravatarQuickEditorCore:new(options:{email:string;scope:string[];onProfileUpdated:()=>void})=>{open:()=>void}}}).Gravatar;
+  if(!library?.GravatarQuickEditorCore){setMessage('Avatar editor is unavailable. Please try again later.');return;}
+  try{new library.GravatarQuickEditorCore({email,scope:['avatars'],onProfileUpdated:()=>setAvatarRevision(value=>value+1)}).open()}
+  catch{setMessage('Could not open the avatar editor. Please check whether popups are blocked.');}
+ };
+
  useEffect(()=>{void generatedApi.getUser({id}).then(response=>{if(response.status!==200)throw Error((response.data as {error?:string}).error||'Unable to load user');const r=response.data as {user:any;canCorrectDob:boolean};setUser(r);setFirst(r.user.first_name||'');setLast(r.user.last_name||'');setDob(r.user.date_of_birth||'')}).catch(e=>setMessage(e.message))},[id]);
  if(message&&!user)return <Alert severity="error">{message}</Alert>;
  if(!user)return <Skeleton height={240}/>;
  const u=user.user;
- return <Stack spacing={3} sx={{my:4,maxWidth:760}}><Button size="small" startIcon={<Glyph type="back"/>} sx={{alignSelf:"flex-start"}} onClick={()=>go(backPath)}>{backPath==='/admin/users'?'Back to users':'Back to events'}</Button><Stack direction={{xs:'column',sm:'row'}} alignItems={{sm:'center'}} spacing={2}><AccountAvatar email={u.email||undefined} name={[u.first_name,u.last_name].filter(Boolean).join(' ')} size={96}/><Box sx={{flexGrow:1}}><Typography variant="h4">{u.first_name} {u.last_name}</Typography><Typography color="text.secondary">{u.email||'No email address'}</Typography><Button component="a" href="https://gravatar.com/profile/" target="_blank" rel="noopener noreferrer" size="small" sx={{mt:0.5}}>Edit profile picture in Gravatar</Button></Box>{!edit&&<Fab variant="extended" size="medium" color="primary" aria-label="Edit profile" onClick={()=>go('/users/'+id+'/edit')}><Glyph type="edit"/> <Box component="span" sx={{ml:1}}>Edit</Box></Fab>}</Stack>
+ return <Stack spacing={3} sx={{my:4,maxWidth:760}}><Button size="small" startIcon={<Glyph type="back" size={24}/>} sx={{alignSelf:"flex-start"}} onClick={()=>go(edit?'/users/'+id:backPath)}>{edit?'Back to profile':backPath==='/admin/users'?'Back to users':'Back to events'}</Button><Stack direction={{xs:'column',sm:'row'}} alignItems={{sm:'center'}} spacing={2}><Box sx={{position:'relative',width:96,height:96,flexShrink:0}}>
+  <AccountAvatar email={u.email||undefined} name={[u.first_name,u.last_name].filter(Boolean).join(' ')} size={96} revision={avatarRevision}/>
+  {canEditAvatar&&u.email&&<Tooltip title={'Edit profile picture in Gravatar using '+u.email}>
+   <IconButton onClick={()=>openAvatarEditor(u.email)} aria-label="Edit profile picture in Gravatar"
+    size="small" sx={{position:'absolute',right:-4,bottom:-4,bgcolor:'background.paper',boxShadow:2,border:'1px solid',borderColor:'divider','&:hover':{bgcolor:'action.hover'}}}>
+    <Glyph type="edit" size={18}/>
+   </IconButton>
+  </Tooltip>}
+ </Box><Box sx={{flexGrow:1}}><Typography variant="h4">{u.first_name} {u.last_name}</Typography><Typography color="text.secondary">{u.email||'No email address'}</Typography></Box>{!edit&&<Fab variant="extended" size="medium" color="primary" aria-label="Edit profile" onClick={()=>go('/users/'+id+'/edit')}><Glyph type="edit"/> <Box component="span" sx={{ml:1}}>Edit</Box></Fab>}</Stack>
  {edit?<Stack spacing={2} component="form" sx={{maxWidth:480,width:'100%'}} onSubmit={ev=>{ev.preventDefault();void generatedApi.updateUser({id,body:{firstName:first,lastName:last,...(user.canCorrectDob?{dateOfBirth:dob}:{})}}).then(response=>{if(response.status!==200)throw Error((response.data as {error?:string}).error||'Unable to update user');go('/users/'+id)}).catch(e=>setMessage(e.message))}}><TextField label="First name" value={first} onChange={e=>{setFirst(e.target.value);setDirty(true)}}/><TextField label="Last name" value={last} onChange={e=>{setLast(e.target.value);setDirty(true)}}/><TextField label="Email" value={u.email||''} disabled/>{user.canCorrectDob?<TextField label="Date of birth" type="date" slotProps={{inputLabel:{shrink:true}}} value={dob} onChange={e=>{setDob(e.target.value);setDirty(true)}}/>:<TextField label="Date of birth" value={dob} disabled/>}<Stack direction="row" spacing={1}><Button type="submit" variant="contained">Save</Button><Button onClick={()=>{if(!dirty||confirm('Discard changes?'))go('/users/'+id)}}>Cancel</Button></Stack></Stack>:<Stack spacing={0.5}><Typography>Email: {u.email||'No email address'}</Typography><Typography>Date of birth: {u.date_of_birth||'Not set'}</Typography></Stack>}
  {message&&<Alert severity="error">{message}</Alert>}</Stack>;
 }
@@ -265,7 +281,9 @@ function UsersDirectory(){
  <Typography sx={{display:{xs:'block',sm:'none'}}}>{[p.first_name,p.last_name].filter(Boolean).join(' ')||p.email}</Typography>
  <Typography color="text.secondary" sx={{display:{xs:'none',lg:'block'},overflow:'hidden',textOverflow:'ellipsis'}}>{p.email}</Typography>
  </ListItemButton><Divider/></React.Fragment>)}{!people.length&&<Typography sx={{p:2}}>No matching users. Try a different name or email.</Typography>}{more&&<Button onClick={()=>void load(offset)}>Load more</Button>}</Box>
- </Box>{error&&<Alert severity="error">{error}</Alert>}</Stack>;
+ </Box>{error&&<Alert severity="error">{error}</Alert>}
+ <Fab variant="extended" color="primary" aria-label="Create user" onClick={()=>go('/admin/users/new')} sx={{position:'fixed',bottom:{xs:24,sm:32},right:{xs:24,sm:32},zIndex:10}}><Glyph type="person"/><Box component="span" sx={{ml:1}}>Create user</Box></Fab>
+ </Stack>;
 }
 
 function EventDetail({id,admin,me}:{id:string;admin:boolean;me:Me}){
@@ -336,21 +354,21 @@ function EventDetail({id,admin,me}:{id:string;admin:boolean;me:Me}){
  const closed=Date.now()>=event.start_at;
  const full=event.spots_available===0;
  return <Stack spacing={2} sx={{my:4}}>
-  <Button size="small" startIcon={<Glyph type="back"/>} sx={{alignSelf:"flex-start"}} onClick={()=>go(admin?"/admin/events":"/")}>Back to events</Button>
+  <Button size="small" startIcon={<Glyph type="back" size={24}/>} sx={{alignSelf:"flex-start"}} onClick={()=>go(admin?"/admin/events":"/")}>Back to events</Button>
   <Typography variant="h4">{event.title}</Typography>
   <Box sx={{display:'grid',gridTemplateColumns:{xs:'minmax(0,1fr)',md:'minmax(0,2fr) minmax(240px,1fr)'},gap:3,alignItems:'start'}}>
    <Stack spacing={2} sx={{minWidth:0}}>
     <EventWhen event={event} clockNow={clockNow}/>
     {error&&<Alert severity="error" role="alert">{error}</Alert>}
     {notice&&<Alert severity="success" role="status">{notice}</Alert>}
-    {!closed&&(!full||signup)&&<Button variant="contained" disabled={busy} sx={{alignSelf:'flex-start'}} onClick={()=>void act(signup?'withdraw':'signup')}>
+    {!closed&&(!full||signup)&&<Button variant="contained" startIcon={<Glyph type={signup?'withdraw':'signups'}/>} disabled={busy} sx={{alignSelf:'flex-start'}} onClick={()=>void act(signup?'withdraw':'signup')}>
      {signup?'Cancel registration as '+(me.firstName||'me'):eligible?'Sign up as '+(me.firstName||'me'):'Sign up'}
     </Button>}
     {closed&&<Alert severity="info">Signups closed when the event started.</Alert>}
     {!closed&&full&&!signup&&<Alert severity="info">This event is full.</Alert>}
    </Stack>
    {signup&&<Box component="aside" aria-label="Event participants" sx={{minWidth:0}}>
-    <Typography variant="h6" sx={{mb:1}}>Participants</Typography>
+    <Stack direction="row" spacing={1} alignItems="center" sx={{mb:1}}><Glyph type="attendance" size={24}/><Typography variant="h6">Participants</Typography></Stack>
     <Stack spacing={0.75}>{participants.map((participant,index)=><Typography key={index}>{participant.name}</Typography>)}</Stack>
    </Box>}
   </Box>
@@ -372,11 +390,12 @@ function EventPageEditor({id}:{id?:string}){
  const date=(key:'start'|'end')=>draft[key]?dayjs(draft[key]):null;
  const setDate=(key:'start'|'end',v:Dayjs|null)=>{if(!v?.isValid())return;const stamp=v.format('YYYY-MM-DD');setDraft(old=>{const before=old.start.slice(0,10);const next={...old,[key]:stamp+'T'+(old[key].slice(11)||'09:00')};if(key==='start'&&(!old.end||old.end.slice(0,10)===before))next.end=stamp+'T'+(old.end.slice(11)||'10:00');return next})};
  const setTime=(key:'start'|'end',v:Dayjs|null)=>{if(v?.isValid())update(key,(draft[key].slice(0,10)||dayjs().format('YYYY-MM-DD'))+'T'+v.format('HH:mm'))};
- const close=()=>{if(draft.title!==original.title||JSON.stringify(draft)!==JSON.stringify(original))setConfirmClose(true);else go(id?'/events/'+id:'/admin/events')};
- const save=async()=>{const errors=validateDraft(draft);if(Object.keys(errors).length){setMessage(Object.values(errors).join('; '));return}setBusy(true);setMessage('');try{const result=id?await generatedApi.updateAdminEvent({id,body:{...draft,version}}):await generatedApi.createAdminEvent({body:draft});if(result.status!==200&&result.status!==201){const failure=result.data as {error?:string};throw Error(failure.error||'Unable to save event')}const saved=result.data as {event:{id:string}};go('/events/'+saved.event.id)}catch(e){setMessage(e instanceof Error?e.message:'Save failed; draft retained')}finally{setBusy(false)}};
+ const editorReturnPath=id?'/admin/events/'+id:'/admin/events';
+ const close=()=>{if(draft.title!==original.title||JSON.stringify(draft)!==JSON.stringify(original))setConfirmClose(true);else go(editorReturnPath)};
+ const save=async()=>{const errors=validateDraft(draft);if(Object.keys(errors).length){setMessage(Object.values(errors).join('; '));return}setBusy(true);setMessage('');try{const result=id?await generatedApi.updateAdminEvent({id,body:{...draft,version}}):await generatedApi.createAdminEvent({body:draft});if(result.status!==200&&result.status!==201){const failure=result.data as {error?:string};throw Error(failure.error||'Unable to save event')}const saved=result.data as {event:{id:string}};go('/admin/events/'+saved.event.id)}catch(e){setMessage(e instanceof Error?e.message:'Save failed; draft retained')}finally{setBusy(false)}};
  const duration=draft.start&&draft.end?dayjs(draft.end).diff(dayjs(draft.start),'minute'):0;
  return <LocalizationProvider dateAdapter={AdapterDayjs}><Stack spacing={2} sx={{my:4,maxWidth:750}}>
- <Stack direction="row" alignItems="center" spacing={1}><Tooltip title="Back"><IconButton aria-label="Back" onClick={close}><Glyph type="back"/></IconButton></Tooltip><Typography variant="h4" sx={{flex:1}}>{id?'Edit event':'Create event'}</Typography></Stack>
+ <Stack direction="row" alignItems="center" spacing={1}><Tooltip title="Back"><IconButton aria-label="Back" onClick={close}><Glyph type="back" size={24}/></IconButton></Tooltip><Typography variant="h4" sx={{flex:1}}>{id?'Edit event':'Create event'}</Typography></Stack>
  {duplication&&!id&&<Alert severity="info">Duplicating {duplication.title}; saving creates a different event.</Alert>}
  {message&&<Alert severity="error">{message}</Alert>}
  <TextField required label="Event title" value={draft.title} onChange={e=>update('title',e.target.value)}/>
@@ -388,7 +407,7 @@ function EventPageEditor({id}:{id?:string}){
  <Button onClick={()=>setMore(v=>!v)} aria-expanded={more}>More options</Button>
  {more&&<><DatePicker label="End date" value={date('end')} onChange={v=>setDate('end',v)} slotProps={{textField:{fullWidth:true}}}/><Autocomplete options={timeZones} value={draft.timezone} onChange={(_,v)=>update('timezone',v||'America/Los_Angeles')} renderInput={p=><TextField {...p} label="Time zone"/>}/></>}
  <Stack direction="row" spacing={1} justifyContent="flex-end"><Button size="small" onClick={close}>Cancel</Button><Button size="small" variant="contained" startIcon={<Glyph type="save"/>} disabled={busy} onClick={()=>void save()}>Save event</Button></Stack>
- <Dialog open={confirmClose} onClose={()=>setConfirmClose(false)}><DialogTitle>Discard unsaved changes?</DialogTitle><DialogActions><Button onClick={()=>setConfirmClose(false)}>Keep editing</Button><Button color="error" onClick={()=>go(id?'/events/'+id:'/admin/events')}>Discard changes</Button></DialogActions></Dialog>
+ <Dialog open={confirmClose} onClose={()=>setConfirmClose(false)}><DialogTitle>Discard unsaved changes?</DialogTitle><DialogActions><Button onClick={()=>setConfirmClose(false)}>Keep editing</Button><Button color="error" onClick={()=>go(editorReturnPath)}>Discard changes</Button></DialogActions></Dialog>
  </Stack></LocalizationProvider>;
 }
 
@@ -481,6 +500,10 @@ function AdminEventSignups({id}:{id:string}){
  };
  useEffect(()=>{void load().catch(e=>setError(e instanceof Error?e.message:'Unable to load roster'))},[id]);
  useEffect(()=>{let active=true;void generatedApi.getEvent({id}).then(response=>{if(response.status!==200)throw Error('Unable to load event details');if(active)setEventDetails((response.data as {event:EventRecord}).event)}).catch(e=>{if(active)setError(e instanceof Error?e.message:'Unable to load event details')});return()=>{active=false}},[id]);
+ const copyPublicLink=async()=>{
+  try{await navigator.clipboard.writeText(new URL('/events/'+id,location.origin).toString());setNotice('Event link copied');}
+  catch{setError('Unable to copy event link.');}
+ };
  const search=async()=>{
   setError('');
   try{const response=await generatedApi.listAdminUsers({q:query});if(response.status!==200)throw Error((response.data as {error?:string}).error||'Unable to find users');setPeople((response.data as unknown as {users:typeof people}).users);}
@@ -500,14 +523,17 @@ function AdminEventSignups({id}:{id:string}){
   const name=[entry.first_name,entry.last_name].filter(Boolean).join(' ')||'Unnamed attendee';
   return [{key:entry.id+'-signup',time:entry.created_at,name,action:'Signed up',userId:entry.user_id},
    ...(entry.deleted_at===null?[]:[{key:entry.id+'-withdraw',time:entry.deleted_at,name,action:'Withdrew',userId:entry.user_id}])];
- }).sort((a,b)=>b.time-a.time);
+ }).concat(eventDetails?.created_at!==undefined?[{key:'event-created',time:eventDetails.created_at,name:'',action:'Event created',userId:''}]:[]).sort((a,b)=>b.time-a.time);
  return <Stack spacing={3} sx={{my:4,pb:8}}>
-  <Button sx={{alignSelf:'flex-start'}} onClick={()=>go('/admin/events')}>Back to admin events</Button>
+  <Button startIcon={<Glyph type="back" size={24}/>} sx={{alignSelf:'flex-start'}} onClick={()=>go('/admin/events')}>Back to admin events</Button>
   <Typography variant="h4">{eventDetails?.title||'Event management'}</Typography>
   {error&&<Alert severity="error" role="alert">{error}</Alert>}
   {notice&&<Alert severity="success" role="status">{notice}</Alert>}
   <Box component="section" aria-labelledby="admin-event-details-heading">
-   <Typography id="admin-event-details-heading" variant="h5" sx={{mb:2}}>Details</Typography>
+   <Stack direction="row" alignItems="center" justifyContent="space-between" gap={1} sx={{mb:2}}>
+    <Typography id="admin-event-details-heading" variant="h5">Details</Typography>
+    <Button size="small" startIcon={<Glyph type="link"/>} onClick={()=>void copyPublicLink()}>Copy link</Button>
+   </Stack>
    {eventDetails?<EventWhen event={eventDetails}/>:<Skeleton height={100}/>}
   </Box>
   <Box component="section" aria-labelledby="admin-event-roster-heading">
@@ -537,7 +563,7 @@ function AdminEventSignups({id}:{id:string}){
    {timeline.length===0?<Typography color="text.secondary">No signup activity yet.</Typography>:
     <Box component="ol" sx={{listStyle:'none',m:0,pl:2,borderLeft:'2px solid',borderColor:'divider'}}>
      {timeline.map(item=><Box component="li" key={item.key} sx={{position:'relative',pl:2,pb:3,'&:before':{content:'""',position:'absolute',left:-23,top:7,width:12,height:12,borderRadius:'50%',bgcolor:item.action==='Signed up'?'success.main':'text.secondary'}}}>
-      <Typography fontWeight={600}>{item.action}: {item.name}</Typography>
+      <Typography fontWeight={600}>{item.action}{item.name?': '+item.name:''}</Typography>
       <Typography variant="body2" color="text.secondary"><time dateTime={new Date(item.time).toISOString()}>{new Date(item.time).toLocaleString()}</time></Typography>
      </Box>)}
     </Box>}
@@ -549,31 +575,62 @@ function AdminEventSignups({id}:{id:string}){
  </Stack>;
 }
 
+type SignupHistoryItem={id:string;event_id:string;created_at:number;deleted_at:number|null;title:string;start_at:number;end_at:number;location:string;timezone:string;capacity:number|null;signups_count:number};
 function MySignups({me}:{me:Me}){
- const [items,setItems]=useState<{id:string;event_id:string;created_at:number;deleted_at:number|null;title:string;start_at:number;end_at:number}[]>([]);
- const [error,setError]=useState(''),[loading,setLoading]=useState(true);
+ const [items,setItems]=useState<SignupHistoryItem[]>([]);
+ const [view,setView]=useState<'upcoming'|'past'|'cancelled'>('upcoming');
+ const [error,setError]=useState(''),[notice,setNotice]=useState(''),[loading,setLoading]=useState(true);
  useEffect(()=>{
   if(!me.authenticated||!me.profileComplete||!me.agreementCurrent){setLoading(false);return;}
   let active=true;
   void generatedApi.listMySignups().then(result=>{
    if(result.status!==200)throw Error((result.data as {error?:string}).error||'Unable to load signups');
-   if(active)setItems((result.data as {signups:typeof items}).signups);
+   if(active)setItems((result.data as {signups:SignupHistoryItem[]}).signups);
   }).catch(e=>{if(active)setError(e instanceof Error?e.message:'Unable to load signups')})
    .finally(()=>{if(active)setLoading(false)});
   return()=>{active=false};
  },[me.authenticated,me.profileComplete,me.agreementCurrent]);
  if(!me.authenticated||!me.profileComplete||!me.agreementCurrent)
   return <Stack sx={{my:4}} spacing={2}><Typography variant="h4">My signups</Typography><Alert severity="info">Sign in and complete your account to see your event signups.</Alert><Button onClick={()=>go('/login')}>Complete account</Button></Stack>;
- return <Stack spacing={2} sx={{my:4}}><Typography variant="h4">My signups</Typography>
-  {loading?<CircularProgress aria-label="Loading signups"/>:error?<Alert severity="error" role="alert">{error}</Alert>:items.length===0?<Typography>No signups yet.</Typography>:
-   items.map(item=><Card variant="outlined" key={item.id}><CardContent>
-    <Typography variant="h6">{item.title}</Typography>
-    <Typography color="text.secondary">{new Date(item.start_at).toLocaleString()} · {item.deleted_at===null?'Active signup':'Withdrawn'}</Typography>
-    <Typography variant="body2" color="text.secondary">Signed up {new Date(item.created_at).toLocaleString()}</Typography>
-    {item.deleted_at!==null&&<Typography variant="body2" color="text.secondary">Withdrawn {new Date(item.deleted_at).toLocaleString()}</Typography>}
-    <Button size="small" onClick={()=>go('/events/'+item.event_id)}>View event</Button>
-   </CardContent></Card>)}
- </Stack>;
+ const copyEventLink=async(id:string)=>{
+  try{await navigator.clipboard.writeText(new URL('/events/'+id,location.origin).toString());setNotice('Event link copied');}
+  catch{setError('Unable to copy the event link. Please copy it from your browser address bar.');}
+ };
+ const activeEventIds=new Set(items.filter(item=>item.deleted_at===null).map(item=>item.event_id));
+ const latestByEvent=new Map<string,SignupHistoryItem>();
+ for(const item of items){
+  const previous=latestByEvent.get(item.event_id);
+  if(!previous||item.created_at>previous.created_at||(item.created_at===previous.created_at&&item.id>previous.id))latestByEvent.set(item.event_id,item);
+ }
+ const now=Date.now();
+ const filtered=Array.from(latestByEvent.values()).filter(item=>
+  view==='cancelled'?!activeEventIds.has(item.event_id)&&item.deleted_at!==null:
+  activeEventIds.has(item.event_id)&&item.deleted_at===null&&(view==='upcoming'?item.end_at>now:item.end_at<=now)
+ ).sort((a,b)=>view==='upcoming'?a.start_at-b.start_at:b.start_at-a.start_at);
+ return <Box component="section" aria-label="My signups" sx={{my:5}}>
+  <Typography variant="h4" sx={{mb:2}}>My signups</Typography>
+  <ToggleButtonGroup exclusive color="primary" size="small" value={view} onChange={(_,v:'upcoming'|'past'|'cancelled'|null)=>{if(v)setView(v)}} aria-label="Signup timeline"
+   sx={{gap:1,maxWidth:'100%',overflowX:'auto','& .MuiToggleButton-root':{borderRadius:'24px !important',px:2,flexShrink:0}}}>
+   <ToggleButton value="upcoming">Upcoming</ToggleButton><ToggleButton value="past">Past</ToggleButton><ToggleButton value="cancelled">Cancelled</ToggleButton>
+  </ToggleButtonGroup>
+  {loading?<Box sx={{p:4}} role="status"><CircularProgress aria-label="Loading signups"/></Box>:
+   error?<Alert severity="error" role="alert">{error}</Alert>:
+   filtered.length===0?<Box sx={{p:4}}><Typography variant="h6">{view==='cancelled'?'No cancelled signups.':view==='past'?'No past signups.':'No upcoming signups.'}</Typography></Box>:
+   <Box sx={{display:'grid',gridTemplateColumns:{xs:'1fr',md:'repeat(2,minmax(0,1fr))'},gap:2,pt:3}}>
+    {filtered.map(item=>{
+     const event:EventRecord={id:item.event_id,title:item.title,location:item.location,timezone:item.timezone,start_at:item.start_at,end_at:item.end_at,version:1,capacity:item.capacity,signups_count:item.signups_count,spots_available:item.capacity===null?null:Math.max(0,item.capacity-item.signups_count)};
+     return <Card variant="outlined" key={item.event_id} sx={{display:'flex',flexDirection:'column'}}>
+      <CardContent sx={{flexGrow:1}}>
+       <Typography variant="h6" component="h3"><Button sx={{p:0,textAlign:'left',fontSize:'inherit'}} onClick={()=>go('/events/'+item.event_id)}>{item.title}</Button></Typography>
+       <EventWhen event={event}/>
+       <Typography variant="body2" color="text.secondary" sx={{mt:1}}>{item.deleted_at!==null?'Cancelled '+new Date(item.deleted_at).toLocaleString():'Signed up '+new Date(item.created_at).toLocaleString()}</Typography>
+      </CardContent>
+      <CardActions sx={{justifyContent:'flex-end',px:2,pb:2}}><Button size="small" onClick={()=>go('/events/'+item.event_id)}>Details</Button><Tooltip title="Copy public event link"><IconButton size="small" aria-label={'Copy link to '+item.title} onClick={()=>void copyEventLink(item.event_id)}><Glyph type="link"/></IconButton></Tooltip></CardActions>
+     </Card>;
+    })}
+   </Box>}
+  <Snackbar open={!!notice} autoHideDuration={4500} onClose={()=>setNotice('')} anchorOrigin={{vertical:'bottom',horizontal:'center'}}><Alert severity="success" onClose={()=>setNotice('')}>{notice}</Alert></Snackbar>
+ </Box>;
 }
 
 function UsageDashboard(){
@@ -651,7 +708,7 @@ function RoutedApp(){
 
  return <ThemeProvider theme={theme}><CssBaseline/><Snackbar open={adminRedirectAlert} autoHideDuration={6000} onClose={()=>setAdminRedirectAlert(false)}>
  <Alert severity="warning" role="alert" onClose={()=>setAdminRedirectAlert(false)}>You don't have access to the administrator event page. Showing the public event page instead.</Alert>
- </Snackbar><AppBar position="static" color="default" elevation={0} sx={{borderBottom:1,borderColor:'divider'}}><Container maxWidth="lg"><Stack direction="row" alignItems="center" spacing={1} sx={{py:1}}><Box component="img" src="/club-logo.png" alt="SF Fil-Am Lions logo" sx={{width:40,height:40}}/><Button color="inherit" onClick={()=>go('/')} sx={{fontWeight:700}}>Serve With Lions</Button>{admin&&<Typography component="span" sx={{color:'warning.main',fontWeight:700}}>· Admin</Typography>}<Box sx={{flexGrow:1}}/>{canAdmin&&<Button size="small" color="inherit" startIcon={<Glyph type="swap"/>} sx={{display:{xs:'none',md:'inline-flex'}}} onClick={()=>go(workspaceSwitchPath)}>{admin?'Attendee':'Admin'} view</Button>}<Tooltip title="Appearance"><IconButton color="inherit" aria-label="Appearance" onClick={e=>setAppearanceAnchor(e.currentTarget)}><Glyph type={appearance==='dark'?'moon':appearance==='light'?'sun':'system'}/></IconButton></Tooltip><Menu anchorEl={appearanceAnchor} open={!!appearanceAnchor} onClose={()=>setAppearanceAnchor(null)}>{(['light','dark','system'] as const).map(mode=><MenuItem key={mode} selected={appearance===mode} onClick={()=>{setAppearance(mode);localStorage.setItem('servewith-appearance',mode);setAppearanceAnchor(null)}}><Box sx={{mr:1.5}}><Glyph type={mode==='light'?'sun':mode==='dark'?'moon':'system'}/></Box>{mode[0].toUpperCase()+mode.slice(1)}</MenuItem>)}</Menu><Button size="small" color="inherit" onClick={e=>setAnchor(e.currentTarget)} aria-label="Account menu" startIcon={<AccountAvatar email={me.authenticated?me.email:undefined} name={me.firstName||undefined}/>}>{me.authenticated?<Box sx={{display:{xs:'none',sm:'block'}}}>{me.firstName||'Account'}</Box>:<Box sx={{display:{xs:'none',sm:'block'}}}>Sign in</Box>}</Button><Menu anchorEl={anchor} open={!!anchor} onClose={()=>setAnchor(null)}>{me.authenticated&&<MenuItem onClick={()=>{setAnchor(null);go('/users/'+me.userId)}}><Box sx={{mr:1.5}}><Glyph type="person"/></Box>My Profile</MenuItem>}{me.authenticated&&<MenuItem onClick={()=>{setAnchor(null);go('/my-signups')}}><Box sx={{mr:1.5}}><Glyph type="signups"/></Box>My signups</MenuItem>}{canAdmin&&<Box sx={{display:{xs:'block',md:'none'}}}><MenuItem onClick={()=>{setAnchor(null);go(workspaceSwitchPath)}}><Box sx={{mr:1.5}}><Glyph type="swap"/></Box>{admin?'Attendee workspace':'Administrator workspace'}</MenuItem></Box>}{me.authenticated?<MenuItem onClick={()=>{setAnchor(null);void api('logout',{}).then(refresh).then(()=>go('/'))}}><Box sx={{mr:1.5}}><Glyph type="logout"/></Box>Sign out</MenuItem>:<MenuItem onClick={()=>{setAnchor(null);go('/login')}}><Box sx={{mr:1.5}}><Glyph type="login"/></Box>Sign in</MenuItem>}</Menu></Stack>{!admin&&<ToggleButtonGroup exclusive color="primary" size="small"
+ </Snackbar><AppBar position="static" color="default" elevation={0} sx={{borderBottom:1,borderColor:'divider'}}><Container maxWidth="lg"><Stack direction="row" alignItems="center" spacing={1} sx={{py:1}}><Box component="img" src="/club-logo.png" alt="SF Fil-Am Lions logo" sx={{width:40,height:40}}/><Button color="inherit" onClick={()=>go('/')} sx={{fontWeight:700}}>Serve With Lions</Button>{admin&&<Typography component="span" sx={{color:'warning.main',fontWeight:700}}>· Admin</Typography>}<Box sx={{flexGrow:1}}/>{canAdmin&&<Button size="small" color="inherit" startIcon={<Glyph type="swap"/>} sx={{display:{xs:'none',md:'inline-flex'}}} onClick={()=>go(workspaceSwitchPath)}>{admin?'Attendee':'Admin'} view</Button>}<Tooltip title="Appearance"><IconButton color="inherit" aria-label="Appearance" onClick={e=>setAppearanceAnchor(e.currentTarget)}><Glyph type={appearance==='dark'?'moon':appearance==='light'?'sun':'system'}/></IconButton></Tooltip><Menu anchorEl={appearanceAnchor} open={!!appearanceAnchor} onClose={()=>setAppearanceAnchor(null)}>{(['light','dark','system'] as const).map(mode=><MenuItem key={mode} selected={appearance===mode} onClick={()=>{setAppearance(mode);localStorage.setItem('servewith-appearance',mode);setAppearanceAnchor(null)}}><Box sx={{mr:1.5}}><Glyph type={mode==='light'?'sun':mode==='dark'?'moon':'system'}/></Box>{mode[0].toUpperCase()+mode.slice(1)}</MenuItem>)}</Menu><Button size="small" color="inherit" onClick={e=>setAnchor(e.currentTarget)} aria-label="Account menu" startIcon={<AccountAvatar email={me.authenticated?me.email:undefined} name={me.firstName||undefined}/>}>{me.authenticated?<Box sx={{display:{xs:'none',sm:'block'}}}>{me.firstName||'Account'}</Box>:<Box sx={{display:{xs:'none',sm:'block'}}}>Sign in</Box>}</Button><Menu anchorEl={anchor} open={!!anchor} onClose={()=>setAnchor(null)}>{me.authenticated&&<MenuItem onClick={()=>{setAnchor(null);go('/users/'+me.userId)}}><Box sx={{mr:1.5}}><Glyph type="person"/></Box>My Profile</MenuItem>}{canAdmin&&<Box sx={{display:{xs:'block',md:'none'}}}><MenuItem onClick={()=>{setAnchor(null);go(workspaceSwitchPath)}}><Box sx={{mr:1.5}}><Glyph type="swap"/></Box>{admin?'Attendee workspace':'Administrator workspace'}</MenuItem></Box>}{me.authenticated?<MenuItem onClick={()=>{setAnchor(null);void api('logout',{}).then(refresh).then(()=>go('/'))}}><Box sx={{mr:1.5}}><Glyph type="logout"/></Box>Sign out</MenuItem>:<MenuItem onClick={()=>{setAnchor(null);go('/login')}}><Box sx={{mr:1.5}}><Glyph type="login"/></Box>Sign in</MenuItem>}</Menu></Stack>{!admin&&<ToggleButtonGroup exclusive color="primary" size="small"
   value={path==='/my-signups'?'signups':'events'} onChange={(_,v:string|null)=>{if(v)go(v==='signups'?'/my-signups':'/')}} aria-label="Attendee sections" sx={{my:1,gap:1,maxWidth:'100%',overflowX:'auto','& .MuiToggleButton-root':{borderRadius:'24px !important',px:2,gap:0.75,flexShrink:0}}}>
    <ToggleButton value="events"><Glyph type="events"/>View events</ToggleButton><ToggleButton value="signups"><Glyph type="signups"/>My signups</ToggleButton>
   </ToggleButtonGroup>}{admin&&canAdmin&&<ToggleButtonGroup exclusive color="primary" size="small"
@@ -660,7 +717,7 @@ function RoutedApp(){
   aria-label="Administrator sections" sx={{my:1,gap:1,maxWidth:'100%',overflowX:'auto','& .MuiToggleButton-root':{borderRadius:'24px !important',px:2,gap:0.75,flexShrink:0}}}>
    <ToggleButton value="events"><Glyph type="events"/>Events</ToggleButton><ToggleButton value="users"><Glyph type="users"/>Users</ToggleButton><ToggleButton value="usage"><Glyph type="usage"/>Usage</ToggleButton>
   </ToggleButtonGroup>}</Container></AppBar><StagingNotice/>
- <Container maxWidth="lg" component="main">{path==='/terms'?<PolicyPage kind="terms"/>:path==='/privacy'?<PolicyPage kind="privacy"/>:path==='/login'?<AuthScreen me={me} refresh={refresh}/>:path==='/admin/events/new'&&canAdmin?<EventPageEditor/>:editRoute&&canAdmin?<EventPageEditor id={editRoute[1]}/>:adminEventRoute&&canAdmin?<AdminEventSignups id={adminEventRoute[1]}/>:userRoute?<UserView key={path} id={userRoute[1]} edit={!!userRoute[2]} backPath={userRoute[1]===me.userId?'/':'/admin/users'}/>:eventRoute?<EventDetail id={eventRoute[1]} admin={false} me={me}/>:path==='/admin/users'&&canAdmin?<UsersDirectory/>:path==='/admin/users/new'&&canAdmin?<AdminCreateUser/>:path==='/admin/usage'&&canAdmin?<UsageDashboard/>:path==='/my-signups'?<MySignups me={me}/>:path.startsWith('/admin')&&!canAdmin?<Alert severity="warning" sx={{mt:3}}>Complete your profile and current agreement to access administrator tools. <Button onClick={()=>go('/login')}>Account setup</Button></Alert>:<><Typography variant="h4" sx={{mt:4}}>{admin?'Manage events':'Serve With SF Fil-Am Lions'}</Typography><EventList admin={canAdmin&&admin}/></>}<BuildFooter/></Container></ThemeProvider>;
+ <Container maxWidth="lg" component="main" sx={{flex:1,width:'100%'}}>{path==='/terms'?<PolicyPage kind="terms"/>:path==='/privacy'?<PolicyPage kind="privacy"/>:path==='/login'?<AuthScreen me={me} refresh={refresh}/>:path==='/admin/events/new'&&canAdmin?<EventPageEditor/>:editRoute&&canAdmin?<EventPageEditor id={editRoute[1]}/>:adminEventRoute&&canAdmin?<AdminEventSignups id={adminEventRoute[1]}/>:userRoute?<UserView key={path} id={userRoute[1]} edit={!!userRoute[2]} backPath={userRoute[1]===me.userId?'/':'/admin/users'} canEditAvatar={userRoute[1]===me.userId}/>:eventRoute?<EventDetail id={eventRoute[1]} admin={false} me={me}/>:path==='/admin/users'&&canAdmin?<UsersDirectory/>:path==='/admin/users/new'&&canAdmin?<AdminCreateUser/>:path==='/admin/usage'&&canAdmin?<UsageDashboard/>:path==='/my-signups'?<MySignups me={me}/>:path.startsWith('/admin')&&!canAdmin?<Alert severity="warning" sx={{mt:3}}>Complete your profile and current agreement to access administrator tools. <Button onClick={()=>go('/login')}>Account setup</Button></Alert>:<><Typography variant="h4" sx={{mt:4}}>{admin?'Manage events':'Serve With SF Fil-Am Lions'}</Typography><EventList admin={canAdmin&&admin}/></>}<BuildFooter/></Container></ThemeProvider>;
 }
 
 createRoot(document.getElementById('app')!).render(<RoutedApp/>);
