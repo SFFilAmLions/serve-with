@@ -128,3 +128,19 @@ test('edit routes return to their owning detail screens, not generic event pages
  assert.match(source,/onClick=\{\(\)=>go\(editorReturnPath\)\}>Discard changes/);
  assert.match(source,/onClick=\{\(\)=>\{if\(!dirty\|\|confirm\('Discard changes\?'\)\)go\('\/users\/'\+id\)\}\}/);
 });
+
+test('My Signups mirrors the event grid and separates active, past and unrejoined withdrawals',()=>{
+ assert.match(source,/const activeEventIds=new Set\(items\.filter\(item=>item\.deleted_at===null\)/);
+ assert.match(source,/const latestByEvent=new Map<string,SignupHistoryItem>/);
+ assert.match(source,/view==='cancelled'\?!activeEventIds\.has\(item\.event_id\)&&item\.deleted_at!==null/);
+ assert.match(source,/view==='upcoming'\?item\.end_at>now:item\.end_at<=now/);
+ assert.match(source,/value="cancelled">Cancelled/);
+ assert.match(source,/gridTemplateColumns:\{xs:'1fr',md:'repeat\(2,minmax\(0,1fr\)\)'\}/);
+ assert.match(source,/<EventWhen event=\{event\}\/>/);
+});
+
+test('the GitHub build footer is placed after flex-growing main content',()=>{
+ assert.match(source,/minHeight:'100dvh',display:'flex',flexDirection:'column'/);
+ assert.match(source,/component="main" sx=\{\{flex:1,width:'100%'\}\}/);
+ assert.match(source,/<BuildFooter\/><\/Container><\/Box><\/ThemeProvider>/);
+});
