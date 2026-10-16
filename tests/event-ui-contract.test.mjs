@@ -69,11 +69,15 @@ test('SDDW-006 navigation and registration controls retain contextual, accessibl
  assert.match(source,/navigator\.clipboard\.writeText/);
 });
 
-test('SDDW-006 profile and roster use the shared people-management patterns',()=>{
- for(const label of ['Edit profile picture in Gravatar','Event roster and registration history','Cancel registration','aria-label="Edit event"']){
+test('SDDW-006 profile and admin event sections expose roster and activity history',()=>{
+ for(const label of ['Edit profile picture in Gravatar','Details','Roster (','History','Confirm signup','aria-label="Edit event"']){
   assert.ok(source.includes(label),label);
  }
- assert.match(source,/<TableHead>/);
+ assert.match(source,/active=entries\.filter\(entry=>entry\.deleted_at===null\)/);
+ assert.match(source,/timeline=entries\.flatMap/);
+ assert.match(source,/sort\(\(a,b\)=>b\.time-a\.time\)/);
+ assert.match(source,/component="ol"/);
+ assert.match(source,/component="section" aria-labelledby="admin-event-history-heading"/);
  assert.match(source,/<Fab variant="extended"/);
  assert.match(source,/maxWidth:480/);
 });
