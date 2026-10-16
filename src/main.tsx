@@ -5,7 +5,7 @@ import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { TimePicker } from '@mui/x-date-pickers/TimePicker';
-import { AppBar, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Alert, Autocomplete, Snackbar, Checkbox, FormControlLabel, Container, CssBaseline, Stack, TextField, ThemeProvider, Typography, useMediaQuery, IconButton, Menu, MenuItem, ListItemButton, Divider, Tooltip, Skeleton, Card, CardContent, CardActions, Chip, Avatar, ToggleButtonGroup, ToggleButton, Fab, Table, TableBody, TableCell, TableContainer, TableHead, TableRow } from '@mui/material';
+import { AppBar, Box, Button, CircularProgress, LinearProgress, Dialog, DialogActions, DialogContent, DialogTitle, Alert, Autocomplete, Snackbar, Checkbox, FormControlLabel, Container, CssBaseline, Stack, TextField, ThemeProvider, Typography, useMediaQuery, IconButton, Menu, MenuItem, ListItemButton, Divider, Tooltip, Skeleton, Card, CardContent, CardActions, Chip, Avatar, ToggleButtonGroup, ToggleButton, Fab, Table, TableBody, TableCell, TableContainer, TableHead, TableRow } from '@mui/material';
 import './style.css';
 import policyMetadata from './generated/policy-versions.json';
 import privacyPolicy from '../policies/privacy/approved-draft.md?raw';
@@ -55,7 +55,7 @@ function EventWhen({event}:{event:EventRecord}){
  const abbreviated=new Intl.DateTimeFormat('en-US',{timeZone:event.timezone,timeZoneName:'short'}).formatToParts(event.start_at).find(p=>p.type==='timeZoneName')?.value||event.timezone;
  return <Stack spacing={1}><Typography>{start===end?start:start+' – '+end}</Typography><Typography variant="body2" color="text.secondary">{time(event.start_at)} – {time(event.end_at)}</Typography><Stack direction="row" gap={1} flexWrap="wrap"><Chip icon={<Glyph type="pin"/>} size="small" label={event.location} variant="outlined"/>{timeZoneOffsetMinutes(event.start_at,event.timezone)!==timeZoneOffsetMinutes(event.start_at,Intl.DateTimeFormat().resolvedOptions().timeZone)&&<Tooltip title={event.timezone}><Chip size="small" variant="outlined" label={abbreviated}/></Tooltip>}</Stack>{event.signups_count!==undefined&&<Typography variant="body2" color="text.secondary">
   {event.signups_count} {event.signups_count===1?'spot taken':'spots taken'} · {event.capacity===null?'No max attendance limit':event.spots_available===undefined?'Capacity information unavailable':event.spots_available+' spots available'}
- </Typography>}</Stack>;
+ </Typography>}{event.signups_count!==undefined&&typeof event.capacity==='number'&&event.capacity>=0&&<LinearProgress variant="determinate" value={event.capacity===0?100:Math.min(100,Math.max(0,event.signups_count/event.capacity*100))} aria-label={`Attendance: ${event.signups_count} of ${event.capacity} spots filled`} sx={{height:8,borderRadius:4}}/>}</Stack>;
 }
 
 const generatedApi = createApiClient();
