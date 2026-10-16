@@ -970,7 +970,7 @@ test('Cloudflare usage rejects partial GraphQL data with errors instead of repor
   const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode('test:'+token))),b=>b.toString(16).padStart(2,'0')).join('');
   h.sqlite.prepare('INSERT INTO sessions(token_hash,email,expires_at,created_at) VALUES(?,?,?,?)').run(hash,'lionaugust@icloud.com',now+600000,now);
   globalThis.fetch=async()=>new Response(JSON.stringify({errors:[{message:'analytics access denied'}],data:{viewer:{accounts:[{workersInvocationsAdaptive:[{sum:{requests:21}}],d1AnalyticsAdaptiveGroups:[{sum:{rowsRead:7,rowsWritten:3}}]}]}}}),{status:200});
-  const response=await h.req('/api/admin/usage','GET',undefined,'__Host-sw_session='+token,{ENVIRONMENT:'staging',CLOUDFLARE_ANALYTICS_API_TOKEN:'partial-query-token',USAGE_CLOUDFLARE_ACCOUNT_ID:'account'});
+  const response=await h.req('/api/admin/usage','GET',undefined,'__Host-sw_session='+token,{ENVIRONMENT:'staging',CLOUDFLARE_ANALYTICS_API_TOKEN:'partial-query-token',USAGE_CLOUDFLARE_ACCOUNT_ID:'partial-graphql-errors-test-account'});
   assert.equal(response.status,200);
   const providers=(await response.json()).providers.filter(provider=>provider.name.startsWith('Cloudflare'));
   assert.equal(providers.length,3);
