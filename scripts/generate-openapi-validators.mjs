@@ -26,8 +26,13 @@ function numericBounds(schema:Schema,value:number):boolean {
 function check(raw: unknown,value: unknown): boolean {
  const schema=raw as Schema;
  if(schema.$ref){
-  const name=schema.$ref.split('/').pop()!;
-  const ref=componentSchemas[name];
+  // Only local component-schema references are supported. Never resolve
+  // inherited Object.prototype keys as though they were component schemas.
+  const prefix='#/components/schemas/';
+  if(!schema.$ref.startsWith(prefix))return false;
+  const name=schema.$ref.slice(prefix.length);
+  if(!name||name.includes('/'))return false;
+  const ref=Object.hasOwn(componentSchemas,name)?componentSchemas[name]:undefined;
   return ref!==undefined && check(ref,value);
  }
  if(schema.allOf&&!schema.allOf.every(item=>check(item,value)))return false;
