@@ -446,6 +446,7 @@ test('generated JSON enum validation accepts structurally equal arrays and objec
  const compiled=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText;
  const {checkComplexEnum}=await import('data:text/javascript;base64,'+Buffer.from(compiled).toString('base64'));
  assert.equal(checkComplexEnum({role:'member',active:true}),true);
+ assert.equal(checkComplexEnum({active:true,role:'member'}),true,'JSON object key order does not affect enum equality');
  assert.equal(checkComplexEnum([1,2]),true);
  assert.equal(checkComplexEnum(null),true);
  assert.equal(checkComplexEnum({role:'admin',active:true}),false);
