@@ -396,3 +396,17 @@ test('generated validator honors enums for nullable union schemas',async()=>{
  assert.equal(checkUnionEnum('unapproved'),false);
  assert.equal(checkUnionEnum(0),false);
 });
+
+
+test('generated required properties must be own properties, not inherited from prototypes',async()=>{
+ const ts=await import('typescript');
+ const source=readFileSync('src/generated/openapi-validators.ts','utf8');
+ const compiled=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText;
+ const {validateOperationBody:validate}=await import('data:text/javascript;base64,'+Buffer.from(compiled).toString('base64'));
+ const inherited=Object.create({firstName:'Impersonated',lastName:'Volunteer'});
+ assert.equal(validate('createAdminUserStub',inherited),false,'inherited names must not satisfy required JSON properties');
+ assert.equal(validate('createAdminUserStub',{firstName:'Alex',lastName:'Volunteer'}),true);
+ const partial=Object.create({lastName:'Volunteer'});
+ partial.firstName='Alex';
+ assert.equal(validate('createAdminUserStub',partial),false,'each required name must be owned');
+});
