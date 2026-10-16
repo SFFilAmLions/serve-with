@@ -25,6 +25,25 @@ jobs:
           VITE_COMMIT_SHA: ${{ github.sha }}
           VITE_DEPLOY_ENV: staging
         run: npm run build
+      - name: Export staging D1 before migrations
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          test -n "$CLOUDFLARE_API_TOKEN" && test -n "$CLOUDFLARE_ACCOUNT_ID" || { echo "::error::Missing Cloudflare secrets"; exit 1; }
+          mkdir -p "$RUNNER_TEMP/staging-backup"
+          npx wrangler d1 export serve-with-staging-db --env staging --remote --output="$RUNNER_TEMP/staging-backup/pre-migration.sql"
+          test -s "$RUNNER_TEMP/staging-backup/pre-migration.sql" || { echo "::error::Staging D1 backup is empty"; exit 1; }
+          sqlite3 "$RUNNER_TEMP/staging-backup/verify.db" < "$RUNNER_TEMP/staging-backup/pre-migration.sql"
+          test "$(sqlite3 "$RUNNER_TEMP/staging-backup/verify.db" 'PRAGMA integrity_check;')" = "ok" || { echo "::error::Staging D1 backup integrity check failed"; exit 1; }
+          test -z "$(sqlite3 "$RUNNER_TEMP/staging-backup/verify.db" 'PRAGMA foreign_key_check;')" || { echo "::error::Staging D1 backup foreign key check failed"; exit 1; }
+      - name: Retain restricted staging recovery export
+        uses: actions/upload-artifact@v4
+        with:
+          name: staging-d1-pre-migration-${{ github.sha }}
+          path: ${{ runner.temp }}/staging-backup/pre-migration.sql
+          if-no-files-found: error
+          retention-days: 3
       - name: Deploy staging Worker
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
