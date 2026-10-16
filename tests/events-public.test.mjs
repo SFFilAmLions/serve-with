@@ -482,6 +482,25 @@ test('usage endpoint reports Resend daily quota only with the dedicated usage ke
  }finally{globalThis.fetch=originalFetch;h.sqlite.close();}
 });
 
+test('usage endpoint reports Cloudflare staging metrics only with scoped analytics configuration',async()=>{
+ const h=harness(),originalFetch=globalThis.fetch;
+ try{
+  const now=Date.now(),token='f'.repeat(64);
+  const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode('test:'+token))),b=>b.toString(16).padStart(2,'0')).join('');
+  h.sqlite.prepare('INSERT INTO sessions(token_hash,email,expires_at,created_at) VALUES(?,?,?,?)').run(hash,'lionaugust@icloud.com',now+600000,now);
+  globalThis.fetch=async(url,init)=>{
+   assert.equal(String(url),'https://api.cloudflare.com/client/v4/graphql');
+   assert.equal(new Headers(init.headers).get('authorization'),'Bearer scoped-analytics-key');
+   return new Response(JSON.stringify({data:{viewer:{accounts:[{workersInvocationsAdaptive:[{sum:{requests:21}}],d1AnalyticsAdaptiveGroups:[{sum:{readQueries:7,writeQueries:3}}]}]}}}),{status:200});
+  };
+  const response=await h.req('/api/admin/usage','GET',undefined,'__Host-sw_session='+token,{CLOUDFLARE_ANALYTICS_API_TOKEN:'scoped-analytics-key',USAGE_CLOUDFLARE_ACCOUNT_ID:'account',USAGE_D1_DATABASE_ID:'database',USAGE_WORKER_NAME:'serve-with-staging'});
+  assert.equal(response.status,200);
+  const providers=(await response.json()).providers;
+  assert.equal(providers.find(provider=>provider.name==='Cloudflare Workers').used,21);
+  assert.equal(providers.find(provider=>provider.name==='Cloudflare D1').used,10);
+ }finally{globalThis.fetch=originalFetch;h.sqlite.close();}
+});
+
 test('admin creates email-optional unverified user without consent or login',async()=>{
  const h=harness();try{
   const path='/api/admin/users';

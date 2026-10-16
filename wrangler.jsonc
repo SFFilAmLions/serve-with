@@ -30,7 +30,10 @@
         }
       ],
       "vars": {
-        "ENVIRONMENT": "staging"
+        "ENVIRONMENT": "staging",
+        "USAGE_CLOUDFLARE_ACCOUNT_ID": "8dcf1bb3ead186caabaff06fcee82a97",
+        "USAGE_D1_DATABASE_ID": "97a54923-d1b5-4f55-bc33-0787c63cd1a1",
+        "USAGE_WORKER_NAME": "serve-with-staging"
       }
     }
   }

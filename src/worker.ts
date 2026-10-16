@@ -15,6 +15,10 @@ interface Env {
   // This key is intentionally separate from the send-only authentication key.
   // Resend's usage endpoint requires a full-access key.
   RESEND_USAGE_API_KEY?: string;
+  CLOUDFLARE_ANALYTICS_API_TOKEN?: string;
+  USAGE_CLOUDFLARE_ACCOUNT_ID?: string;
+  USAGE_D1_DATABASE_ID?: string;
+  USAGE_WORKER_NAME?: string;
   AUTH_FROM_EMAIL?: string;
   ENVIRONMENT?: string;
   STAGING_REGISTRATION_EMAILS?: string;
@@ -50,6 +54,37 @@ async function resendUsage(env:Env):Promise<UsageProvider>{
       reason:confirmedLimit===null?'No daily email cap on the current Resend plan':'Daily email usage across the Resend account'
     };
   }catch{return unavailableUsage('Resend','account','The Resend usage service could not be reached');}
+}
+async function cloudflareUsage(env:Env):Promise<[UsageProvider,UsageProvider]>{
+  const unavailable=[
+    unavailableUsage('Cloudflare Workers','staging Worker','A read-only Cloudflare analytics credential has not been configured'),
+    unavailableUsage('Cloudflare D1','staging database','A read-only Cloudflare analytics credential has not been configured')
+  ] as [UsageProvider,UsageProvider];
+  if(!env.CLOUDFLARE_ANALYTICS_API_TOKEN||!env.USAGE_CLOUDFLARE_ACCOUNT_ID||!env.USAGE_D1_DATABASE_ID||!env.USAGE_WORKER_NAME)return unavailable;
+  const end=new Date(),start=new Date(end.getTime()-24*60*60*1000);
+  const query=`query ServeWithUsage($accountTag: string!, $datetimeStart: string!, $datetimeEnd: string!, $start: Date, $end: Date, $scriptName: string!, $databaseId: string!) {
+    viewer { accounts(filter: {accountTag: $accountTag}) {
+      workersInvocationsAdaptive(limit: 100, filter: {scriptName: $scriptName, datetime_geq: $datetimeStart, datetime_leq: $datetimeEnd}) { sum { requests } }
+      d1AnalyticsAdaptiveGroups(limit: 10000, filter: {date_geq: $start, date_leq: $end, databaseId: $databaseId}) { sum { readQueries writeQueries } }
+    } }
+  }`;
+  try{
+    const response=await fetch('https://api.cloudflare.com/client/v4/graphql',{
+      method:'POST',headers:{authorization:'Bearer '+env.CLOUDFLARE_ANALYTICS_API_TOKEN,'content-type':'application/json'},
+      body:JSON.stringify({query,variables:{accountTag:env.USAGE_CLOUDFLARE_ACCOUNT_ID,datetimeStart:start.toISOString(),datetimeEnd:end.toISOString(),start:start.toISOString().slice(0,10),end:end.toISOString().slice(0,10),scriptName:env.USAGE_WORKER_NAME,databaseId:env.USAGE_D1_DATABASE_ID}})
+    });
+    if(!response.ok)return [unavailableUsage('Cloudflare Workers','staging Worker','The Cloudflare analytics service is currently unavailable'),unavailableUsage('Cloudflare D1','staging database','The Cloudflare analytics service is currently unavailable')];
+    const payload=recordOf(await response.json()),data=recordOf(payload?.data),viewer=recordOf(data?.viewer),accounts=viewer?.accounts;
+    const account=Array.isArray(accounts)?recordOf(accounts[0]):null;
+    const workerRows=account?.workersInvocationsAdaptive,d1Rows=account?.d1AnalyticsAdaptiveGroups;
+    const workerRequests=Array.isArray(workerRows)?workerRows.reduce((total,row)=>total+(usageNumber(recordOf(recordOf(row)?.sum)?.requests)??0),0):null;
+    const d1Queries=Array.isArray(d1Rows)?d1Rows.reduce((total,row)=>{const sum=recordOf(recordOf(row)?.sum);return total+(usageNumber(sum?.readQueries)??0)+(usageNumber(sum?.writeQueries)??0)},0):null;
+    if(workerRequests===null||d1Queries===null)return [unavailableUsage('Cloudflare Workers','staging Worker','The Cloudflare analytics response did not contain usable Worker metrics'),unavailableUsage('Cloudflare D1','staging database','The Cloudflare analytics response did not contain usable D1 metrics')];
+    return [
+      {name:'Cloudflare Workers',scope:'staging Worker · rolling 24h',status:'available',used:workerRequests,limit:null,remaining:null,resetsAt:null,reason:'Worker invocations; Cloudflare plan limit not confirmed'},
+      {name:'Cloudflare D1',scope:'staging database · rolling 24h',status:'available',used:d1Queries,limit:null,remaining:null,resetsAt:null,reason:'Read and write queries; Cloudflare plan limit not confirmed'}
+    ];
+  }catch{return [unavailableUsage('Cloudflare Workers','staging Worker','The Cloudflare analytics service could not be reached'),unavailableUsage('Cloudflare D1','staging database','The Cloudflare analytics service could not be reached')];}
 }
 
 async function verifyTurnstile(request:Request,env:Env,token:unknown):Promise<boolean>{
@@ -380,9 +415,10 @@ async function legacyFetch(request: Request, env: Env): Promise<Response> {
         const environment=env.ENVIRONMENT==='production'?'production':env.ENVIRONMENT==='staging'?'staging':'unknown';
         // Provider integrations must fail closed: never substitute zero for an
         // unavailable reading, and never use deployment or sending credentials.
+        const [workersUsage,d1Usage]=await cloudflareUsage(env);
         const providers:UsageProvider[]=[
-          unavailableUsage('Cloudflare Workers','staging Worker','A read-only Cloudflare analytics credential has not been configured'),
-          unavailableUsage('Cloudflare D1','staging database','A read-only Cloudflare analytics credential has not been configured'),
+          workersUsage,
+          d1Usage,
           await resendUsage(env),
           unavailableUsage('Turnstile','staging widget','No supported programmatic Turnstile quota endpoint is configured')
         ];
