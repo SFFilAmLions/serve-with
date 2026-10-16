@@ -345,6 +345,8 @@ async function legacyFetch(request: Request, env: Env): Promise<Response> {
       if (!privilegeReady(subject,env)) return json({ error: 'Profile or current agreement required', code: 'account_completion_required' }, 403);
       const email = subject.user.email;
       if(path==='/api/admin/usage'){
+        // Usage & Quotas is outside the SDDW-006 staging verification scope.
+        if(env.ENVIRONMENT==='staging')return json({error:'Usage & Quotas is not included in staging'},404);
         if(request.method!=='GET')return json({error:'Method not allowed'},405);
         // No analytics credential exists within the approved scope. Do not
         // reuse transactional Resend keys or invent limits/usage values.
