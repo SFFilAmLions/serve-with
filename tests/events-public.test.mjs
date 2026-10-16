@@ -889,7 +889,7 @@ test('all documented API operations map authenticated Worker responses to declar
 });
 
 
-test('staging excludes Usage & Quotas while retaining authenticated admin authorization',async()=>{
+test('staging provides experimental Usage & Quotas without inventing provider usage',async()=>{
  const h=harness();
  try{
   const token='d'.repeat(64),now=Date.now();
@@ -898,7 +898,10 @@ test('staging excludes Usage & Quotas while retaining authenticated admin author
   const path='/api/admin/usage',staging={ENVIRONMENT:'staging'};
   assert.equal((await h.req(path,'GET',undefined,undefined,staging)).status,401,'staging must still enforce authentication');
   const response=await h.req(path,'GET',undefined,'__Host-sw_session='+token,staging);
-  assert.equal(response.status,404,'staging must not serve the Usage & Quotas endpoint');
-  assert.match((await response.json()).error,/not included in staging/);
+  assert.equal(response.status,200,'authorized staging admin can inspect experimental usage status');
+  const data=await response.json();
+  assert.equal(data.environment,'staging');
+  assert.equal(data.providers.length,4);
+  assert.ok(data.providers.every(provider=>provider.status==='unavailable'&&provider.used===null&&provider.limit===null&&provider.remaining===null),'unknown readings must not be fabricated');
  }finally{h.sqlite.close()}
 });
