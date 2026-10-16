@@ -60,8 +60,6 @@ function EventWhen({event}:{event:EventRecord}){
 const generatedApi = createApiClient();
 const repositoryUrl = 'https://github.com/SFFilAmLions/serve-with';
 const buildEnvironment = import.meta.env.VITE_DEPLOY_ENV;
-// SDDW-006 staging rollout explicitly excludes the unfinished Usage & Quotas feature.
-const usageEnabled = buildEnvironment !== 'staging';
 const buildSha = import.meta.env.VITE_COMMIT_SHA || '';
 const releaseTag = import.meta.env.VITE_RELEASE_TAG || '';
 function BuildFooter() {
@@ -538,17 +536,22 @@ function MySignups({me}:{me:Me}){
 function UsageDashboard(){
  const [data,setData]=useState<{environment:string;collectedAt:string;providers:{name:string;scope:string;status:string;used:number|null;limit:number|null;remaining:number|null;resetsAt:string|null;reason?:string}[]}|null>(null);
  const [error,setError]=useState(''),[loading,setLoading]=useState(true);
+ const [diagnostic,setDiagnostic]=useState('No provider request has completed yet.');
  const refresh=async()=>{
   setLoading(true);setError('');
   try{
    const response=await generatedApi.getAdminUsage();
-   if(response.status!==200)throw Error((response.data as {error?:string}).error||'Unable to load usage data');
-   setData(response.data as NonNullable<typeof data>);
+   if(response.status!==200){setDiagnostic('API returned HTTP '+response.status);throw Error((response.data as {error?:string}).error||'Unable to load usage data');}
+   const payload=response.data as NonNullable<typeof data>;
+   setData(payload);
+   setDiagnostic(JSON.stringify({httpStatus:response.status,environment:payload.environment,collectedAt:payload.collectedAt,providers:payload.providers.map(p=>({name:p.name,status:p.status,scope:p.scope,hasUsage:p.used!==null,hasLimit:p.limit!==null}))},null,2));
   }catch(e){setError(e instanceof Error?e.message:'Unable to load provider usage');}finally{setLoading(false);}
  };
  useEffect(()=>{void refresh()},[]);
  return <Stack spacing={2} sx={{my:4}}>
   <Typography variant="h4">Usage &amp; Quotas</Typography>
+  <Alert severity="warning">Experimental: provider usage integrations are not yet complete. These values may be unavailable or inaccurate until verified against each provider. Unknown is not zero.</Alert>
+  <Box component="details" sx={{p:1,border:1,borderColor:'divider',borderRadius:1}}><Box component="summary" sx={{cursor:'pointer'}}>Integration diagnostics (no credentials or account identifiers)</Box><Box component="pre" sx={{whiteSpace:'pre-wrap',overflowWrap:'anywhere',fontSize:12}}>{diagnostic}</Box></Box>
   <Typography variant="body2" color="text.secondary">Usage may be shared across an account or specific to an application. Limits are shown only when confirmed by a provider.</Typography>
   <Button sx={{alignSelf:'flex-start'}} disabled={loading} onClick={()=>void refresh()}>Refresh status</Button>
   {loading&&<CircularProgress aria-label="Loading provider usage status"/>}
@@ -607,9 +610,9 @@ function RoutedApp(){
   value={path.startsWith('/admin/users')?'users':path.startsWith('/admin/usage')?'usage':'events'}
   onChange={(_,v:string|null)=>{if(v)go(v==='users'?'/admin/users':v==='usage'?'/admin/usage':'/admin/events')}}
   aria-label="Administrator sections" sx={{my:1,gap:1,'& .MuiToggleButton-root':{borderRadius:'24px !important',px:2}}}>
-   <ToggleButton value="events">Events</ToggleButton><ToggleButton value="users">Users</ToggleButton>{usageEnabled&&<ToggleButton value="usage">Usage</ToggleButton>}
+   <ToggleButton value="events">Events</ToggleButton><ToggleButton value="users">Users</ToggleButton><ToggleButton value="usage">Usage</ToggleButton>
   </ToggleButtonGroup>}</Container></AppBar>
- <Container maxWidth="lg" component="main">{path==='/terms'?<PolicyPage kind="terms"/>:path==='/privacy'?<PolicyPage kind="privacy"/>:path==='/login'?<AuthScreen me={me} refresh={refresh}/>:path==='/admin/events/new'&&canAdmin?<EventPageEditor/>:editRoute&&canAdmin?<EventPageEditor id={editRoute[1]}/>:adminEventRoute&&canAdmin?<AdminEventSignups id={adminEventRoute[1]}/>:userRoute?<UserView key={path} id={userRoute[1]} edit={!!userRoute[2]}/>:eventRoute?<EventDetail id={eventRoute[1]} admin={canAdmin} me={me}/>:path==='/admin/users'&&canAdmin?<UsersDirectory/>:path==='/admin/users/new'&&canAdmin?<AdminCreateUser/>:path==='/admin/usage'&&canAdmin?(usageEnabled?<UsageDashboard/>:<Alert severity="info" sx={{mt:3}}>Usage &amp; Quotas is excluded from this staging verification.</Alert>):path==='/my-signups'?<MySignups me={me}/>:path.startsWith('/admin')&&!canAdmin?<Alert severity="warning" sx={{mt:3}}>Complete your profile and current agreement to access administrator tools. <Button onClick={()=>go('/login')}>Account setup</Button></Alert>:<><Typography variant="h4" sx={{mt:4}}>{admin?'Manage events':'Serve With SF Fil-Am Lions'}</Typography><EventList admin={canAdmin&&admin}/></>}<BuildFooter/></Container></ThemeProvider>;
+ <Container maxWidth="lg" component="main">{path==='/terms'?<PolicyPage kind="terms"/>:path==='/privacy'?<PolicyPage kind="privacy"/>:path==='/login'?<AuthScreen me={me} refresh={refresh}/>:path==='/admin/events/new'&&canAdmin?<EventPageEditor/>:editRoute&&canAdmin?<EventPageEditor id={editRoute[1]}/>:adminEventRoute&&canAdmin?<AdminEventSignups id={adminEventRoute[1]}/>:userRoute?<UserView key={path} id={userRoute[1]} edit={!!userRoute[2]}/>:eventRoute?<EventDetail id={eventRoute[1]} admin={canAdmin} me={me}/>:path==='/admin/users'&&canAdmin?<UsersDirectory/>:path==='/admin/users/new'&&canAdmin?<AdminCreateUser/>:path==='/admin/usage'&&canAdmin?<UsageDashboard/>:path==='/my-signups'?<MySignups me={me}/>:path.startsWith('/admin')&&!canAdmin?<Alert severity="warning" sx={{mt:3}}>Complete your profile and current agreement to access administrator tools. <Button onClick={()=>go('/login')}>Account setup</Button></Alert>:<><Typography variant="h4" sx={{mt:4}}>{admin?'Manage events':'Serve With SF Fil-Am Lions'}</Typography><EventList admin={canAdmin&&admin}/></>}<BuildFooter/></Container></ThemeProvider>;
 }
 
 createRoot(document.getElementById('app')!).render(<RoutedApp/>);
