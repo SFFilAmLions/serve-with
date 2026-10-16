@@ -180,7 +180,7 @@ export function App(){
  const [admin,setAdmin]=useState(false);
  const dark=useMediaQuery('(prefers-color-scheme: dark)');
  const theme=React.useMemo(()=>createClubTheme(dark?'dark':'light'),[dark]);
- return <ThemeProvider theme={theme}><CssBaseline/><AppBar position="static" color="default" elevation={0}><Container><Box sx={{py:1.5,display:"flex",alignItems:"center",gap:1.5}}><Box component="img" src="/club-logo.png" alt="San Francisco Fil-Am Lions Club logo" sx={{width:48,height:48,objectFit:"contain"}}/><Typography variant="h6">Serve With Lions</Typography></Box></Container></AppBar><Container maxWidth="md" component="main"><Typography variant="h3" component="h1" sx={{mt:5}}>Serve With SF Fil-Am Lions</Typography><Typography color="text.secondary">Making it easier to serve together.</Typography><EventList admin={admin}/><SignIn onAuthChange={setAdmin}/><Box sx={{mt:3,display:'flex',gap:2}}><a href="/terms">Terms of Use</a><a href="/privacy">Privacy Policy</a></Box><BuildFooter/></Container></ThemeProvider>
+ return <ThemeProvider theme={theme}><CssBaseline/><Box sx={{minHeight:'100dvh',display:'flex',flexDirection:'column',width:'100%'}}><AppBar position="static" color="default" elevation={0}><Container><Box sx={{py:1.5,display:"flex",alignItems:"center",gap:1.5}}><Box component="img" src="/club-logo.png" alt="San Francisco Fil-Am Lions Club logo" sx={{width:48,height:48,objectFit:"contain"}}/><Typography variant="h6">Serve With Lions</Typography></Box></Container></AppBar><Container maxWidth="md" component="main"><Typography variant="h3" component="h1" sx={{mt:5}}>Serve With SF Fil-Am Lions</Typography><Typography color="text.secondary">Making it easier to serve together.</Typography><EventList admin={admin}/><SignIn onAuthChange={setAdmin}/><Box sx={{mt:3,display:'flex',gap:2}}><a href="/terms">Terms of Use</a><a href="/privacy">Privacy Policy</a></Box></Container><Container maxWidth="lg" component="div" sx={{width:'100%'}}><BuildFooter/></Container></Box></ThemeProvider>
 }
 
 type Me = {requiredVersions?:{terms:string;privacy:string}|null;authenticated:boolean;email?:string;userId?:string;firstName?:string|null;lastName?:string|null;profileComplete?:boolean;agreementCurrent?:boolean;administratorEligible?:boolean;privileged?:boolean};
@@ -573,31 +573,57 @@ function AdminEventSignups({id}:{id:string}){
  </Stack>;
 }
 
+type SignupHistoryItem={id:string;event_id:string;created_at:number;deleted_at:number|null;title:string;start_at:number;end_at:number;location:string;timezone:string;capacity:number|null;signups_count:number};
 function MySignups({me}:{me:Me}){
- const [items,setItems]=useState<{id:string;event_id:string;created_at:number;deleted_at:number|null;title:string;start_at:number;end_at:number}[]>([]);
+ const [items,setItems]=useState<SignupHistoryItem[]>([]);
+ const [view,setView]=useState<'upcoming'|'past'|'cancelled'>('upcoming');
  const [error,setError]=useState(''),[loading,setLoading]=useState(true);
  useEffect(()=>{
   if(!me.authenticated||!me.profileComplete||!me.agreementCurrent){setLoading(false);return;}
   let active=true;
   void generatedApi.listMySignups().then(result=>{
    if(result.status!==200)throw Error((result.data as {error?:string}).error||'Unable to load signups');
-   if(active)setItems((result.data as {signups:typeof items}).signups);
+   if(active)setItems((result.data as {signups:SignupHistoryItem[]}).signups);
   }).catch(e=>{if(active)setError(e instanceof Error?e.message:'Unable to load signups')})
    .finally(()=>{if(active)setLoading(false)});
   return()=>{active=false};
  },[me.authenticated,me.profileComplete,me.agreementCurrent]);
  if(!me.authenticated||!me.profileComplete||!me.agreementCurrent)
   return <Stack sx={{my:4}} spacing={2}><Typography variant="h4">My signups</Typography><Alert severity="info">Sign in and complete your account to see your event signups.</Alert><Button onClick={()=>go('/login')}>Complete account</Button></Stack>;
- return <Stack spacing={2} sx={{my:4}}><Typography variant="h4">My signups</Typography>
-  {loading?<CircularProgress aria-label="Loading signups"/>:error?<Alert severity="error" role="alert">{error}</Alert>:items.length===0?<Typography>No signups yet.</Typography>:
-   items.map(item=><Card variant="outlined" key={item.id}><CardContent>
-    <Typography variant="h6">{item.title}</Typography>
-    <Typography color="text.secondary">{new Date(item.start_at).toLocaleString()} · {item.deleted_at===null?'Active signup':'Withdrawn'}</Typography>
-    <Typography variant="body2" color="text.secondary">Signed up {new Date(item.created_at).toLocaleString()}</Typography>
-    {item.deleted_at!==null&&<Typography variant="body2" color="text.secondary">Withdrawn {new Date(item.deleted_at).toLocaleString()}</Typography>}
-    <Button size="small" onClick={()=>go('/events/'+item.event_id)}>View event</Button>
-   </CardContent></Card>)}
- </Stack>;
+ const activeEventIds=new Set(items.filter(item=>item.deleted_at===null).map(item=>item.event_id));
+ const latestByEvent=new Map<string,SignupHistoryItem>();
+ for(const item of items){
+  const previous=latestByEvent.get(item.event_id);
+  if(!previous||item.created_at>previous.created_at||(item.created_at===previous.created_at&&item.id>previous.id))latestByEvent.set(item.event_id,item);
+ }
+ const now=Date.now();
+ const filtered=Array.from(latestByEvent.values()).filter(item=>
+  view==='cancelled'?!activeEventIds.has(item.event_id)&&item.deleted_at!==null:
+  activeEventIds.has(item.event_id)&&item.deleted_at===null&&(view==='upcoming'?item.end_at>now:item.end_at<=now)
+ ).sort((a,b)=>view==='upcoming'?a.start_at-b.start_at:b.start_at-a.start_at);
+ return <Box component="section" aria-label="My signups" sx={{my:5}}>
+  <Typography variant="h4" sx={{mb:2}}>My signups</Typography>
+  <ToggleButtonGroup exclusive color="primary" size="small" value={view} onChange={(_,v:'upcoming'|'past'|'cancelled'|null)=>{if(v)setView(v)}} aria-label="Signup timeline"
+   sx={{gap:1,maxWidth:'100%',overflowX:'auto','& .MuiToggleButton-root':{borderRadius:'24px !important',px:2,flexShrink:0}}}>
+   <ToggleButton value="upcoming">Upcoming</ToggleButton><ToggleButton value="past">Past</ToggleButton><ToggleButton value="cancelled">Cancelled</ToggleButton>
+  </ToggleButtonGroup>
+  {loading?<Box sx={{p:4}} role="status"><CircularProgress aria-label="Loading signups"/></Box>:
+   error?<Alert severity="error" role="alert">{error}</Alert>:
+   filtered.length===0?<Box sx={{p:4}}><Typography variant="h6">{view==='cancelled'?'No cancelled signups.':view==='past'?'No past signups.':'No upcoming signups.'}</Typography></Box>:
+   <Box sx={{display:'grid',gridTemplateColumns:{xs:'1fr',md:'repeat(2,minmax(0,1fr))'},gap:2,pt:3}}>
+    {filtered.map(item=>{
+     const event:EventRecord={id:item.event_id,title:item.title,location:item.location,timezone:item.timezone,start_at:item.start_at,end_at:item.end_at,version:1,capacity:item.capacity,signups_count:item.signups_count,spots_available:item.capacity===null?null:Math.max(0,item.capacity-item.signups_count)};
+     return <Card variant="outlined" key={item.event_id} sx={{display:'flex',flexDirection:'column'}}>
+      <CardContent sx={{flexGrow:1}}>
+       <Typography variant="h6" component="h3"><Button sx={{p:0,textAlign:'left',fontSize:'inherit'}} onClick={()=>go('/events/'+item.event_id)}>{item.title}</Button></Typography>
+       <EventWhen event={event}/>
+       <Typography variant="body2" color="text.secondary" sx={{mt:1}}>{item.deleted_at!==null?'Cancelled '+new Date(item.deleted_at).toLocaleString():'Signed up '+new Date(item.created_at).toLocaleString()}</Typography>
+      </CardContent>
+      <CardActions sx={{justifyContent:'flex-end',px:2,pb:2}}><Button size="small" onClick={()=>go('/events/'+item.event_id)}>Details</Button></CardActions>
+     </Card>;
+    })}
+   </Box>}
+ </Box>;
 }
 
 function UsageDashboard(){
@@ -684,7 +710,7 @@ function RoutedApp(){
   aria-label="Administrator sections" sx={{my:1,gap:1,maxWidth:'100%',overflowX:'auto','& .MuiToggleButton-root':{borderRadius:'24px !important',px:2,gap:0.75,flexShrink:0}}}>
    <ToggleButton value="events"><Glyph type="events"/>Events</ToggleButton><ToggleButton value="users"><Glyph type="users"/>Users</ToggleButton><ToggleButton value="usage"><Glyph type="usage"/>Usage</ToggleButton>
   </ToggleButtonGroup>}</Container></AppBar><StagingNotice/>
- <Container maxWidth="lg" component="main">{path==='/terms'?<PolicyPage kind="terms"/>:path==='/privacy'?<PolicyPage kind="privacy"/>:path==='/login'?<AuthScreen me={me} refresh={refresh}/>:path==='/admin/events/new'&&canAdmin?<EventPageEditor/>:editRoute&&canAdmin?<EventPageEditor id={editRoute[1]}/>:adminEventRoute&&canAdmin?<AdminEventSignups id={adminEventRoute[1]}/>:userRoute?<UserView key={path} id={userRoute[1]} edit={!!userRoute[2]} backPath={userRoute[1]===me.userId?'/':'/admin/users'} canEditAvatar={userRoute[1]===me.userId}/>:eventRoute?<EventDetail id={eventRoute[1]} admin={false} me={me}/>:path==='/admin/users'&&canAdmin?<UsersDirectory/>:path==='/admin/users/new'&&canAdmin?<AdminCreateUser/>:path==='/admin/usage'&&canAdmin?<UsageDashboard/>:path==='/my-signups'?<MySignups me={me}/>:path.startsWith('/admin')&&!canAdmin?<Alert severity="warning" sx={{mt:3}}>Complete your profile and current agreement to access administrator tools. <Button onClick={()=>go('/login')}>Account setup</Button></Alert>:<><Typography variant="h4" sx={{mt:4}}>{admin?'Manage events':'Serve With SF Fil-Am Lions'}</Typography><EventList admin={canAdmin&&admin}/></>}<BuildFooter/></Container></ThemeProvider>;
+ <Container maxWidth="lg" component="main" sx={{flex:1,width:'100%'}}>{path==='/terms'?<PolicyPage kind="terms"/>:path==='/privacy'?<PolicyPage kind="privacy"/>:path==='/login'?<AuthScreen me={me} refresh={refresh}/>:path==='/admin/events/new'&&canAdmin?<EventPageEditor/>:editRoute&&canAdmin?<EventPageEditor id={editRoute[1]}/>:adminEventRoute&&canAdmin?<AdminEventSignups id={adminEventRoute[1]}/>:userRoute?<UserView key={path} id={userRoute[1]} edit={!!userRoute[2]} backPath={userRoute[1]===me.userId?'/':'/admin/users'} canEditAvatar={userRoute[1]===me.userId}/>:eventRoute?<EventDetail id={eventRoute[1]} admin={false} me={me}/>:path==='/admin/users'&&canAdmin?<UsersDirectory/>:path==='/admin/users/new'&&canAdmin?<AdminCreateUser/>:path==='/admin/usage'&&canAdmin?<UsageDashboard/>:path==='/my-signups'?<MySignups me={me}/>:path.startsWith('/admin')&&!canAdmin?<Alert severity="warning" sx={{mt:3}}>Complete your profile and current agreement to access administrator tools. <Button onClick={()=>go('/login')}>Account setup</Button></Alert>:<><Typography variant="h4" sx={{mt:4}}>{admin?'Manage events':'Serve With SF Fil-Am Lions'}</Typography><EventList admin={canAdmin&&admin}/></>}<BuildFooter/></Container></ThemeProvider>;
 }
 
 createRoot(document.getElementById('app')!).render(<RoutedApp/>);
