@@ -497,6 +497,10 @@ function AdminEventSignups({id}:{id:string}){
  };
  useEffect(()=>{void load().catch(e=>setError(e instanceof Error?e.message:'Unable to load roster'))},[id]);
  useEffect(()=>{let active=true;void generatedApi.getEvent({id}).then(response=>{if(response.status!==200)throw Error('Unable to load event details');if(active)setEventDetails((response.data as {event:EventRecord}).event)}).catch(e=>{if(active)setError(e instanceof Error?e.message:'Unable to load event details')});return()=>{active=false}},[id]);
+ const copyPublicLink=async()=>{
+  try{await navigator.clipboard.writeText(new URL('/events/'+id,location.origin).toString());setNotice('Event link copied');}
+  catch{setError('Unable to copy event link.');}
+ };
  const search=async()=>{
   setError('');
   try{const response=await generatedApi.listAdminUsers({q:query});if(response.status!==200)throw Error((response.data as {error?:string}).error||'Unable to find users');setPeople((response.data as unknown as {users:typeof people}).users);}
@@ -523,7 +527,10 @@ function AdminEventSignups({id}:{id:string}){
   {error&&<Alert severity="error" role="alert">{error}</Alert>}
   {notice&&<Alert severity="success" role="status">{notice}</Alert>}
   <Box component="section" aria-labelledby="admin-event-details-heading">
-   <Typography id="admin-event-details-heading" variant="h5" sx={{mb:2}}>Details</Typography>
+   <Stack direction="row" alignItems="center" justifyContent="space-between" gap={1} sx={{mb:2}}>
+    <Typography id="admin-event-details-heading" variant="h5">Details</Typography>
+    <Button size="small" startIcon={<Glyph type="link"/>} onClick={()=>void copyPublicLink()}>Copy link</Button>
+   </Stack>
    {eventDetails?<EventWhen event={eventDetails}/>:<Skeleton height={100}/>}
   </Box>
   <Box component="section" aria-labelledby="admin-event-roster-heading">
