@@ -119,3 +119,12 @@ test('admin event details link and creation history remain available without red
  assert.doesNotMatch(source,/<MenuItem[^>]*>My signups<\/MenuItem>/);
  assert.match(source,/<ToggleButton value="signups">/);
 });
+
+test('edit routes return to their owning detail screens, not generic event pages',()=>{
+ assert.match(source,/onClick=\{\(\)=>go\(edit\?'\/users\/'\+id:backPath\)\}/);
+ assert.match(source,/edit\?'Back to profile'/);
+ assert.match(source,/const editorReturnPath=id\?'\/admin\/events\/'\+id:'\/admin\/events'/);
+ assert.match(source,/go\('\/admin\/events\/'\+saved\.event\.id\)/);
+ assert.match(source,/onClick=\{\(\)=>go\(editorReturnPath\)\}>Discard changes/);
+ assert.match(source,/onClick=\{\(\)=>\{if\(!dirty\|\|confirm\('Discard changes\?'\)\)go\('\/users\/'\+id\)\}\}/);
+});
