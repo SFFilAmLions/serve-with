@@ -154,3 +154,8 @@ test('event listings and details show accessible visual cues without location ch
  const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
  for(const name of ['calendar_month','groups','person_remove'])assert.ok(html.includes(name),name);
 });
+
+test('admin users directory provides a create-user floating action button',()=>{
+ assert.match(source,/<Fab variant="extended" color="primary" aria-label="Create user" onClick=\{\(\)=>go\('\/admin\/users\/new'\)\}/);
+ assert.match(source,/position:'fixed',bottom:\{xs:24,sm:32\},right:\{xs:24,sm:32\}/);
+});
