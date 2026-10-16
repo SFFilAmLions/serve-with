@@ -467,7 +467,7 @@ test('usage endpoint hides provider credentials and never fabricates limits',asy
 test('usage endpoint reports Resend daily quota only with the dedicated usage key',async()=>{
  const h=harness(),originalFetch=globalThis.fetch;
  try{
-  const now=Date.now(),token='u'.repeat(64);
+  const now=Date.now(),token='e'.repeat(64);
   const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode('test:'+token))),b=>b.toString(16).padStart(2,'0')).join('');
   h.sqlite.prepare('INSERT INTO sessions(token_hash,email,expires_at,created_at) VALUES(?,?,?,?)').run(hash,'lionaugust@icloud.com',now+600000,now);
   globalThis.fetch=async(url,init)=>{
