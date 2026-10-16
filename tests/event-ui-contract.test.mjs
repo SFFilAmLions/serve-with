@@ -59,3 +59,21 @@ test('Turnstile UI requests a fresh token for each login email',()=>{
  assert.match(source,/setCaptchaRound\(n=>n\+1\)/);
  assert.match(source,/captchaReady/);
 });
+
+test('SDDW-006 navigation and registration controls retain contextual, accessible actions',()=>{
+ for(const label of ['Copy public event link','Copy link to ','Cancel registration as ','View events','My signups','Attendee sections','Administrator sections']){
+  assert.ok(source.includes(label),label);
+ }
+ assert.match(source,/workspaceSwitchPath=eventContextId/);
+ assert.match(source,/\/admin\/events\/'\+eventContextId/);
+ assert.match(source,/navigator\.clipboard\.writeText/);
+});
+
+test('SDDW-006 profile and roster use the shared people-management patterns',()=>{
+ for(const label of ['Edit profile picture in Gravatar','Event roster and registration history','Cancel registration','aria-label="Edit event"']){
+  assert.ok(source.includes(label),label);
+ }
+ assert.match(source,/<TableHead>/);
+ assert.match(source,/<Fab variant="extended"/);
+ assert.match(source,/maxWidth:480/);
+});

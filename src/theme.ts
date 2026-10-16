@@ -25,6 +25,8 @@ export function createClubTheme(mode:Appearance){
    MuiCssBaseline:{styleOverrides:{'html':{colorScheme:mode},'body':{backgroundColor:dark?'#141613':'#FCFBF6'}}},
    MuiCard:{styleOverrides:{root:{borderRadius:20}}},
    MuiButton:{styleOverrides:{root:{borderRadius:20,textTransform:'none',fontWeight:700}}},
+   MuiToggleButton:{styleOverrides:{root:{borderRadius:24,textTransform:'none',fontWeight:700,
+    '&.Mui-selected,&.Mui-selected:hover':{backgroundColor:clubGold,color:'#25200B',borderColor:clubGold}}}},
    MuiTabs:{styleOverrides:{root:{borderBottom:dark?'1px solid #484D43':'1px solid #DDE0D6'}}}
   }
  });
