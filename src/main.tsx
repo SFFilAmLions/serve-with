@@ -252,7 +252,7 @@ function UserView({id,edit,backPath,canEditAvatar}:{id:string;edit:boolean;backP
  if(message&&!user)return <Alert severity="error">{message}</Alert>;
  if(!user)return <Skeleton height={240}/>;
  const u=user.user;
- return <Stack spacing={3} sx={{my:4,maxWidth:760}}><Button size="small" startIcon={<Glyph type="back"/>} sx={{alignSelf:"flex-start"}} onClick={()=>go(backPath)}>{backPath==='/admin/users'?'Back to users':'Back to events'}</Button><Stack direction={{xs:'column',sm:'row'}} alignItems={{sm:'center'}} spacing={2}><Box sx={{position:'relative',width:96,height:96,flexShrink:0}}>
+ return <Stack spacing={3} sx={{my:4,maxWidth:760}}><Button size="small" startIcon={<Glyph type="back"/>} sx={{alignSelf:"flex-start"}} onClick={()=>go(edit?'/users/'+id:backPath)}>{edit?'Back to profile':backPath==='/admin/users'?'Back to users':'Back to events'}</Button><Stack direction={{xs:'column',sm:'row'}} alignItems={{sm:'center'}} spacing={2}><Box sx={{position:'relative',width:96,height:96,flexShrink:0}}>
   <AccountAvatar email={u.email||undefined} name={[u.first_name,u.last_name].filter(Boolean).join(' ')} size={96} revision={avatarRevision}/>
   {canEditAvatar&&u.email&&<Tooltip title={'Edit profile picture in Gravatar using '+u.email}>
    <IconButton onClick={()=>openAvatarEditor(u.email)} aria-label="Edit profile picture in Gravatar"
@@ -388,8 +388,9 @@ function EventPageEditor({id}:{id?:string}){
  const date=(key:'start'|'end')=>draft[key]?dayjs(draft[key]):null;
  const setDate=(key:'start'|'end',v:Dayjs|null)=>{if(!v?.isValid())return;const stamp=v.format('YYYY-MM-DD');setDraft(old=>{const before=old.start.slice(0,10);const next={...old,[key]:stamp+'T'+(old[key].slice(11)||'09:00')};if(key==='start'&&(!old.end||old.end.slice(0,10)===before))next.end=stamp+'T'+(old.end.slice(11)||'10:00');return next})};
  const setTime=(key:'start'|'end',v:Dayjs|null)=>{if(v?.isValid())update(key,(draft[key].slice(0,10)||dayjs().format('YYYY-MM-DD'))+'T'+v.format('HH:mm'))};
- const close=()=>{if(draft.title!==original.title||JSON.stringify(draft)!==JSON.stringify(original))setConfirmClose(true);else go(id?'/events/'+id:'/admin/events')};
- const save=async()=>{const errors=validateDraft(draft);if(Object.keys(errors).length){setMessage(Object.values(errors).join('; '));return}setBusy(true);setMessage('');try{const result=id?await generatedApi.updateAdminEvent({id,body:{...draft,version}}):await generatedApi.createAdminEvent({body:draft});if(result.status!==200&&result.status!==201){const failure=result.data as {error?:string};throw Error(failure.error||'Unable to save event')}const saved=result.data as {event:{id:string}};go('/events/'+saved.event.id)}catch(e){setMessage(e instanceof Error?e.message:'Save failed; draft retained')}finally{setBusy(false)}};
+ const editorReturnPath=id?'/admin/events/'+id:'/admin/events';
+ const close=()=>{if(draft.title!==original.title||JSON.stringify(draft)!==JSON.stringify(original))setConfirmClose(true);else go(editorReturnPath)};
+ const save=async()=>{const errors=validateDraft(draft);if(Object.keys(errors).length){setMessage(Object.values(errors).join('; '));return}setBusy(true);setMessage('');try{const result=id?await generatedApi.updateAdminEvent({id,body:{...draft,version}}):await generatedApi.createAdminEvent({body:draft});if(result.status!==200&&result.status!==201){const failure=result.data as {error?:string};throw Error(failure.error||'Unable to save event')}const saved=result.data as {event:{id:string}};go('/admin/events/'+saved.event.id)}catch(e){setMessage(e instanceof Error?e.message:'Save failed; draft retained')}finally{setBusy(false)}};
  const duration=draft.start&&draft.end?dayjs(draft.end).diff(dayjs(draft.start),'minute'):0;
  return <LocalizationProvider dateAdapter={AdapterDayjs}><Stack spacing={2} sx={{my:4,maxWidth:750}}>
  <Stack direction="row" alignItems="center" spacing={1}><Tooltip title="Back"><IconButton aria-label="Back" onClick={close}><Glyph type="back"/></IconButton></Tooltip><Typography variant="h4" sx={{flex:1}}>{id?'Edit event':'Create event'}</Typography></Stack>
@@ -404,7 +405,7 @@ function EventPageEditor({id}:{id?:string}){
  <Button onClick={()=>setMore(v=>!v)} aria-expanded={more}>More options</Button>
  {more&&<><DatePicker label="End date" value={date('end')} onChange={v=>setDate('end',v)} slotProps={{textField:{fullWidth:true}}}/><Autocomplete options={timeZones} value={draft.timezone} onChange={(_,v)=>update('timezone',v||'America/Los_Angeles')} renderInput={p=><TextField {...p} label="Time zone"/>}/></>}
  <Stack direction="row" spacing={1} justifyContent="flex-end"><Button size="small" onClick={close}>Cancel</Button><Button size="small" variant="contained" startIcon={<Glyph type="save"/>} disabled={busy} onClick={()=>void save()}>Save event</Button></Stack>
- <Dialog open={confirmClose} onClose={()=>setConfirmClose(false)}><DialogTitle>Discard unsaved changes?</DialogTitle><DialogActions><Button onClick={()=>setConfirmClose(false)}>Keep editing</Button><Button color="error" onClick={()=>go(id?'/events/'+id:'/admin/events')}>Discard changes</Button></DialogActions></Dialog>
+ <Dialog open={confirmClose} onClose={()=>setConfirmClose(false)}><DialogTitle>Discard unsaved changes?</DialogTitle><DialogActions><Button onClick={()=>setConfirmClose(false)}>Keep editing</Button><Button color="error" onClick={()=>go(editorReturnPath)}>Discard changes</Button></DialogActions></Dialog>
  </Stack></LocalizationProvider>;
 }
 
