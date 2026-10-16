@@ -20,6 +20,14 @@ function formatOk(format:string,value:string):boolean {
  // Unknown formats are advisory: business handlers retain authoritative rules.
  return true;
 }
+function sameJson(a:unknown,b:unknown):boolean {
+ if(Object.is(a,b))return true;
+ if(a===null||b===null||typeof a!=='object'||typeof b!=='object')return false;
+ if(Array.isArray(a)||Array.isArray(b))return Array.isArray(a)&&Array.isArray(b)&&a.length===b.length&&a.every((v,i)=>sameJson(v,b[i]));
+ const x=a as Record<string,unknown>,y=b as Record<string,unknown>;
+ const keys=Object.keys(x);
+ return keys.length===Object.keys(y).length&&keys.every(k=>Object.hasOwn(y,k)&&sameJson(x[k],y[k]));
+}
 function numericBounds(schema:Schema,value:number):boolean {
  return (schema.minimum===undefined||value>=schema.minimum) && (schema.maximum===undefined||value<=schema.maximum) && (schema.exclusiveMinimum===undefined||value>schema.exclusiveMinimum) && (schema.exclusiveMaximum===undefined||value<schema.exclusiveMaximum);
 }
@@ -39,7 +47,7 @@ function check(raw: unknown,value: unknown): boolean {
  if(schema.anyOf&&!schema.anyOf.some(item=>check(item,value)))return false;
  if(schema.oneOf&&schema.oneOf.filter(item=>check(item,value)).length!==1)return false;
  if(schema.const!==undefined&&!Object.is(value,schema.const))return false;
- if(schema.enum && !schema.enum.some(candidate=>JSON.stringify(candidate)===JSON.stringify(value)))return false;
+ if(schema.enum && !schema.enum.some(candidate=>sameJson(candidate,value)))return false;
  if(Array.isArray(schema.type))return schema.type.some(t=>check({...schema,type:t},value));
  if(schema.type==='null')return value===null;
  if(schema.type==='string')return typeof value==='string' &&
