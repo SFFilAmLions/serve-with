@@ -74,7 +74,7 @@ function BuildFooter() {
 }
 function StagingNotice(){
  if(buildEnvironment!=='staging')return null;
- return <Alert severity="error" variant="filled" square icon={false} sx={{borderRadius:0,justifyContent:'center',fontWeight:700,'& .MuiAlert-message':{py:0.5}} action={<Button color="inherit" component="a" href={productionUrl} sx={{border:1,borderColor:'currentColor'}}>Go to main site</Button>}>You are viewing the staging site.</Alert>;
+ return <Alert severity="error" variant="filled" square icon={false} sx={{borderRadius:0,justifyContent:'center',fontWeight:700,'& .MuiAlert-message':{py:0.5}}} action={<Button color="inherit" component="a" href={productionUrl} sx={{border:1,borderColor:'currentColor'}}>Go to main site</Button>}>You are viewing the staging site.</Alert>;
 }
 const magic = new URL(location.href).searchParams.get('magic');
 if (magic) history.replaceState(null,'','/login');
