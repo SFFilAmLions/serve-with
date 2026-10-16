@@ -51,8 +51,9 @@ function check(raw: unknown,value: unknown): boolean {
   const object=value as Record<string,unknown>;
   for(const key of schema.required??[])if(!Object.hasOwn(object,key))return false;
   for(const [key,child] of Object.entries(object)){
-   const property=schema.properties?.[key];
-   if(property){if(!check(property,child))return false;continue;}
+   // JSON property names such as __proto__ must not resolve inherited schema keys.
+   const property=schema.properties&&Object.hasOwn(schema.properties,key)?schema.properties[key]:undefined;
+   if(property!==undefined){if(!check(property,child))return false;continue;}
    if(schema.additionalProperties===false)return false;
    if(typeof schema.additionalProperties==='object'&&!check(schema.additionalProperties,child))return false;
   }
