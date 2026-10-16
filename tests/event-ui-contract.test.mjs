@@ -89,3 +89,16 @@ test('staging builds show a prominent route to production without affecting prod
  assert.match(source,/Main site/);
  assert.match(source,/<StagingNotice\/>/);
 });
+
+test('tab icons are present in the subsetted Google Material Symbols font',()=>{
+ const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
+ for(const icon of ['event','group','monitoring','how_to_reg'])assert.match(html,new RegExp('(?:,|=)'+icon+'(?:,|&amp;)'),icon);
+});
+
+test('profile picture edit uses an accessible pencil control only for the profile owner',()=>{
+ assert.match(source,/canEditAvatar=\{userRoute\[1\]===me\.userId\}/);
+ assert.match(source,/canEditAvatar&&u\.email&&<Tooltip/);
+ assert.match(source,/aria-label="Edit profile picture in Gravatar"/);
+ assert.match(source,/position:'absolute',right:-4,bottom:-4/);
+ assert.doesNotMatch(source,/>Edit profile picture in Gravatar<\/Button>/);
+});
