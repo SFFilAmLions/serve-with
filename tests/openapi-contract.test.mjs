@@ -410,3 +410,16 @@ test('generated required properties must be own properties, not inherited from p
  partial.firstName='Alex';
  assert.equal(validate('createAdminUserStub',partial),false,'each required name must be owned');
 });
+
+
+test('generated validator does not treat prototype keys as declared JSON schema properties',async()=>{
+ const ts=await import('typescript');
+ const source=readFileSync('src/generated/openapi-validators.ts','utf8')+
+  '\nexport const checkReservedKeys=(value:unknown)=>check({type:"object",properties:{name:{type:"string"}},additionalProperties:false},value);';
+ const compiled=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText;
+ const {checkReservedKeys}=await import('data:text/javascript;base64,'+Buffer.from(compiled).toString('base64'));
+ assert.equal(checkReservedKeys({name:'Alex'}),true);
+ assert.equal(checkReservedKeys(JSON.parse('{"__proto__":{"admin":true}}')),false,'__proto__ must not bypass additionalProperties:false');
+ assert.equal(checkReservedKeys(JSON.parse('{"constructor":"unexpected"}')),false,'constructor must not bypass additionalProperties:false');
+ assert.equal(checkReservedKeys(JSON.parse('{"toString":"unexpected"}')),false,'inherited Object.prototype keys are not schema properties');
+});
