@@ -109,7 +109,6 @@ test('profile picture edit uses an accessible pencil control only for the profil
  const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
  assert.match(html,/@gravatar-com\/quick-editor@0\.8\.0/);
 });
-
 test('admin event details link and creation history remain available without redundant menu signup',()=>{
  assert.match(source,/key:'event-created'/);
  assert.match(source,/action:'Event created'/);
