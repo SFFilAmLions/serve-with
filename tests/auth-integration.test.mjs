@@ -4,6 +4,13 @@ import { readFileSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import ts from 'typescript';
 
+const opSource = readFileSync('src/generated/openapi-operations.ts','utf8');
+const opJS = ts.transpileModule(opSource,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText;
+globalThis.__testOpenapiRegistry = await import('data:text/javascript;base64,'+Buffer.from(opJS).toString('base64'));
+const validationTS=readFileSync('src/generated/openapi-validators.ts','utf8');
+const validationJS=ts.transpileModule(validationTS,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText;
+globalThis.__testOpenapiValidators=await import('data:text/javascript;base64,'+Buffer.from(validationJS).toString('base64'));
+
 globalThis.__testTemporal = (await import('@js-temporal/polyfill')).Temporal;
 globalThis.__testEligibility = (await import('data:text/javascript;base64,' + Buffer.from(
   ts.transpileModule(readFileSync('src/registration-eligibility.ts','utf8'),
@@ -12,6 +19,8 @@ globalThis.__testEligibility = (await import('data:text/javascript;base64,' + Bu
 
 globalThis.__testPolicyMetadata = JSON.parse(readFileSync('src/generated/policy-versions.json','utf8'));
 const source = readFileSync('src/worker.ts', 'utf8')
+  .replace("import { operations, matchOperation, dispatchOperation, type WorkerHandlers } from './generated/openapi-operations';", "const {operations,matchOperation,dispatchOperation}=globalThis.__testOpenapiRegistry;")
+  .replace("import { validateOperationBody } from './generated/openapi-validators';", "const {validateOperationBody}=globalThis.__testOpenapiValidators;")
   .replace("import policyMetadata from './generated/policy-versions.json';", "const policyMetadata = globalThis.__testPolicyMetadata;")
   .replace("import { Temporal } from '@js-temporal/polyfill';", "const Temporal = globalThis.__testTemporal;")
   .replace("import { isStagingRegistrationEligible } from './registration-eligibility';", "const isStagingRegistrationEligible = globalThis.__testEligibility;")
@@ -23,6 +32,7 @@ function database() {
   sqlite.exec(readFileSync('migrations/0001_auth.sql','utf8'));
   sqlite.exec(readFileSync('migrations/0002_auth_rate_limits.sql','utf8'));
   sqlite.exec(readFileSync('migrations/0004_users_and_agreements.sql','utf8'));
+  sqlite.exec('BEGIN;'+readFileSync('migrations/0006_unclaimed_users.sql','utf8')+'COMMIT;');
   sqlite.exec('PRAGMA foreign_keys=ON');
   const adapter = { prepare(sql) { const stmt = sqlite.prepare(sql); return {
     bind(...params) { return { first: async () => stmt.get(...params) || null,
@@ -314,4 +324,41 @@ test('Turnstile blocks email issuance unless Siteverify confirms hostname and ac
   assert.equal((await request('siteverify-outage')).status,403);
   assert.equal(h.sent.length,1);
  }finally{globalThis.fetch=originalFetch;h.close();}
+});
+
+test('email-verified stub claim reuses ID and requires full profile and personal agreements',async()=>{
+ const h=harness();try{
+  const id='44444444-4444-4444-8444-444444444444';
+  h.sqlite.exec(readFileSync('migrations/0003_events.sql','utf8'));
+  h.sqlite.exec(readFileSync('migrations/0005_event_signups.sql','utf8'));
+  h.sqlite.prepare('INSERT INTO participation_identities(id) VALUES(?)').run(id);
+  h.sqlite.prepare('INSERT INTO user_stubs(id,email,first_name,last_name,created_at,updated_at) VALUES(?,?,?,?,?,?)')
+   .run(id,'unclaimed@example.org','Admin','Entered',1,1);
+  assert.equal((await h.req('/api/auth/request',{email:'unclaimed@example.org'})).status,200);
+  assert.equal(h.sent.length,1);
+  const code=credentials(h.sent[0]).code;
+  const login=await h.req('/api/auth/verify',{email:'unclaimed@example.org',code});
+  assert.equal(login.status,200);
+  const session=login.headers.get('set-cookie');
+  assert.equal(h.sqlite.prepare('SELECT user_id FROM sessions WHERE email=?').get('unclaimed@example.org').user_id,id);
+  const incomplete=await (await h.req('/api/auth/me',undefined,{cookie:session})).json();
+  assert.equal(incomplete.authenticated,true);
+  assert.equal(incomplete.profileComplete,false);
+  assert.equal(incomplete.agreementCurrent,false);
+  assert.equal((await h.req('/api/auth/agreements',{accepted:true,termsVersion:'wrong',privacyVersion:'wrong'},{cookie:session})).status,403);
+  assert.equal((await h.req('/api/auth/profile',{firstName:'Actual',lastName:'Owner',dateOfBirth:'1991-05-22'},{cookie:session})).status,200);
+  const versions=JSON.parse(readFileSync('src/generated/policy-versions.json','utf8'));
+  const accepted=await h.req('/api/auth/agreements',{
+   accepted:true,termsVersion:versions.terms.version,privacyVersion:versions.privacy.version
+  },{cookie:session});
+  assert.equal(accepted.status,200);
+  const claimed=h.sqlite.prepare('SELECT id,email_verified_at,first_name,last_name,terms_accepted_at FROM users WHERE id=?').get(id);
+  assert.equal(claimed.id,id);
+  assert.ok(h.sqlite.prepare('SELECT claimed_at FROM user_stubs WHERE id=?').get(id).claimed_at);
+  assert.ok(claimed.email_verified_at);assert.ok(claimed.terms_accepted_at);
+  assert.equal(claimed.first_name,'Actual');
+  const completed=await (await h.req('/api/auth/me',undefined,{cookie:session})).json();
+  assert.equal(completed.profileComplete,true);
+  assert.equal(completed.agreementCurrent,true);
+ }finally{h.close();}
 });

@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>Serve With Lions — API Reference</title>
+  <style>body{margin:0} .skip{position:absolute;left:-9999px} .skip:focus{left:1rem;top:1rem;z-index:99;background:white;padding:1rem}</style>
+</head>
+<body>
+  <a class="skip" href="#api-reference">Skip to API reference</a>
+  <main id="api-reference" aria-label="Serve With Lions API reference"></main>
+  <script type="module">
+    import { createApiReference } from 'https://cdn.jsdelivr.net/npm/@scalar/api-reference@1.73.1/esm.js';
+    createApiReference('#api-reference', {
+      url: '/api/openapi.json',
+      hideClientButton: false
+    });
+  </script>
+</body>
+</html>

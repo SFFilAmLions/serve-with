@@ -90,14 +90,15 @@ test('incomplete verified profile stays on the login flow without policy fabrica
  }finally{await browser.close()}
 });
 
-test('administrator workspace has Events and Users tabs and separate appearance choices',async()=>{
+test('administrator workspace has segmented Events, Users, Usage pills and separate appearance choices',async()=>{
  const {browser,page}=await context(admin);
  try{
   await page.goto(base);
   await page.getByRole('button',{name:'Admin view'}).click();
-  await page.getByText('Administrator',{exact:true}).first().waitFor();
-  await page.getByRole('tab',{name:'Events',exact:true}).waitFor();
-  await page.getByRole('tab',{name:'Users',exact:true}).waitFor();
+  await page.getByText('· Admin',{exact:true}).first().waitFor();
+  await page.getByRole('button',{name:'Events',exact:true}).waitFor();
+  await page.getByRole('button',{name:'Users',exact:true}).waitFor();
+  await page.getByRole('button',{name:'Usage',exact:true}).waitFor();
   await page.getByRole('button',{name:'Appearance'}).click();
   await page.getByRole('menuitem',{name:'Dark'}).click();
   assert.equal(await page.evaluate(()=>localStorage.getItem('servewith-appearance')),'dark');
@@ -177,5 +178,374 @@ test('System appearance responds to OS preference and mobile event lists do not 
   await page.emulateMedia({colorScheme:'dark'});
   await page.waitForFunction(previous=>getComputedStyle(document.body).backgroundColor!==previous,light);
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+ }finally{await browser.close()}
+});
+
+test('existing attendee on full event is not signed up twice',async()=>{
+ const event={...example,spots_available:0,capacity:1};
+ const {browser,page}=await context(admin,[event]);
+ let posts=0;
+ try{
+  await page.route('**/api/events/'+eventId,r=>r.fulfill({json:{event}}));
+  await page.route('**/api/events/'+eventId+'/signups',r=>{if(r.request().method()==='GET')return r.fulfill({json:{signup:{id:'existing'}}});posts++;return r.fulfill({status:500,json:{error:'Unexpected duplicate'}})});
+  await page.route('**/api/events/'+eventId+'/participants',r=>r.fulfill({json:{participants:[]}}));
+  
+  await page.addInitScript(id=>localStorage.setItem('servewith-pending-signup',JSON.stringify({id,expiresAt:Date.now()+60000})),eventId);
+  await page.goto(base+'/events/'+eventId);
+  await page.getByText('You are already signed up for this event.').waitFor();
+  assert.equal(posts,0);
+ }finally{await browser.close()}
+});
+
+test('full event never offers anonymous signup or reveals roster',async()=>{
+ const event={...example,capacity:1,signups_count:1,spots_available:0};
+ const {browser,page}=await context(anonymous,[event]);
+ try{
+  await page.route('**/api/events/'+eventId,r=>r.fulfill({json:{event}}));
+  let rosterCalls=0,signupPosts=0;
+  await page.route('**/api/events/'+eventId+'/participants',r=>{rosterCalls++;return r.fulfill({status:401,json:{error:'Unauthorized'}})});
+  await page.route('**/api/events/'+eventId+'/signups',r=>{if(r.request().method()==='POST')signupPosts++;return r.fulfill({status:401,json:{error:'Unauthorized'}})});
+  await page.goto(base+'/events/'+eventId);
+  await page.getByText('This event is full.').waitFor();
+  assert.equal(await page.getByRole('button',{name:'Sign up',exact:true}).count(),0);
+  assert.equal(await page.getByRole('heading',{name:'Participants'}).count(),0);
+  assert.equal(rosterCalls,0);
+  assert.equal(signupPosts,0);
+ }finally{await browser.close()}
+});
+
+test('administrator usage dashboard preserves unavailable and unknown metrics',async()=>{
+ const {browser,page}=await context(admin);
+ try{
+  await page.route('**/api/admin/usage',r=>r.fulfill({json:{
+   environment:'staging',collectedAt:'2026-10-13T00:00:00Z',
+   providers:[{name:'Cloudflare D1',scope:'staging database',status:'unavailable',used:null,limit:null,remaining:null,resetsAt:null,reason:'No authorized analytics token'}]
+  }}));
+  await page.goto(base+'/admin/usage');
+  await page.getByRole('heading',{name:'Usage & Quotas'}).waitFor();
+  await page.getByRole('heading',{name:'Cloudflare D1'}).waitFor();
+  await page.getByText('Usage: Unknown').waitFor();
+  await page.getByText('Limit: Unknown').waitFor();
+  await page.getByText('Remaining: Unknown').waitFor();
+  assert.equal(await page.getByText(/utilization \(/).count(),0);
+  await page.getByText('No authorized analytics token').waitFor();
+ }finally{await browser.close()}
+});
+
+test('unauthorized administrator usage page does not fetch private provider metrics',async()=>{
+ const {browser,page}=await context(anonymous);
+ let calls=0;
+ try{
+  await page.route('**/api/admin/usage',r=>{calls++;return r.fulfill({status:403,json:{error:'Forbidden'}})});
+  await page.goto(base+'/admin/usage');
+  await page.getByText(/Complete your profile and current agreement to access administrator tools/).waitFor();
+  assert.equal(calls,0);
+ }finally{await browser.close()}
+});
+
+test('non-admin event management deep link redirects without fetching private roster',async()=>{
+ const attendee={...admin,administratorEligible:false,privileged:false,email:'member@example.org',userId:'77777777-7777-4777-8777-777777777777'};
+ const {browser,page}=await context(attendee,[example]);
+ let adminCalls=0;
+ try{
+  await page.route('**/api/events/'+eventId,r=>r.fulfill({json:{event:example}}));
+  await page.route('**/api/events/'+eventId+'/signups',r=>r.fulfill({json:{signup:null}}));
+  await page.route('**/api/admin/events/'+eventId+'/signups',r=>{adminCalls++;return r.fulfill({status:403,json:{error:'Forbidden'}})});
+  await page.goto(base+'/admin/events/'+eventId);
+  await page.getByRole('heading',{name:'Service day'}).waitFor();
+  assert.equal(new URL(page.url()).pathname,'/events/'+eventId);
+  await page.getByText(/don't have access to the administrator event page/).waitFor();
+  assert.equal(adminCalls,0,'public redirect must not request administrator roster');
+ }finally{await browser.close()}
+});
+
+test('expired pending signup intent is discarded without any mutation',async()=>{
+ const event={...example,capacity:2,signups_count:0,spots_available:2};
+ const {browser,page}=await context(admin,[event]);
+ let posts=0;
+ try{
+  await page.route('**/api/events/'+eventId,r=>r.fulfill({json:{event}}));
+  await page.route('**/api/events/'+eventId+'/signups',r=>{
+   if(r.request().method()==='GET')return r.fulfill({json:{signup:null}});
+   posts++;return r.fulfill({status:500,json:{error:'Unexpected signup'}});
+  });
+  await page.addInitScript(id=>localStorage.setItem('servewith-pending-signup',JSON.stringify({id,expiresAt:Date.now()-60000})),eventId);
+  await page.goto(base+'/events/'+eventId);
+  await page.getByRole('heading',{name:'Service day'}).waitFor();
+  await page.waitForFunction(()=>localStorage.getItem('servewith-pending-signup')===null);
+  assert.equal(posts,0,'expired intent must not create a signup');
+ }finally{await browser.close()}
+});
+
+test('valid pending signup continues once after login and clears intent',async()=>{
+ const event={...example,capacity:2,signups_count:0,spots_available:2};
+ const {browser,page}=await context(admin,[event]);
+ let posts=0,signedUp=false;
+ try{
+  await page.route('**/api/events/'+eventId,r=>r.fulfill({json:{event}}));
+  await page.route('**/api/events/'+eventId+'/signups',r=>{
+   if(r.request().method()==='GET')return r.fulfill({json:{signup:signedUp?{id:'completed-signup'}:null}});
+   if(r.request().method()==='POST'){
+    posts++;signedUp=true;
+    return r.fulfill({status:201,json:{signup:{id:'completed-signup'}}});
+   }
+   return r.fulfill({status:405,json:{error:'Method not allowed'}});
+  });
+  await page.route('**/api/events/'+eventId+'/participants',r=>r.fulfill({json:{participants:[{name:'Admin Example'}]}}));
+  await page.addInitScript(id=>{
+   if(!sessionStorage.getItem('continuation-seeded')){
+    localStorage.setItem('servewith-pending-signup',JSON.stringify({id,expiresAt:Date.now()+60000}));
+    sessionStorage.setItem('continuation-seeded','yes');
+   }
+  },eventId);
+  await page.goto(base+'/events/'+eventId);
+  await page.getByText('You have signed up for this event.').waitFor();
+  assert.equal(posts,1);
+  assert.equal(await page.evaluate(()=>localStorage.getItem('servewith-pending-signup')),null);
+  await page.reload();
+  await page.getByRole('heading',{name:'Service day'}).waitFor();
+  await page.getByRole('button',{name:/Withdraw/}).waitFor();
+  assert.equal(posts,1,'refresh must not replay completed signup');
+ }finally{await browser.close()}
+});
+
+test('pending signup for a different event never signs up the current event',async()=>{
+ const event={...example,capacity:2,signups_count:0,spots_available:2};
+ const {browser,page}=await context(admin,[event]);
+ let posts=0;
+ try{
+  await page.route('**/api/events/'+eventId,r=>r.fulfill({json:{event}}));
+  await page.route('**/api/events/'+eventId+'/signups',r=>{
+   if(r.request().method()==='GET')return r.fulfill({json:{signup:null}});
+   posts++;return r.fulfill({status:500,json:{error:'Unexpected cross-event signup'}});
+  });
+  await page.addInitScript(id=>localStorage.setItem('servewith-pending-signup',JSON.stringify({id,expiresAt:Date.now()+60000})),newEventId);
+  await page.goto(base+'/events/'+eventId);
+  await page.getByRole('heading',{name:'Service day'}).waitFor();
+  await page.getByRole('button',{name:'Sign up as Admin'}).waitFor();
+  assert.equal(posts,0,'pending intent for another event must never submit on this event');
+  const intent=await page.evaluate(()=>JSON.parse(localStorage.getItem('servewith-pending-signup')));
+  assert.equal(intent.id,newEventId,'unrelated event page must not replace the intended target');
+ }finally{await browser.close()}
+});
+
+test('pending signup capacity conflict reports failure and is not replayed',async()=>{
+ const event={...example,capacity:1,signups_count:0,spots_available:1};
+ const {browser,page}=await context(admin,[event]);
+ let posts=0;
+ try{
+  await page.route('**/api/events/'+eventId,r=>r.fulfill({json:{event}}));
+  await page.route('**/api/events/'+eventId+'/signups',r=>{
+   if(r.request().method()==='GET')return r.fulfill({json:{signup:null}});
+   posts++;return r.fulfill({status:409,json:{error:'Event is full'}});
+  });
+  await page.addInitScript(id=>{
+   if(!sessionStorage.getItem('seeded-conflict')){
+    localStorage.setItem('servewith-pending-signup',JSON.stringify({id,expiresAt:Date.now()+60000}));
+    sessionStorage.setItem('seeded-conflict','yes');
+   }
+  },eventId);
+  await page.goto(base+'/events/'+eventId);
+  await page.getByRole('alert').getByText('Event is full').waitFor();
+  assert.equal(posts,1);
+  assert.equal(await page.evaluate(()=>localStorage.getItem('servewith-pending-signup')),null);
+  await page.reload();
+  await page.getByRole('heading',{name:'Service day'}).waitFor();
+  assert.equal(posts,1,'failed continuation must not replay on reload');
+ }finally{await browser.close()}
+});
+
+test('started event cancels pending signup before any POST',async()=>{
+ const event={...example,start_at:Date.now()-60000,end_at:Date.now()+600000,spots_available:5,capacity:5};
+ const {browser,page}=await context(admin,[event]);
+ let posts=0;
+ try{
+  await page.route('**/api/events/'+eventId,r=>r.fulfill({json:{event}}));
+  await page.route('**/api/events/'+eventId+'/signups',r=>{
+   if(r.request().method()==='GET')return r.fulfill({json:{signup:null}});
+   posts++;return r.fulfill({status:500,json:{error:'Unexpected signup'}});
+  });
+  await page.addInitScript(id=>localStorage.setItem('servewith-pending-signup',JSON.stringify({id,expiresAt:Date.now()+60000})),eventId);
+  await page.goto(base+'/events/'+eventId);
+  await page.getByText('Signups closed when the event started.').first().waitFor();
+  await page.waitForFunction(()=>localStorage.getItem('servewith-pending-signup')===null);
+  assert.equal(posts,0);
+  assert.equal(await page.getByRole('button',{name:/Sign up/}).count(),0);
+ }finally{await browser.close()}
+});
+
+test('signup action is keyboard operable and success has an accessible status',async()=>{
+ const event={...example,capacity:3,spots_available:3,signups_count:0};
+ const {browser,page}=await context(admin,[event]);
+ let active=false,posts=0;
+ try{
+  await page.route('**/api/events/'+eventId,r=>r.fulfill({json:{event}}));
+  await page.route('**/api/events/'+eventId+'/signups',r=>{
+   if(r.request().method()==='GET')return r.fulfill({json:{signup:active?{id:'signup-keyboard'}:null}});
+   posts++;active=true;return r.fulfill({status:201,json:{signup:{id:'signup-keyboard'}}});
+  });
+  await page.route('**/api/events/'+eventId+'/participants',r=>r.fulfill({json:{participants:[{name:'Admin Example'}]}}));
+  await page.goto(base+'/events/'+eventId);
+  const signup=page.getByRole('button',{name:'Sign up as Admin'});
+  await signup.focus();
+  await page.keyboard.press('Enter');
+  await page.getByRole('status').getByText('You have signed up for this event.').waitFor();
+  await page.getByRole('button',{name:'Withdraw'}).waitFor();
+  assert.equal(posts,1);
+ }finally{await browser.close()}
+});
+
+test('malformed pending signup intent is cleared without a mutation',async()=>{
+ const event={...example,capacity:2,signups_count:0,spots_available:2};
+ const {browser,page}=await context(admin,[event]);
+ let posts=0;
+ try{
+  await page.route('**/api/events/'+eventId,r=>r.fulfill({json:{event}}));
+  await page.route('**/api/events/'+eventId+'/signups',r=>{
+   if(r.request().method()==='GET')return r.fulfill({json:{signup:null}});
+   posts++;return r.fulfill({status:500,json:{error:'Unexpected POST'}});
+  });
+  await page.addInitScript(()=>localStorage.setItem('servewith-pending-signup','{not valid JSON'));
+  await page.goto(base+'/events/'+eventId);
+  await page.getByRole('button',{name:'Sign up as Admin'}).waitFor();
+  await page.waitForFunction(()=>localStorage.getItem('servewith-pending-signup')===null);
+  assert.equal(posts,0);
+ }finally{await browser.close()}
+});
+
+test('withdrawal is keyboard-operable and shows an accessible confirmation',async()=>{
+ const event={...example,capacity:2,signups_count:1,spots_available:1};
+ const {browser,page}=await context(admin,[event]);
+ let enrolled=true,deletes=0;
+ try{
+  await page.route('**/api/events/'+eventId,r=>r.fulfill({json:{event}}));
+  await page.route('**/api/events/'+eventId+'/signups',r=>{
+   if(r.request().method()==='GET')return r.fulfill({json:{signup:enrolled?{id:'existing'}:null}});
+   if(r.request().method()==='DELETE'){deletes++;enrolled=false;return r.fulfill({json:{withdrawn:true}})}
+   return r.fulfill({status:405,json:{error:'Unexpected method'}});
+  });
+  await page.route('**/api/events/'+eventId+'/participants',r=>r.fulfill({json:{participants:[{name:'Admin Example'}]}}));
+  await page.goto(base+'/events/'+eventId);
+  const withdraw=page.getByRole('button',{name:'Withdraw'});
+  await withdraw.focus();
+  await page.keyboard.press('Enter');
+  await page.getByRole('status').getByText('Your signup has been withdrawn.').waitFor();
+  await page.getByRole('button',{name:'Sign up as Admin'}).waitFor();
+  assert.equal(deletes,1);
+  assert.equal(await page.getByRole('heading',{name:'Participants'}).count(),0,'roster disappears after withdrawal');
+ }finally{await browser.close()}
+});
+
+test('usage provider failure is an accessible error and refresh remains available',async()=>{
+ const {browser,page}=await context(admin);
+ let calls=0;
+ try{
+  await page.route('**/api/admin/usage',r=>{
+   calls++;
+   return r.fulfill({status:503,json:{error:'Metrics provider unavailable'}});
+  });
+  await page.goto(base+'/admin/usage');
+  await page.getByRole('alert').getByText('Metrics provider unavailable').waitFor();
+  await page.getByRole('button',{name:'Refresh status'}).click();
+  await page.waitForFunction(()=>document.body.innerText.includes('Metrics provider unavailable'));
+  assert.equal(calls,2,'refresh retries when an upstream metrics call fails');
+  assert.equal(await page.getByText('Current usage').count(),0,'failure must not render a fabricated reading');
+ }finally{await browser.close()}
+});
+
+test('usage retries successfully after transient provider failure',async()=>{
+ const {browser,page}=await context(admin);
+ let calls=0;
+ try{
+  await page.route('**/api/admin/usage',r=>{
+   calls++;
+   if(calls===1)return r.fulfill({status:503,json:{error:'Temporary metrics outage'}});
+   return r.fulfill({json:{environment:'staging',collectedAt:'2026-10-14T00:00:00Z',providers:[{name:'Cloudflare D1',scope:'staging database',status:'unavailable',used:null,limit:null,remaining:null,resetsAt:null,reason:'No authorized metrics'}]}});
+  });
+  await page.goto(base+'/admin/usage');
+  await page.getByRole('alert').getByText('Temporary metrics outage').waitFor();
+  await page.getByRole('button',{name:'Refresh status'}).click();
+  await page.getByRole('heading',{name:'Cloudflare D1'}).waitFor();
+  await page.getByText('Usage: Unknown').waitFor();
+  assert.equal(await page.getByRole('alert').count(),0);
+  assert.equal(calls,2);
+ }finally{await browser.close()}
+});
+
+test('withdrawal conflict leaves participation unchanged and gives an accessible error',async()=>{
+ const event={...example,capacity:2,signups_count:1,spots_available:1};
+ const {browser,page}=await context(admin,[event]);
+ let deletes=0;
+ try{
+  await page.route('**/api/events/'+eventId,r=>r.fulfill({json:{event}}));
+  await page.route('**/api/events/'+eventId+'/signups',r=>{
+   if(r.request().method()==='GET')return r.fulfill({json:{signup:{id:'existing'}}});
+   if(r.request().method()==='DELETE'){deletes++;return r.fulfill({status:409,json:{error:'Withdrawal cutoff has passed'}})}
+   return r.fulfill({status:405,json:{error:'Unexpected method'}});
+  });
+  await page.route('**/api/events/'+eventId+'/participants',r=>r.fulfill({json:{participants:[{name:'Admin Example'}]}}));
+  await page.goto(base+'/events/'+eventId);
+  await page.getByRole('button',{name:'Withdraw'}).click();
+  await page.getByRole('alert').getByText('Withdrawal cutoff has passed').waitFor();
+  assert.equal(await page.getByRole('button',{name:'Withdraw'}).count(),1);
+  assert.equal(await page.getByRole('heading',{name:'Participants'}).count(),1);
+  assert.equal(deletes,1);
+ }finally{await browser.close()}
+});
+
+test('roster is not fetched or displayed after session expires on navigation',async()=>{
+ const event={...example,capacity:2,signups_count:1,spots_available:1};
+ let me=admin,rosterCalls=0;
+ const {browser,page}=await context(()=>me,[event]);
+ try{
+  await page.route('**/api/events/'+eventId,r=>r.fulfill({json:{event}}));
+  await page.route('**/api/events/'+eventId+'/signups',r=>r.fulfill({json:{signup:me.authenticated?{id:'existing'}:null}}));
+  await page.route('**/api/events/'+eventId+'/participants',r=>{rosterCalls++;return r.fulfill({json:{participants:[{name:'Private Attendee'}]}})});
+  await page.goto(base+'/events/'+eventId);
+  await page.getByText('Private Attendee').waitFor();
+  assert.equal(rosterCalls,1);
+  me=anonymous;
+  await page.reload();
+  await page.getByRole('heading',{name:'Service day'}).waitFor();
+  await page.getByRole('button',{name:'Sign up',exact:true}).waitFor();
+  assert.equal(await page.getByText('Private Attendee').count(),0,'private roster must disappear when session expires');
+  assert.equal(rosterCalls,1,'anonymous revisit must not fetch the roster');
+ }finally{await browser.close()}
+});
+
+test('signup denial keeps visitor unenrolled and communicates failure accessibly',async()=>{
+ const event={...example,capacity:3,signups_count:0,spots_available:3};
+ const {browser,page}=await context(admin,[event]);
+ let posts=0,rosters=0;
+ try{
+  await page.route('**/api/events/'+eventId,r=>r.fulfill({json:{event}}));
+  await page.route('**/api/events/'+eventId+'/signups',r=>{
+   if(r.request().method()==='GET')return r.fulfill({json:{signup:null}});
+   posts++;return r.fulfill({status:403,json:{error:'Current agreement required'}});
+  });
+  await page.route('**/api/events/'+eventId+'/participants',r=>{rosters++;return r.fulfill({json:{participants:[{name:'Private Person'}]}})});
+  await page.goto(base+'/events/'+eventId);
+  await page.getByRole('button',{name:'Sign up as Admin'}).click();
+  await page.getByRole('alert').getByText('Current agreement required').waitFor();
+  assert.equal(await page.getByRole('button',{name:'Sign up as Admin'}).count(),1);
+  assert.equal(await page.getByRole('heading',{name:'Participants'}).count(),0);
+  assert.equal(posts,1);
+  assert.equal(rosters,0,'denied signup must not fetch participant identities');
+ }finally{await browser.close()}
+});
+
+test('existing enrollment displays names without exposing profile data in roster DOM',async()=>{
+ const event={...example,capacity:3,signups_count:1,spots_available:2};
+ const {browser,page}=await context(admin,[event]);
+ try{
+  await page.route('**/api/events/'+eventId,r=>r.fulfill({json:{event}}));
+  await page.route('**/api/events/'+eventId+'/signups',r=>r.fulfill({json:{signup:{id:'already-enrolled'}}}));
+  await page.route('**/api/events/'+eventId+'/participants',r=>r.fulfill({json:{participants:[{name:'Example Volunteer'}]}}));
+  await page.goto(base+'/events/'+eventId);
+  await page.getByText('Example Volunteer').waitFor();
+  const section=page.getByRole('heading',{name:'Participants'}).locator('..');
+  assert.ok((await section.innerText()).includes('Example Volunteer'));
+  assert.equal((await section.innerText()).includes('admin@example.org'),false);
+  assert.equal(await page.getByRole('button',{name:'Withdraw'}).count(),1);
  }finally{await browser.close()}
 });

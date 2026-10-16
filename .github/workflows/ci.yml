@@ -21,6 +21,8 @@ jobs:
           node-version: '22'
       - run: npm install
       - run: npm test
+      - name: OpenAPI contract compatibility against main
+        run: node scripts/check-openapi-compat.mjs
       - run: npm run build
       - run: npx playwright install --with-deps chromium
       - run: npm run test:browser

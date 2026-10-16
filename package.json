@@ -5,15 +5,17 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "npm run generate:admins && npm run generate:policies && tsc --noEmit && vite build",
-    "pretest": "npm run generate:policies",
-    "predev": "npm run generate:policies",
+    "build": "npm run generate:admins && npm run generate:policies && npm run generate:openapi && tsc --noEmit && vite build",
+    "pretest": "npm run generate:policies && npm run generate:openapi",
+    "predev": "npm run generate:policies && npm run generate:openapi",
     "generate:policies": "node scripts/generate-policy-versions.mjs",
     "preview": "vite preview",
     "validate:admins": "node scripts/validate-admins.mjs",
     "generate:admins": "node scripts/generate-admins.mjs",
     "test": "node --test tests/*.test.mjs",
-    "test:browser": "node --test tests/browser/*.test.mjs"
+    "test:browser": "node --test tests/browser/*.test.mjs",
+    "generate:openapi": "node scripts/validate-openapi.mjs && node scripts/generate-openapi-operations.mjs && node scripts/generate-openapi-client.mjs && node scripts/generate-openapi-validators.mjs && node scripts/generate-openapi-assets.mjs",
+    "api:generate": "npm run generate:openapi"
   },
   "dependencies": {
     "@js-temporal/polyfill": "0.5.1",

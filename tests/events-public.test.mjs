@@ -3,6 +3,14 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import ts from 'typescript';
+import YAML from 'yaml';
+
+const opSource = readFileSync('src/generated/openapi-operations.ts','utf8');
+const opJS = ts.transpileModule(opSource,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText;
+globalThis.__testOpenapiRegistry = await import('data:text/javascript;base64,'+Buffer.from(opJS).toString('base64'));
+const validationTS=readFileSync('src/generated/openapi-validators.ts','utf8');
+const validationJS=ts.transpileModule(validationTS,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText;
+globalThis.__testOpenapiValidators=await import('data:text/javascript;base64,'+Buffer.from(validationJS).toString('base64'));
 
 globalThis.__testTemporal = (await import('@js-temporal/polyfill')).Temporal;
 globalThis.__testEligibility = (await import('data:text/javascript;base64,' + Buffer.from(
@@ -12,6 +20,8 @@ globalThis.__testEligibility = (await import('data:text/javascript;base64,' + Bu
 
 globalThis.__testPolicyMetadata = JSON.parse(readFileSync('src/generated/policy-versions.json','utf8'));
 const source = readFileSync('src/worker.ts','utf8')
+  .replace("import { operations, matchOperation, dispatchOperation, type WorkerHandlers } from './generated/openapi-operations';", "const {operations,matchOperation,dispatchOperation}=globalThis.__testOpenapiRegistry;")
+  .replace("import { validateOperationBody } from './generated/openapi-validators';", "const {validateOperationBody}=globalThis.__testOpenapiValidators;")
   .replace("import policyMetadata from './generated/policy-versions.json';", "const policyMetadata = globalThis.__testPolicyMetadata;")
   .replace("import { Temporal } from '@js-temporal/polyfill';", "const Temporal = globalThis.__testTemporal;")
   .replace("import { isStagingRegistrationEligible } from './registration-eligibility';", "const isStagingRegistrationEligible = globalThis.__testEligibility;")
@@ -22,8 +32,11 @@ const worker = (await import('data:text/javascript;base64,' + Buffer.from(compil
 function harness() {
   const sqlite = new DatabaseSync(':memory:');
   sqlite.exec(readFileSync('migrations/0001_auth.sql','utf8'));
+  sqlite.exec(readFileSync('migrations/0002_auth_rate_limits.sql','utf8'));
   sqlite.exec(readFileSync('migrations/0003_events.sql','utf8'));
   sqlite.exec(readFileSync('migrations/0004_users_and_agreements.sql','utf8'));
+  sqlite.exec(readFileSync('migrations/0005_event_signups.sql','utf8'));
+  sqlite.exec('BEGIN;'+readFileSync('migrations/0006_unclaimed_users.sql','utf8')+'COMMIT;');
   const versionTerms=JSON.parse(readFileSync('src/generated/policy-versions.json','utf8')).terms.version, versionPrivacy=JSON.parse(readFileSync('src/generated/policy-versions.json','utf8')).privacy.version;
   // Event regressions retain an already-completed authorized administrator session.
   sqlite.prepare('INSERT INTO users(id,email,first_name,last_name,date_of_birth,email_verified_at,created_at,updated_at,terms_accepted_at,accepted_terms_version,accepted_privacy_version) VALUES(?,?,?,?,?,?,?,?,?,?,?)')
@@ -34,12 +47,16 @@ function harness() {
       first: async () => statement.get(...args) || null,
       run: async () => ({ meta: { changes: Number(statement.run(...args).changes) } })
     }; }
-  }; } };
-  const req = (path, method='GET', body, cookie) => worker.fetch(new Request('https://servewith-beta.sffilamlions.org' + path,{
+  }; }, batch:async(statements)=>{
+    sqlite.exec('BEGIN');
+    try{for(const stmt of statements)await stmt.run();sqlite.exec('COMMIT');}
+    catch(e){sqlite.exec('ROLLBACK');throw e;}
+  } };
+  const req = (path, method='GET', body, cookie, overrides={}) => worker.fetch(new Request('https://servewith-beta.sffilamlions.org' + path,{
     method, headers:{ origin:'https://servewith-beta.sffilamlions.org', 'content-type':'application/json', ...(cookie ? {cookie}:{}) },
     ...(body ? {body:JSON.stringify(body)}:{})
   }),{
-    AUTH_DB:adapter, AUTH_PEPPER:'test', REQUIRED_TERMS_VERSION:versionTerms, REQUIRED_PRIVACY_VERSION:versionPrivacy, ASSETS:{fetch:async()=>new Response('asset')}
+    AUTH_DB:adapter, AUTH_PEPPER:'test', REQUIRED_TERMS_VERSION:versionTerms, REQUIRED_PRIVACY_VERSION:versionPrivacy, ASSETS:{fetch:async()=>new Response('asset')},...overrides
   });
   const insert = (id,start,end,deleted=null) => sqlite.prepare(
     'INSERT INTO events (id,title,location,timezone,start_at,end_at,created_at,updated_at,deleted_at) VALUES (?,?,?,?,?,?,?,?,?)'
@@ -72,7 +89,7 @@ test('public events include in-progress, hide deleted, sort deterministically an
     assert.deepEqual(upcoming.events.map(e=>e.id),['current','future-a','future-b']);
     assert.deepEqual(past.events.map(e=>e.id),['boundary','past']);
     assert.equal(upcoming.events[0].version,1);
-    assert.deepEqual(Object.keys(upcoming.events[0]).sort(),['end_at','id','location','start_at','timezone','title','version']);
+    assert.deepEqual(Object.keys(upcoming.events[0]).sort(),['capacity','end_at','id','location','signups_count','spots_available','start_at','timezone','title','version']);
   }finally{h.sqlite.close();}
 });
 
@@ -222,4 +239,679 @@ test('Temporal rejects gaps and ambiguous overlaps in distinct time zones',async
   const summer=Temporal.PlainDateTime.from('2026-07-04T09:00').toZonedDateTime(zone,{disambiguation:'reject'});
   assert.equal(summer.timeZoneId,zone);
  }
+});
+
+test('OpenAPI-generated route table reaches real Worker event handlers with auth and origin parity', async () => {
+  const {mkdtempSync,rmSync,readFileSync:read} = await import('node:fs');
+  const {tmpdir} = await import('node:os');
+  const {join} = await import('node:path');
+  const {spawnSync} = await import('node:child_process');
+  const folder=mkdtempSync(join(tmpdir(),'serve-with-real-worker-'));
+  let routes;
+  try {
+    const output=join(folder,'server-contract.ts');
+    const generated=spawnSync(process.execPath,['scripts/generate-server-contract.mjs','openapi/openapi.yaml',output],{encoding:'utf8'});
+    assert.equal(generated.status,0,generated.stderr||generated.stdout);
+    const js=ts.transpileModule(read(output,'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText;
+    routes=(await import('data:text/javascript;base64,'+Buffer.from(js).toString('base64'))).operationRoutes;
+  } finally {rmSync(folder,{recursive:true,force:true});}
+  const dispatch=(request,env)=>{
+    const url=new URL(request.url);
+    const matched=routes.some(route=>route.method===request.method &&
+      new RegExp('^'+route.path.replace(/\{[^}]+\}/g,'[^/]+')+'$').test(url.pathname));
+    return matched ? worker.fetch(request,env) : new Response(null,{status:404});
+  };
+  const h=harness();
+  try {
+    const origin='https://servewith-beta.sffilamlions.org';
+    const eventUrl=origin+'/api/events';
+    const publicResponse=await dispatch(new Request(eventUrl),{AUTH_DB:h.adapter});
+    assert.equal(publicResponse.status,200);
+    assert.deepEqual((await publicResponse.json()).events,[]);
+    const value={title:'Generated contract integration',location:'Park',timezone:'America/Los_Angeles',start:'2026-11-14T09:00',end:'2026-11-14T12:00'};
+    const req=(headers)=>new Request(origin+'/api/admin/events',{method:'POST',headers:{'content-type':'application/json',...headers},body:JSON.stringify(value)});
+    const env={AUTH_DB:h.adapter,AUTH_PEPPER:'test',ASSETS:{fetch:async()=>new Response('asset')}};
+    assert.equal((await dispatch(req({origin}),env)).status,401);
+    const session='f'.repeat(64),now=Date.now();
+    const digest=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode('test:'+session))),b=>b.toString(16).padStart(2,'0')).join('');
+    h.sqlite.prepare('INSERT INTO sessions(token_hash,email,expires_at,created_at) VALUES (?,?,?,?)').run(digest,'lionaugust@icloud.com',now+600000,now);
+    const cookie='__Host-sw_session='+session;
+    assert.equal((await dispatch(req({origin:'https://attacker.example',cookie}),env)).status,400);
+    assert.equal((await dispatch(req({origin,cookie,'sec-fetch-site':'cross-site'}),env)).status,400);
+    const created=await dispatch(req({origin,cookie}),env);
+    assert.equal(created.status,201);
+    const event=(await created.json()).event;
+    assert.equal(event.title,value.title);
+    const detail=await dispatch(new Request(origin+'/api/events/'+event.id),env);
+    assert.equal(detail.status,200);
+    assert.equal((await detail.json()).event.id,event.id);
+  } finally {h.sqlite.close();}
+});
+
+test('compatibility normalizer forwards legacy event-create bodies to real Worker without changing authorization', async () => {
+  const {normalizeLegacyEventCreate}=await import('../scripts/normalize-openapi-spike.mjs');
+  const h=harness();
+  try {
+    const origin='https://servewith-beta.sffilamlions.org',now=Date.now(),session='7'.repeat(64);
+    const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode('test:'+session))),b=>b.toString(16).padStart(2,'0')).join('');
+    h.sqlite.prepare('INSERT INTO sessions(token_hash,email,expires_at,created_at) VALUES (?,?,?,?)')
+      .run(hash,'lionaugust@icloud.com',now+600000,now);
+    const value={title:'  Cleanup  ',location:' Park ',timezone:'America/Los_Angeles',start:'2026-11-14T09:00',end:'2026-11-14T12:00',unexpected:'ignored'};
+    const original=structuredClone(value);
+    const req=(body,headers={})=>new Request(origin+'/api/admin/events',{method:'POST',
+      headers:{'content-type':'application/json',origin,cookie:'__Host-sw_session='+session,...headers},
+      body:JSON.stringify(body)});
+    const env={AUTH_DB:h.adapter,AUTH_PEPPER:'test',ASSETS:{fetch:async()=>new Response('asset')}};
+    const normalized=normalizeLegacyEventCreate(value);
+    assert.deepEqual(value,original,'normalizer does not mutate browser input');
+    assert.deepEqual(Object.keys(normalized).sort(),['end','location','start','timezone','title']);
+    const response=await worker.fetch(req(normalized),env);
+    assert.equal(response.status,201);
+    const event=(await response.json()).event;
+    assert.equal(event.title,'Cleanup');
+    assert.equal(event.location,'Park');
+    assert.equal((await worker.fetch(req(normalized,{origin:'https://attacker.example'}),env)).status,400);
+    assert.equal((await worker.fetch(req(normalized,{'sec-fetch-site':'cross-site'}),env)).status,400);
+    assert.equal((await worker.fetch(req({...normalized,title:'  '}),env)).status,422);
+    assert.equal(h.sqlite.prepare('SELECT COUNT(*) n FROM events').get().n,1);
+  } finally {h.sqlite.close();}
+});
+
+test('generated OpenAPI dispatcher delegates to actual Worker without bypassing CSRF or admin checks', async () => {
+  const {spawnSync}=await import('node:child_process');
+  const generated=spawnSync(process.execPath,['scripts/generate-openapi-operations.mjs'],{encoding:'utf8'});
+  assert.equal(generated.status,0,generated.stderr||generated.stdout);
+  const source=readFileSync('src/generated/openapi-operations.ts','utf8');
+  const js=ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}}).outputText;
+  const {operations,dispatchOperation}=await import('data:text/javascript;base64,'+Buffer.from(js).toString('base64'));
+  const h=harness();
+  try {
+    const origin='https://servewith-beta.sffilamlions.org';
+    const env={AUTH_DB:h.adapter,AUTH_PEPPER:'test',ASSETS:{fetch:async()=>new Response('asset')}};
+    const handlers=Object.fromEntries(operations.map(op=>[op.id,(request)=>worker.fetch(request,env)]));
+    const send=(headers)=>dispatchOperation(new Request(origin+'/api/admin/events',{
+      method:'POST',headers:{'content-type':'application/json',...headers},
+      body:JSON.stringify({title:'Service',location:'Park',timezone:'America/Los_Angeles',start:'2026-11-14T09:00',end:'2026-11-14T12:00'})
+    }),handlers);
+    assert.equal((await dispatchOperation(new Request(origin+'/api/events'),handlers)).status,200);
+    assert.equal((await send({origin})).status,401);
+    const session='8'.repeat(64),now=Date.now();
+    const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode('test:'+session))),b=>b.toString(16).padStart(2,'0')).join('');
+    h.sqlite.prepare('INSERT INTO sessions(token_hash,email,expires_at,created_at) VALUES (?,?,?,?)')
+      .run(hash,'lionaugust@icloud.com',now+600000,now);
+    const cookie='__Host-sw_session='+session;
+    assert.equal((await send({origin:'https://attacker.example',cookie})).status,400);
+    assert.equal((await send({origin,cookie,'sec-fetch-site':'cross-site'})).status,400);
+    const created=await send({origin,cookie});
+    assert.equal(created.status,201);
+    assert.equal((await created.json()).event.title,'Service');
+    assert.equal(h.sqlite.prepare('SELECT COUNT(*) n FROM events').get().n,1);
+  } finally {h.sqlite.close();}
+});
+
+test('self signup API enforces identity, capacity, withdrawal history and origin using real Worker',async()=>{
+ const h=harness();
+ try {
+  const eventId='123e4567-e89b-42d3-a456-426614174987',now=Date.now();
+  h.insert(eventId,now+300000,now+600000);
+  h.sqlite.prepare('UPDATE events SET capacity=1 WHERE id=?').run(eventId);
+  const root='/api/events/'+eventId+'/signups';
+  assert.equal((await h.req(root,'POST',{})).status,401);
+  const session='9'.repeat(64);
+  const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode('test:'+session))),b=>b.toString(16).padStart(2,'0')).join('');
+  h.sqlite.prepare('INSERT INTO sessions(token_hash,email,expires_at,created_at) VALUES(?,?,?,?)')
+   .run(hash,'lionaugust@icloud.com',now+600000,now);
+  const cookie='__Host-sw_session='+session;
+  assert.equal((await h.req(root,'POST',{},cookie)).status,201);
+  const rosterUrl='/api/events/'+eventId+'/participants';
+  assert.equal((await h.req(rosterUrl)).status,401);
+  const roster=(await (await h.req(rosterUrl,'GET',undefined,cookie)).json()).participants;
+  assert.deepEqual(roster.map(x=>({...x})),[{name:'Admin Example'}]);
+  assert.equal(JSON.stringify(roster).includes('@'),false);
+  const publicEvent=(await (await h.req('/api/events/'+eventId)).json()).event;
+  assert.equal(publicEvent.signups_count,1);
+  assert.equal(publicEvent.spots_available,0);
+  assert.equal(publicEvent.capacity,1);
+  assert.equal(JSON.stringify(publicEvent).includes('lionaugust@icloud.com'),false);
+  assert.equal((await h.req(root,'POST',{},cookie)).status,409);
+  const own=await (await h.req(root,'GET',undefined,cookie)).json();
+  assert.ok(own.signup.id);
+  const history=await (await h.req('/api/me/signups','GET',undefined,cookie)).json();
+  assert.equal(history.signups.length,1);
+  assert.equal(history.signups[0].event_id,eventId);
+  assert.equal((await h.req('/api/me/signups','POST',{},cookie)).status,405,'personal history is strictly read-only');
+  assert.equal((await h.req(rosterUrl,'POST',{},cookie)).status,405,'participant roster is strictly read-only');
+  assert.equal((await h.req(rosterUrl,'GET',undefined,cookie)).status,200,'active participant retains private roster access');
+  assert.equal((await h.req(root,'DELETE',{},cookie)).status,200);
+  assert.equal((await h.req(rosterUrl,'GET',undefined,cookie)).status,403);
+  const withdrawnHistory=await (await h.req('/api/me/signups','GET',undefined,cookie)).json();
+  assert.equal(withdrawnHistory.signups.length,1,'withdrawal preserves the historical signup');
+  assert.ok(withdrawnHistory.signups[0].deleted_at!==null,'history labels withdrawn record explicitly');
+  assert.equal((await (await h.req(root,'GET',undefined,cookie)).json()).signup,null);
+  assert.equal((await h.req(root,'POST',{},cookie)).status,201);
+  assert.equal(h.sqlite.prepare('SELECT COUNT(*) n FROM event_signups WHERE event_id=?').get(eventId).n,2);
+  assert.equal(h.sqlite.prepare('SELECT COUNT(*) n FROM event_signups WHERE event_id=? AND deleted_at IS NULL').get(eventId).n,1);
+  const afterRejoin=await (await h.req('/api/me/signups','GET',undefined,cookie)).json();
+  assert.equal(afterRejoin.signups.length,2,'withdrawn history is preserved after rejoining');
+  assert.equal(afterRejoin.signups.filter(s=>s.deleted_at===null).length,1,'exactly one active signup exists');
+  assert.equal(afterRejoin.signups.filter(s=>s.deleted_at!==null).length,1,'one withdrawn historical record is retained');
+  h.sqlite.prepare('UPDATE events SET start_at=? WHERE id=?').run(Date.now()-1000,eventId);
+  assert.equal((await h.req(root,'DELETE',{},cookie)).status,409);
+  assert.equal((await h.req(root,'POST',{},cookie)).status,409,'event-start cutoff also prevents new attendee signup');
+  assert.equal(h.sqlite.prepare('SELECT COUNT(*) n FROM event_signups WHERE event_id=? AND deleted_at IS NULL').get(eventId).n,1);
+ }finally{h.sqlite.close();}
+});
+
+test('admin delegated signup allows explicit attendee selection and preserves history',async()=>{
+ const h=harness();
+ try{
+  const eventId='123e4567-e89b-42d3-a456-426614174989', now=Date.now();
+  h.insert(eventId,now+300000,now+600000);
+  const targetId='22222222-2222-4222-8222-222222222222';
+  h.sqlite.prepare('INSERT INTO participation_identities(id) VALUES(?)').run(targetId);
+  h.sqlite.prepare('INSERT INTO user_stubs(id,email,first_name,last_name,created_at,updated_at) VALUES(?,?,?,?,?,?)')
+   .run(targetId,'attendee@example.org','Alex','Volunteer',1,1);
+  const path='/api/admin/events/'+eventId+'/signups';
+  const spec=YAML.parse(readFileSync('openapi/openapi.yaml','utf8'));
+  const contract=spec.paths['/api/admin/events/{id}/signups'];
+  const checkResponse=async(response,method)=>{
+   const status=String(response.status),schema=contract[method].responses[status]?.content?.['application/json']?.schema;
+   assert.ok(schema,method.toUpperCase()+' admin signup '+status+' must have a documented JSON response');
+   assertDocumentedJsonShape(await response.json(),schema,spec,method+' '+status);
+   return response.status;
+  };
+  assert.equal(await checkResponse(await h.req(path,'GET'),'get'),401);
+  const token='a'.repeat(64);
+  const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode('test:'+token))),b=>b.toString(16).padStart(2,'0')).join('');
+  h.sqlite.prepare('INSERT INTO sessions(token_hash,email,expires_at,created_at) VALUES(?,?,?,?)')
+    .run(hash,'lionaugust@icloud.com',now+600000,now);
+  const cookie='__Host-sw_session='+token;
+  assert.equal(await checkResponse(await h.req(path,'POST',{userId:targetId},cookie),'post'),201);
+  assert.equal(await checkResponse(await h.req(path,'POST',{userId:targetId},cookie),'post'),409);
+  assert.equal((await h.req(path,'POST',{userId:'not-a-uuid'},cookie)).status,422,'reject malformed delegated attendee IDs');
+  assert.equal((await h.req(path,'POST',{userId:'44444444-4444-4444-8444-444444444444'},cookie)).status,404,'reject absent delegated attendee IDs');
+  const roster=await (await h.req(path,'GET',undefined,cookie)).json();
+  assert.equal(roster.signups.length,1);
+  assert.equal(roster.signups[0].email,'attendee@example.org');
+  assert.equal(await checkResponse(await h.req(path,'DELETE',{userId:targetId},cookie),'delete'),200);
+  assert.equal((await h.req(path,'POST',{userId:targetId},cookie)).status,201);
+  assert.equal(h.sqlite.prepare('SELECT COUNT(*) n FROM event_signups WHERE event_id=?').get(eventId).n,2);
+  const completeRoster=await (await h.req(path,'GET',undefined,cookie)).json();
+  assert.equal(completeRoster.signups.length,2,'admin can inspect both historical records');
+  assert.equal(completeRoster.signups.filter(row=>row.deleted_at===null).length,1);
+  assert.equal(completeRoster.signups.filter(row=>row.deleted_at!==null).length,1);
+  assert.ok(completeRoster.signups.every(row=>row.user_id===targetId),'history retains selected attendee identity');
+  h.sqlite.prepare('UPDATE events SET start_at=? WHERE id=?').run(Date.now()-1,eventId);
+  assert.equal((await h.req(path,'DELETE',{userId:targetId},cookie)).status,409);
+  assert.equal((await h.req(path,'POST',{userId:targetId},cookie)).status,409,'administrator cannot override event start cutoff');
+  assert.equal(h.sqlite.prepare('SELECT COUNT(*) n FROM event_signups WHERE event_id=?').get(eventId).n,2,'denied delegation does not create signup history');
+ }finally{h.sqlite.close();}
+});
+
+test('usage endpoint hides provider credentials and never fabricates limits',async()=>{
+ const h=harness();try{
+  assert.equal((await h.req('/api/admin/usage')).status,401);
+  const now=Date.now(),token='b'.repeat(64);
+  const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode('test:'+token))),b=>b.toString(16).padStart(2,'0')).join('');
+  h.sqlite.prepare('INSERT INTO sessions(token_hash,email,expires_at,created_at) VALUES(?,?,?,?)')
+   .run(hash,'lionaugust@icloud.com',now+600000,now);
+  const response=await h.req('/api/admin/usage','GET',undefined,'__Host-sw_session='+token);
+  assert.equal(response.status,200);
+  const data=await response.json();
+  assert.equal(data.providers.length,4);
+  assert.ok(data.providers.every(p=>p.status==='unavailable'&&p.used===null&&p.limit===null&&p.remaining===null));
+  assert.equal(JSON.stringify(data).includes('fake'),false);
+ }finally{h.sqlite.close();}
+});
+
+test('admin creates email-optional unverified user without consent or login',async()=>{
+ const h=harness();try{
+  const path='/api/admin/users';
+  assert.equal((await h.req(path,'POST',{firstName:'Alex',lastName:'Volunteer'})).status,401);
+  const now=Date.now(),token='c'.repeat(64);
+  const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode('test:'+token))),b=>b.toString(16).padStart(2,'0')).join('');
+  h.sqlite.prepare('INSERT INTO sessions(token_hash,email,expires_at,created_at) VALUES(?,?,?,?)')
+   .run(hash,'lionaugust@icloud.com',now+600000,now);
+  const cookie='__Host-sw_session='+token;
+  assert.equal((await h.req(path,'POST',{firstName:'',lastName:'Volunteer'},cookie)).status,422);
+  const normalized=await h.req(path,'POST',{firstName:'  Casey  ',lastName:'  Helper ',ignoredLegacyField:'safe'},cookie);
+  assert.equal(normalized.status,201,'normalized legacy stub input must remain accepted');
+  assert.equal((await normalized.json()).user.firstName,'Casey');
+  assert.equal((await h.req(path,'POST',{firstName:'A'.repeat(101),lastName:'Volunteer'},cookie)).status,422,'schema rejects names exceeding documented max length');
+  const response=await h.req(path,'POST',{firstName:'Alex',lastName:'Volunteer'},cookie);
+  assert.equal(response.status,201);
+  const created=(await response.json()).user;
+  assert.equal(created.email,null);assert.equal(created.isStub,true);
+  const saved=h.sqlite.prepare('SELECT email,claimed_at FROM user_stubs WHERE id=?').get(created.id);
+  assert.equal(saved.email,null);assert.equal(saved.claimed_at,null);
+  assert.equal(h.sqlite.prepare('SELECT COUNT(*) n FROM users WHERE id=?').get(created.id).n,0);
+  assert.equal(h.sqlite.prepare('SELECT COUNT(*) n FROM agreement_acceptances WHERE user_id=?').get(created.id).n,0);
+  assert.equal(h.sqlite.prepare('SELECT COUNT(*) n FROM sessions WHERE user_id=?').get(created.id).n,0);
+  assert.equal((await h.req(path,'POST',{firstName:'Other',lastName:'Person',email:'lionaugust@icloud.com'},cookie)).status,409);
+  const firstStub=await h.req(path,'POST',{firstName:'First',lastName:'Stub',email:'test-claim@example.org'},cookie);
+  assert.equal(firstStub.status,201);
+  const firstId=(await firstStub.json()).user.id;
+  assert.equal((await h.req(path,'POST',{firstName:'Second',lastName:'Stub',email:' TEST-CLAIM@EXAMPLE.ORG '},cookie)).status,409,'case-insensitive normalized stub email collision must be rejected');
+  assert.equal(h.sqlite.prepare('SELECT COUNT(*) n FROM user_stubs WHERE email=?').get('test-claim@example.org').n,1);
+  assert.equal(h.sqlite.prepare('SELECT id FROM user_stubs WHERE email=?').get('test-claim@example.org').id,firstId);
+  assert.equal(h.sqlite.prepare('SELECT COUNT(*) n FROM agreement_acceptances WHERE user_id=?').get(firstId).n,0,'admin-created identity must not inherit consent');
+  assert.equal(h.sqlite.prepare('SELECT COUNT(*) n FROM sessions WHERE user_id=?').get(firstId).n,0,'stub identity must not grant a login session');
+  assert.equal(h.sqlite.prepare('SELECT COUNT(*) n FROM users WHERE id=?').get(firstId).n,0,'stub identity must not silently become verified');
+ }finally{h.sqlite.close();}
+});
+
+test('database withdrawal rejection maps to a structured conflict for attendee and administrator', async()=>{
+ const h=harness();
+ try{
+  const id='123e4567-e89b-42d3-a456-426614174089';
+  const user='11111111-1111-4111-8111-111111111111';
+  const now=Date.now();
+  h.insert(id,now+600000,now+900000);
+  h.sqlite.prepare('INSERT INTO event_signups(id,event_id,user_id,created_at) VALUES(?,?,?,?)').run('signup-race',id,user,now);
+  // Emulate the database denying a write after an earlier Worker precheck.
+  h.sqlite.exec(`CREATE TRIGGER test_withdraw_abort BEFORE UPDATE OF deleted_at ON event_signups
+    BEGIN SELECT RAISE(ABORT,'Withdrawals closed'); END;`);
+  const session='9'.repeat(64);
+  const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode('test:'+session))),b=>b.toString(16).padStart(2,'0')).join('');
+  h.sqlite.prepare('INSERT INTO sessions(token_hash,email,expires_at,created_at,user_id) VALUES(?,?,?,?,?)')
+    .run(hash,'lionaugust@icloud.com',now+600000,now,user);
+  const cookie='__Host-sw_session='+session;
+  const self=await h.req('/api/events/'+id+'/signups','DELETE',undefined,cookie);
+  assert.equal(self.status,409);
+  assert.equal((await self.json()).code,'withdrawal_conflict');
+  const delegated=await h.req('/api/admin/events/'+id+'/signups','DELETE',{userId:user},cookie);
+  assert.equal(delegated.status,409);
+  assert.equal((await delegated.json()).code,'withdrawal_conflict');
+  assert.equal(h.sqlite.prepare('SELECT deleted_at FROM event_signups WHERE id=?').get('signup-race').deleted_at,null);
+ }finally{h.sqlite.close()}
+});
+
+
+test('admin event capacity edits retain unlimited, reject overfull and stale versions',async()=>{
+ const h=harness();
+ try{
+  const id='123e4567-e89b-42d3-a456-426614174091',now=Date.now();
+  h.insert(id,now+600000,now+900000);
+  const token='d'.repeat(64);
+  const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode('test:'+token))),b=>b.toString(16).padStart(2,'0')).join('');
+  h.sqlite.prepare('INSERT INTO sessions(token_hash,email,expires_at,created_at) VALUES(?,?,?,?)').run(hash,'lionaugust@icloud.com',now+600000,now);
+  const cookie='__Host-sw_session='+token, path='/api/admin/events/'+id;
+  const payload={title:'Capacity test',location:'Park',timezone:'America/Los_Angeles',start:'2026-11-14T09:00',end:'2026-11-14T12:00'};
+  const update=(capacity,version)=>h.req(path,'PUT',{...payload,capacity,version},cookie);
+  // Legacy callers can supply extra keys/whitespace; canonical generated
+  // validation must run after the existing normalization, not reject them.
+  assert.equal((await h.req(path,'PUT',{...payload,title:'  Capacity test  ',ignoredLegacyKey:true,capacity:1,version:1},cookie)).status,200);
+  assert.equal(h.sqlite.prepare('SELECT title FROM events WHERE id=?').get(id).title,'Capacity test');
+  assert.equal(h.sqlite.prepare('SELECT capacity,version FROM events WHERE id=?').get(id).capacity,1);
+  assert.equal((await update(2,1)).status,409,'stale editor cannot overwrite a newer revision');
+  h.sqlite.prepare('INSERT INTO event_signups(id,event_id,user_id,created_at) VALUES(?,?,?,?)')
+   .run('capacity-test-signup',id,'11111111-1111-4111-8111-111111111111',now);
+  const reduced=await update(0,2);
+  assert.equal(reduced.status,409,'active signups prevent lowering capacity below occupancy');
+  assert.ok((await reduced.json()).fields.capacity);
+  assert.deepEqual({...h.sqlite.prepare('SELECT capacity,version FROM events WHERE id=?').get(id)},{capacity:1,version:2});
+  assert.equal((await update(null,2)).status,200,'unlimited capacity remains supported');
+  assert.deepEqual({...h.sqlite.prepare('SELECT capacity,version FROM events WHERE id=?').get(id)},{capacity:null,version:3});
+ }finally{h.sqlite.close();}
+});
+
+
+test('participant roster sorts registered and stub identities together without leaking email',async()=>{
+ const h=harness();
+ try{
+  const id='123e4567-e89b-42d3-a456-426614174092',now=Date.now();
+  h.insert(id,now+300000,now+600000);
+  const names=[['22222222-2222-4222-8222-222222222222','Zed','Zulu'],['33333333-3333-4333-8333-333333333333','Amy','Able']];
+  for(const [user,first,last] of names){
+   h.sqlite.prepare('INSERT INTO participation_identities(id) VALUES(?)').run(user);
+   h.sqlite.prepare('INSERT INTO user_stubs(id,first_name,last_name,created_at,updated_at) VALUES(?,?,?,?,?)').run(user,first,last,now,now);
+   h.sqlite.prepare('INSERT INTO event_signups(id,event_id,user_id,created_at) VALUES(?,?,?,?)').run(user+'-signup',id,user,now);
+  }
+  const adminId='11111111-1111-4111-8111-111111111111';
+  h.sqlite.prepare('INSERT INTO event_signups(id,event_id,user_id,created_at) VALUES(?,?,?,?)').run('admin-roster',id,adminId,now);
+  const token='e'.repeat(64);
+  const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode('test:'+token))),b=>b.toString(16).padStart(2,'0')).join('');
+  h.sqlite.prepare('INSERT INTO sessions(token_hash,email,expires_at,created_at) VALUES(?,?,?,?)').run(hash,'lionaugust@icloud.com',now+600000,now);
+  const roster=await (await h.req('/api/events/'+id+'/participants','GET',undefined,'__Host-sw_session='+token)).json();
+  assert.deepEqual(roster.participants.map(x=>x.name),['Amy Able','Admin Example','Zed Zulu']);
+  assert.ok(roster.participants.every(x=>Object.keys(x).length===1&&typeof x.name==='string'));
+  h.sqlite.prepare('UPDATE event_signups SET deleted_at=? WHERE id=?').run(now+1,names[0][0]+'-signup');
+  const afterWithdrawal=await (await h.req('/api/events/'+id+'/participants','GET',undefined,'__Host-sw_session='+token)).json();
+  assert.deepEqual(afterWithdrawal.participants.map(x=>x.name),['Amy Able','Admin Example'],'withdrawn stub is immediately excluded from names-only roster');
+ }finally{h.sqlite.close();}
+});
+
+
+test('parallel delegated signups at capacity one accept only one distinct attendee',async()=>{
+ const h=harness();
+ try{
+  const eventId='123e4567-e89b-42d3-a456-426614174095', now=Date.now();
+  h.insert(eventId,now+600000,now+900000);
+  h.sqlite.prepare('UPDATE events SET capacity=1 WHERE id=?').run(eventId);
+  const ids=['22222222-2222-4222-8222-222222222222','33333333-3333-4333-8333-333333333333'];
+  for(const [index,id] of ids.entries()){
+   h.sqlite.prepare('INSERT INTO participation_identities(id) VALUES(?)').run(id);
+   h.sqlite.prepare('INSERT INTO user_stubs(id,first_name,last_name,created_at,updated_at) VALUES(?,?,?,?,?)')
+    .run(id,'Volunteer',String(index+1),now,now);
+  }
+  const token='f'.repeat(64);
+  const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode('test:'+token))),b=>b.toString(16).padStart(2,'0')).join('');
+  h.sqlite.prepare('INSERT INTO sessions(token_hash,email,expires_at,created_at) VALUES(?,?,?,?)')
+   .run(hash,'lionaugust@icloud.com',now+600000,now);
+  const cookie='__Host-sw_session='+token;
+  const responses=await Promise.all(ids.map(userId=>h.req('/api/admin/events/'+eventId+'/signups','POST',{userId},cookie)));
+  assert.deepEqual(responses.map(r=>r.status).sort(),[201,409]);
+  assert.equal(h.sqlite.prepare('SELECT COUNT(*) AS n FROM event_signups WHERE event_id=? AND deleted_at IS NULL').get(eventId).n,1);
+  assert.equal(h.sqlite.prepare('SELECT COUNT(*) AS n FROM event_signups WHERE event_id=?').get(eventId).n,1);
+ }finally{h.sqlite.close();}
+});
+
+
+test('verified-email claim migration preserves stub signup identity and rejects cross-identity collisions',()=>{
+ const h=harness();
+ try{
+  const now=Date.now(),eventId='123e4567-e89b-42d3-a456-426614174096';
+  const stubId='55555555-5555-4555-8555-555555555555';
+  h.insert(eventId,now+600000,now+900000);
+  h.sqlite.prepare('INSERT INTO participation_identities(id) VALUES(?)').run(stubId);
+  h.sqlite.prepare('INSERT INTO user_stubs(id,email,first_name,last_name,created_at,updated_at) VALUES(?,?,?,?,?,?)')
+   .run(stubId,'claimable@example.org','Claim','Owner',now,now);
+  h.sqlite.prepare('INSERT INTO event_signups(id,event_id,user_id,created_at) VALUES(?,?,?,?)')
+   .run('pre-claim-signup',eventId,stubId,now);
+  assert.throws(()=>h.sqlite.prepare('INSERT INTO users(id,email,created_at,updated_at) VALUES(?,?,?,?)')
+   .run('66666666-6666-4666-8666-666666666666','claimable@example.org',now,now),/Email belongs to another stub identity/);
+  h.sqlite.prepare('INSERT INTO users(id,email,email_verified_at,created_at,updated_at) VALUES(?,?,?,?,?)')
+   .run(stubId,'claimable@example.org',now,now,now);
+  h.sqlite.prepare('UPDATE user_stubs SET claimed_at=?,updated_at=? WHERE id=?').run(now+1,now+1,stubId);
+  assert.equal(h.sqlite.prepare('SELECT user_id FROM event_signups WHERE id=?').get('pre-claim-signup').user_id,stubId);
+  assert.equal(h.sqlite.prepare('SELECT COUNT(*) n FROM agreement_acceptances WHERE user_id=?').get(stubId).n,0,'email claiming alone cannot imply agreement consent');
+  assert.equal(h.sqlite.prepare('SELECT claimed_at FROM user_stubs WHERE id=?').get(stubId).claimed_at,now+1);
+  assert.equal(h.sqlite.prepare('SELECT COUNT(*) n FROM participation_identities WHERE id=?').get(stubId).n,1);
+  assert.throws(()=>h.sqlite.prepare('UPDATE event_signups SET user_id=? WHERE id=?')
+   .run('11111111-1111-4111-8111-111111111111','pre-claim-signup'),/Signup identity and creation time are immutable/,'identity claim cannot transfer historical signups');
+  assert.equal(h.sqlite.prepare('SELECT COUNT(*) n FROM sessions WHERE user_id=?').get(stubId).n,0,'database claim is not an automatic session grant');
+  assert.equal(h.sqlite.prepare('SELECT terms_accepted_at FROM users WHERE id=?').get(stubId).terms_accepted_at,null,'claim does not forge user consent');
+  const signup=h.sqlite.prepare('SELECT event_id,user_id,created_at,deleted_at FROM event_signups WHERE id=?').get('pre-claim-signup');
+  assert.equal(signup.event_id,eventId,'claim preserves event ownership');
+  assert.equal(signup.user_id,stubId,'claim preserves original participant identity');
+  assert.equal(signup.created_at,now,'claim preserves signup creation timestamp');
+  assert.equal(signup.deleted_at,null,'claim does not withdraw historical enrollment');
+  assert.equal(h.sqlite.prepare('SELECT COUNT(*) n FROM agreement_acceptances WHERE user_id=?').get(stubId).n,0,'claim has no hidden agreement side effects');
+
+ }finally{h.sqlite.close()}
+});
+
+test('a signed-in nonparticipant cannot read another event roster or administrator history',async()=>{
+ const h=harness();
+ try{
+  const now=Date.now(),eventA='123e4567-e89b-42d3-a456-426614174097',eventB='123e4567-e89b-42d3-a456-426614174098';
+  h.insert(eventA,now+600000,now+900000);
+  h.insert(eventB,now+600000,now+900000);
+  const attendeeId='77777777-7777-4777-8777-777777777777',email='ordinary@example.org',token='7'.repeat(64);
+  const versions=JSON.parse(readFileSync('src/generated/policy-versions.json','utf8'));
+  h.sqlite.prepare('INSERT INTO users(id,email,first_name,last_name,date_of_birth,email_verified_at,created_at,updated_at,terms_accepted_at,accepted_terms_version,accepted_privacy_version) VALUES(?,?,?,?,?,?,?,?,?,?,?)')
+   .run(attendeeId,email,'Ordinary','Member','1990-01-01',now,now,now,now,versions.terms.version,versions.privacy.version);
+  const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode('test:'+token))),b=>b.toString(16).padStart(2,'0')).join('');
+  h.sqlite.prepare('INSERT INTO sessions(token_hash,email,expires_at,created_at) VALUES(?,?,?,?)').run(hash,email,now+600000,now);
+  const cookie='__Host-sw_session='+token;
+  h.sqlite.prepare('INSERT INTO event_signups(id,event_id,user_id,created_at) VALUES(?,?,?,?)').run('admin-on-event-a',eventA,'11111111-1111-4111-8111-111111111111',now);
+  assert.equal((await h.req('/api/events/'+eventA+'/participants','GET',undefined,cookie)).status,403);
+  assert.equal((await h.req('/api/admin/events/'+eventA+'/signups','GET',undefined,cookie)).status,403);
+  assert.equal((await h.req('/api/admin/events/'+eventA+'/signups','POST',{userId:attendeeId},cookie)).status,403);
+  assert.equal((await h.req('/api/events/'+eventB+'/signups','POST',{},cookie)).status,201);
+  const ownRosterResponse=await h.req('/api/events/'+eventB+'/participants','GET',undefined,cookie);
+  assert.equal(ownRosterResponse.status,200);
+  const ownRoster=await ownRosterResponse.json();
+  assert.deepEqual(ownRoster.participants,[{name:'Ordinary Member'}]);
+  assert.ok(!JSON.stringify(ownRoster).includes(email),'participant roster must not leak account email');
+  assert.ok(!JSON.stringify(ownRoster).includes('1990-01-01'),'participant roster must not leak date of birth');
+  assert.equal((await h.req('/api/events/'+eventA+'/participants','GET',undefined,cookie)).status,403,'membership in another event does not reveal this roster');
+  assert.equal(h.sqlite.prepare('SELECT COUNT(*) n FROM event_signups WHERE event_id=?').get(eventA).n,1,'forbidden admin mutation did not write');
+ }finally{h.sqlite.close()}
+});
+
+test('verified magic-link claim reuses stub enrollment identity without granting consent',async()=>{
+ const h=harness();
+ try{
+  const now=Date.now(),eventId='123e4567-e89b-42d3-a456-426614174099',stubId='88888888-8888-4888-8888-888888888888';
+  const email='magic-claim@example.org',token='b'.repeat(64);
+  h.insert(eventId,now+600000,now+900000);
+  h.sqlite.prepare('INSERT INTO participation_identities(id) VALUES(?)').run(stubId);
+  h.sqlite.prepare('INSERT INTO user_stubs(id,email,first_name,last_name,created_at,updated_at) VALUES(?,?,?,?,?,?)')
+   .run(stubId,email,'Magic','Claim',now,now);
+  h.sqlite.prepare('INSERT INTO event_signups(id,event_id,user_id,created_at) VALUES(?,?,?,?)')
+   .run('magic-preclaim-signup',eventId,stubId,now);
+  const linkHash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode('test:'+token))),b=>b.toString(16).padStart(2,'0')).join('');
+  h.sqlite.prepare('INSERT INTO login_challenges(id,email,code_hash,link_hash,expires_at,created_at) VALUES(?,?,?,?,?,?)')
+   .run('magic-claim-challenge',email,'unused',linkHash,now+600000,now);
+  assert.equal(h.sqlite.prepare('SELECT email FROM login_challenges WHERE link_hash=? AND expires_at>?').get(linkHash,Date.now())?.email,email,'fixture token matches live challenge');
+  assert.equal(h.sqlite.prepare('SELECT id FROM user_stubs WHERE email=?').get(email)?.id,stubId,'fixture email resolves to unclaimed stub');
+  const verified=await h.req('/api/auth/magic','POST',{token});
+  assert.equal(verified.status,200,'a claimant must verify email via the normal magic link');
+  const cookieHeader=verified.headers.get('set-cookie')||'';
+  const session=cookieHeader.match(/__Host-sw_session=([a-f0-9]{64})/)?.[0];
+  assert.ok(session,'verified claim should create a session');
+  assert.equal(h.sqlite.prepare('SELECT id FROM users WHERE email=?').get(email).id,stubId,'verified claim reuses stub ID');
+  assert.equal(h.sqlite.prepare('SELECT user_id FROM sessions WHERE email=?').get(email).user_id,stubId);
+  assert.equal(h.sqlite.prepare('SELECT user_id FROM event_signups WHERE id=?').get('magic-preclaim-signup').user_id,stubId);
+  assert.equal(h.sqlite.prepare('SELECT terms_accepted_at FROM users WHERE id=?').get(stubId).terms_accepted_at,null,'verification is not consent');
+  assert.equal(h.sqlite.prepare('SELECT COUNT(*) n FROM agreement_acceptances WHERE user_id=?').get(stubId).n,0);
+  assert.equal((await h.req('/api/events/'+eventId+'/signups','POST',{},session)).status,403,'uncompleted profile and policies still gate signup');
+  const versions=JSON.parse(readFileSync('src/generated/policy-versions.json','utf8'));
+  assert.equal((await h.req('/api/auth/agreements','POST',{accepted:true,termsVersion:versions.terms.version,privacyVersion:versions.privacy.version},session)).status,403,'claimant cannot consent before profile completion');
+  assert.equal((await h.req('/api/auth/profile','POST',{firstName:'Magic',lastName:'Claim',dateOfBirth:'1990-01-01'},session)).status,200,'claimant completes the ordinary profile workflow');
+  assert.equal(h.sqlite.prepare('SELECT claimed_at FROM user_stubs WHERE id=?').get(stubId).claimed_at,null,'profile completion alone does not finalize claiming');
+  assert.equal((await h.req('/api/events/'+eventId+'/signups','POST',{},session)).status,403,'profile completion does not bypass consent');
+  assert.equal((await h.req('/api/auth/agreements','POST',{accepted:true,termsVersion:versions.terms.version,privacyVersion:versions.privacy.version},session)).status,200,'claimant accepts policies via normal registration');
+  assert.ok(h.sqlite.prepare('SELECT claimed_at FROM user_stubs WHERE id=?').get(stubId).claimed_at!==null,'consent completes the claim');
+  assert.equal(h.sqlite.prepare('SELECT COUNT(*) n FROM agreement_acceptances WHERE user_id=?').get(stubId).n,1,'claimant consent is recorded only on explicit acceptance');
+  assert.equal((await h.req('/api/events/'+eventId+'/signups','POST',{},session)).status,409,'pre-claim enrollment remains active and cannot be duplicated');
+  assert.equal(h.sqlite.prepare('SELECT COUNT(*) n FROM event_signups WHERE user_id=? AND event_id=?').get(stubId,eventId).n,1,'claim does not reassign or duplicate historical signup');
+  assert.notEqual((await h.req('/api/auth/magic','POST',{token})).status,200,'magic link must not be replayable');
+ }finally{h.sqlite.close()}
+});
+
+test('real Worker public responses satisfy OpenAPI required fields and JSON types',async()=>{
+ const h=harness();
+ try{
+  const spec=YAML.parse(readFileSync('openapi/openapi.yaml','utf8'));
+  const check=(value,schema,location)=>{
+   if(schema.$ref){
+    const key=schema.$ref.split('/').at(-1);
+    return check(value,spec.components.schemas[key],location);
+   }
+   if(Array.isArray(schema.type)){
+    assert.ok(schema.type.some(type=>type==='null'?value===null:type==='integer'?Number.isInteger(value):type==='array'?Array.isArray(value):typeof value===type),location+' type mismatch');
+   }else if(schema.type==='object')assert.ok(value!==null&&typeof value==='object'&&!Array.isArray(value),location+' must be an object');
+   else if(schema.type==='array')assert.ok(Array.isArray(value),location+' must be an array');
+   else if(schema.type==='integer')assert.ok(Number.isInteger(value),location+' must be integer');
+   else if(schema.type==='string')assert.equal(typeof value,'string',location+' must be string');
+   if(schema.required)for(const key of schema.required)assert.ok(Object.hasOwn(value,key),location+' missing '+key);
+   if(value!==null&&schema.properties)for(const [key,shape] of Object.entries(schema.properties)){
+    if(Object.hasOwn(value,key))check(value[key],shape,location+'.'+key);
+   }
+   if(Array.isArray(value)&&schema.items)for(const [index,item] of value.entries())check(item,schema.items,location+'['+index+']');
+  };
+  const id='123e4567-e89b-42d3-a456-426614174100',now=Date.now();
+  h.insert(id,now+600000,now+900000);
+  for(const [url,operation] of [
+   ['/api/events',spec.paths['/api/events'].get],
+   ['/api/events/'+id,spec.paths['/api/events/{id}'].get],
+   ['/api/events/'+id+'/participants',spec.paths['/api/events/{id}/participants'].get]
+  ]){
+   const response=await h.req(url);
+   const status=String(response.status);
+   const schema=operation.responses[status]?.content?.['application/json']?.schema;
+   assert.ok(schema,'missing documented status '+status+' on '+url);
+   check(await response.json(),schema,url+' '+status);
+  }
+ }finally{h.sqlite.close()}
+});
+
+test('real Worker denial responses conform to documented OpenAPI error shapes',async()=>{
+ const h=harness();
+ try{
+  const spec=YAML.parse(readFileSync('openapi/openapi.yaml','utf8'));
+  const id='123e4567-e89b-42d3-a456-426614174101',now=Date.now();
+  h.insert(id,now+600000,now+900000);
+  const cases=[
+   ['/api/events/'+id+'/participants','/api/events/{id}/participants','get'],
+   ['/api/events/'+id+'/signups','/api/events/{id}/signups','get'],
+   ['/api/me/signups','/api/me/signups','get'],
+   ['/api/admin/events/'+id+'/signups','/api/admin/events/{id}/signups','get'],
+   ['/api/admin/usage','/api/admin/usage','get']
+  ];
+  for(const [url,path,method] of cases){
+   const response=await h.req(url);
+   assert.equal(response.status,401,'anonymous access should be rejected at '+url);
+   assert.match(response.headers.get('content-type')||'',/application\/json/);
+   const payload=await response.json();
+   assert.equal(typeof payload.error,'string',url+' must carry a readable error');
+   const schema=spec.paths[path][method].responses['401']?.content?.['application/json']?.schema;
+   assert.ok(schema,url+' should describe its JSON 401 error response');
+   const shape=schema.$ref?spec.components.schemas[schema.$ref.split('/').at(-1)]:schema;
+   for(const key of shape.required||[])assert.ok(Object.hasOwn(payload,key),url+' error missing '+key);
+  }
+ }finally{h.sqlite.close()}
+});
+
+test('anonymous signup mutations document their actual JSON 401 envelopes',async()=>{
+ const h=harness();
+ try{
+  const spec=YAML.parse(readFileSync('openapi/openapi.yaml','utf8'));
+  const id='123e4567-e89b-42d3-a456-426614174102',now=Date.now();
+  h.insert(id,now+600000,now+900000);
+  for(const [path,method,body] of [
+   ['/api/events/{id}/signups','POST',{}],
+   ['/api/events/{id}/signups','DELETE',{}],
+   ['/api/admin/events/{id}/signups','POST',{userId:'11111111-1111-4111-8111-111111111111'}],
+   ['/api/admin/events/{id}/signups','DELETE',{userId:'11111111-1111-4111-8111-111111111111'}]
+  ]){
+   const url=path.replace('{id}',id);
+   const response=await h.req(url,method,body);
+   assert.equal(response.status,401,method+' '+path+' must deny anonymous access');
+   assert.match(response.headers.get('content-type')||'',/application\/json/);
+   const payload=await response.json();
+   assert.equal(typeof payload.error,'string');
+   const declared=spec.paths[path][method.toLowerCase()].responses['401'].content?.['application/json']?.schema;
+   assert.equal(declared?.$ref,'#/components/schemas/Error',method+' '+path+' must document error payload');
+  }
+ }finally{h.sqlite.close()}
+});
+
+test('delegated attendee payloads use canonical generated validation after authentication',async()=>{
+ const h=harness();
+ try{
+  const now=Date.now(),id='123e4567-e89b-42d3-a456-426614174103',token='c'.repeat(64);
+  h.insert(id,now+600000,now+900000);
+  const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode('test:'+token))),b=>b.toString(16).padStart(2,'0')).join('');
+  h.sqlite.prepare('INSERT INTO sessions(token_hash,email,expires_at,created_at) VALUES(?,?,?,?)').run(hash,'lionaugust@icloud.com',now+600000,now);
+  const cookie='__Host-sw_session='+token;
+  for(const method of ['POST','DELETE']){
+   for(const userId of [null,'not-a-uuid','']){
+    const response=await h.req('/api/admin/events/'+id+'/signups',method,{userId},cookie);
+    assert.equal(response.status,422,method+' must reject malformed delegated attendee');
+    assert.equal(typeof (await response.json()).error,'string');
+   }
+  }
+  assert.equal(h.sqlite.prepare('SELECT COUNT(*) AS n FROM event_signups WHERE event_id=?').get(id).n,0);
+ }finally{h.sqlite.close()}
+});
+
+function assertDocumentedJsonShape(value,raw,document,label){
+ const schema=raw?.$ref
+  ?raw.$ref.split('/').slice(1).reduce((part,key)=>part?.[key],document)
+  :raw;
+ assert.ok(schema,label+' schema must resolve');
+ const choices=Array.isArray(schema.type)?schema.type:schema.type?[schema.type]:[];
+ const validType=type=>type==='null'?value===null:type==='integer'?Number.isSafeInteger(value):
+  type==='number'?typeof value==='number'&&Number.isFinite(value):
+  type==='array'?Array.isArray(value):type==='object'?value!==null&&typeof value==='object'&&!Array.isArray(value):typeof value===type;
+ if(choices.length)assert.ok(choices.some(validType),label+' expected '+choices.join('|')+' but received '+(value===null?'null':typeof value));
+ if(value===null)return;
+ for(const key of schema.required||[])assert.ok(Object.hasOwn(value,key),label+' missing '+key);
+ if(schema.properties&&typeof value==='object'&&!Array.isArray(value)){
+  for(const [key,child] of Object.entries(schema.properties))
+   if(Object.hasOwn(value,key))assertDocumentedJsonShape(value[key],child,document,label+'.'+key);
+ }
+ if(Array.isArray(value)&&schema.items)for(const [index,item] of value.entries())
+  assertDocumentedJsonShape(item,schema.items,document,label+'['+index+']');
+}
+
+test('every OpenAPI operation status is characterized against an anonymous real Worker request',async()=>{
+ const h=harness();
+ try{
+  const spec=YAML.parse(readFileSync('openapi/openapi.yaml','utf8'));
+  const id='123e4567-e89b-42d3-a456-426614174106',now=Date.now();
+  h.insert(id,now+600000,now+900000);
+  let count=0;
+  for(const [template,methods] of Object.entries(spec.paths)){
+   for(const [method,operation] of Object.entries(methods)){
+    if(!operation?.operationId)continue;
+    const path=template.replaceAll('{id}',id),verb=method.toUpperCase();
+    const response=await h.req(path,verb,verb==='GET'?undefined:{});
+    const declared=operation.responses?.[String(response.status)];
+    assert.ok(declared,verb+' '+template+' returned undocumented status '+response.status);
+    if(response.status!==204){
+     assert.match(response.headers.get('content-type')||'',/application\/json/,verb+' '+template+' must return JSON');
+     const payload=await response.json();
+     const shape=declared.content?.['application/json']?.schema;
+     assert.ok(shape,verb+' '+template+' '+response.status+' needs a JSON schema');
+     assertDocumentedJsonShape(payload,shape,spec,verb+' '+template+' '+response.status);
+    }
+    count++;
+   }
+  }
+  assert.ok(count>=27,'expected to characterize all documented Worker HTTP operations');
+ }finally{h.sqlite.close()}
+});
+
+test('all documented API operations map authenticated Worker responses to declared statuses',async()=>{
+ const h=harness();
+ try{
+  const spec=YAML.parse(readFileSync('openapi/openapi.yaml','utf8'));
+  const id='123e4567-e89b-42d3-a456-426614174107',now=Date.now();
+  h.insert(id,now+600000,now+900000);
+  const token='7'.repeat(64);
+  const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode('test:'+token))),x=>x.toString(16).padStart(2,'0')).join('');
+  h.sqlite.prepare('INSERT INTO sessions(token_hash,email,expires_at,created_at) VALUES(?,?,?,?)').run(hash,'lionaugust@icloud.com',now+600000,now);
+  const cookie='__Host-sw_session='+token;
+  let checked=0;
+  for(const [template,methods] of Object.entries(spec.paths)){
+   for(const [method,operation] of Object.entries(methods)){
+    if(!operation?.operationId||operation.operationId==='logout')continue;
+    const verb=method.toUpperCase(),url=template.replaceAll('{id}',id);
+    const response=await h.req(url,verb,verb==='GET'?undefined:{},cookie);
+    const declared=operation.responses?.[String(response.status)];
+    assert.ok(declared,verb+' '+template+' returned undocumented authenticated status '+response.status);
+    if(response.status!==204){
+     assert.match(response.headers.get('content-type')||'',/application\/json/);
+     const payload=await response.json();
+     const shape=declared.content?.['application/json']?.schema;
+     assert.ok(shape,verb+' '+template+' '+response.status+' has no JSON schema');
+     assertDocumentedJsonShape(payload,shape,spec,verb+' '+template+' '+response.status);
+    }
+    checked++;
+   }
+  }
+  assert.ok(checked>=26);
+ }finally{h.sqlite.close()}
+});
+
+
+test('staging provides experimental Usage & Quotas without inventing provider usage',async()=>{
+ const h=harness();
+ try{
+  const token='d'.repeat(64),now=Date.now();
+  const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode('test:'+token))),b=>b.toString(16).padStart(2,'0')).join('');
+  h.sqlite.prepare('INSERT INTO sessions(token_hash,email,expires_at,created_at) VALUES(?,?,?,?)').run(hash,'lionaugust@icloud.com',now+600000,now);
+  const path='/api/admin/usage',staging={ENVIRONMENT:'staging'};
+  assert.equal((await h.req(path,'GET',undefined,undefined,staging)).status,401,'staging must still enforce authentication');
+  const response=await h.req(path,'GET',undefined,'__Host-sw_session='+token,staging);
+  assert.equal(response.status,200,'authorized staging admin can inspect experimental usage status');
+  const data=await response.json();
+  assert.equal(data.environment,'staging');
+  assert.equal(data.providers.length,4);
+  assert.ok(data.providers.every(provider=>provider.status==='unavailable'&&provider.used===null&&provider.limit===null&&provider.remaining===null),'unknown readings must not be fabricated');
+ }finally{h.sqlite.close()}
 });
