@@ -1326,6 +1326,10 @@ paths:
                         title: {type: string}
                         start_at: {type: integer}
                         end_at: {type: integer}
+                        location: {type: string}
+                        timezone: {type: string}
+                        capacity: {type: [integer, 'null'], minimum: 0}
+                        signups_count: {type: integer, minimum: 0}
         '401':
           description: Not signed in
           content:
