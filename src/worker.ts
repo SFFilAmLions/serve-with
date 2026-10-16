@@ -313,7 +313,7 @@ async function legacyFetch(request: Request, env: Env): Promise<Response> {
       const comparison = view === 'upcoming' ? '>' : '<=';
       const direction = view === 'upcoming' ? 'ASC' : 'DESC';
       const events = await env.AUTH_DB.prepare(
-        `SELECT e.id,e.title,e.location,e.timezone,e.start_at,e.end_at,e.version,e.capacity,e.created_at,
+        `SELECT e.id,e.title,e.location,e.timezone,e.start_at,e.end_at,e.version,e.capacity,
           (SELECT COUNT(*) FROM event_signups s WHERE s.event_id=e.id AND s.deleted_at IS NULL) AS signups_count
          FROM events e WHERE e.deleted_at IS NULL AND e.end_at ${comparison} ?
          ORDER BY e.start_at ${direction}, e.id ${direction}`
