@@ -17,13 +17,13 @@ import { type Draft, timeZones, validateDraft, emptyDraft, localInput } from './
 
 type EventRecord = { id:string; title:string; location:string; timezone:string; start_at:number; end_at:number; version:number; created_at?:number; capacity?:number|null; signups_count?:number; spots_available?:number|null };
 type View = 'upcoming'|'past';
-function Glyph({type,size=20}:{type:'sun'|'moon'|'system'|'person'|'swap'|'logout'|'login'|'pin'|'back'|'save'|'edit'|'copy'|'link'|'trash'|'github'|'events'|'users'|'usage'|'signups'|'calendar'|'attendance'|'withdraw';size?:18|20|24}) {
+function Glyph({type,size=20}:{type:'sun'|'moon'|'system'|'person'|'swap'|'logout'|'login'|'pin'|'back'|'save'|'edit'|'copy'|'link'|'trash'|'github'|'events'|'users'|'usage'|'signups'|'calendar'|'attendance'|'withdraw'|'clock';size?:18|20|24}) {
  const symbols={
   sun:'light_mode',moon:'dark_mode',system:'settings_brightness',
   person:'person',swap:'swap_horiz',logout:'logout',login:'login',
   pin:'location_on',back:'arrow_back',save:'save',edit:'edit',
   copy:'content_copy',link:'link',trash:'delete',github:'code',
-  events:'event',users:'group',usage:'monitoring',signups:'how_to_reg',calendar:'calendar_month',attendance:'groups',withdraw:'person_remove'
+  events:'event',users:'group',usage:'monitoring',signups:'how_to_reg',calendar:'calendar_month',attendance:'groups',withdraw:'person_remove',clock:'schedule'
  } as const;
  return <Box component="span" className="material-symbols-rounded" aria-hidden="true"
   sx={{fontFamily:'Material Symbols Rounded',fontSize:size,lineHeight:1,
@@ -53,7 +53,7 @@ function EventWhen({event,clockNow}:{event:EventRecord;clockNow?:number}){
  const time=(v:number)=>new Intl.DateTimeFormat('en-US',{hour:'numeric',minute:'2-digit',timeZone:event.timezone}).format(v);
  const start=date(event.start_at),end=date(event.end_at);
  const abbreviated=new Intl.DateTimeFormat('en-US',{timeZone:event.timezone,timeZoneName:'short'}).formatToParts(event.start_at).find(p=>p.type==='timeZoneName')?.value||event.timezone;
- return <Stack spacing={1}><Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap" useFlexGap><Stack direction="row" spacing={1} alignItems="center"><Glyph type="calendar"/><Typography>{start===end?start:start+' – '+end}</Typography></Stack>{clockNow!==undefined&&<Chip size="small" variant="outlined" label={eventRelativeLabel(event.start_at,event.end_at,clockNow)}/>}</Stack><Typography variant="body2" color="text.secondary">{time(event.start_at)} – {time(event.end_at)}</Typography><Stack direction="row" gap={1} flexWrap="wrap"><Stack direction="row" spacing={0.75} alignItems="center"><Glyph type="pin"/><Typography variant="body2" color="text.secondary">{event.location}</Typography></Stack>{timeZoneOffsetMinutes(event.start_at,event.timezone)!==timeZoneOffsetMinutes(event.start_at,Intl.DateTimeFormat().resolvedOptions().timeZone)&&<Tooltip title={event.timezone}><Chip size="small" variant="outlined" label={abbreviated}/></Tooltip>}</Stack>{event.signups_count!==undefined&&<Typography variant="body2" color="text.secondary">
+ return <Stack spacing={1}><Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap" useFlexGap><Stack direction="row" spacing={1} alignItems="center"><Glyph type="calendar"/><Typography>{start===end?start:start+' – '+end}</Typography></Stack>{clockNow!==undefined&&<Chip size="small" variant="outlined" label={eventRelativeLabel(event.start_at,event.end_at,clockNow)}/>}</Stack><Stack direction="row" spacing={1} alignItems="center"><Glyph type="clock"/><Typography variant="body2" color="text.secondary">{time(event.start_at)} – {time(event.end_at)}</Typography></Stack><Stack direction="row" gap={1} flexWrap="wrap"><Stack direction="row" spacing={0.75} alignItems="center"><Glyph type="pin"/><Typography variant="body2" color="text.secondary">{event.location}</Typography></Stack>{timeZoneOffsetMinutes(event.start_at,event.timezone)!==timeZoneOffsetMinutes(event.start_at,Intl.DateTimeFormat().resolvedOptions().timeZone)&&<Tooltip title={event.timezone}><Chip size="small" variant="outlined" label={abbreviated}/></Tooltip>}</Stack>{event.signups_count!==undefined&&<Typography variant="body2" color="text.secondary">
   {event.signups_count} {event.signups_count===1?'spot taken':'spots taken'} · {event.capacity===null?'No max attendance limit':event.spots_available===undefined?'Capacity information unavailable':event.spots_available+' spots available'}
  </Typography>}{event.signups_count!==undefined&&typeof event.capacity==='number'&&event.capacity>=0&&<LinearProgress variant="determinate" value={event.capacity===0?100:Math.min(100,Math.max(0,event.signups_count/event.capacity*100))} aria-label={`Attendance: ${event.signups_count} of ${event.capacity} spots filled`} sx={{height:8,borderRadius:4}}/>}</Stack>;
 }
