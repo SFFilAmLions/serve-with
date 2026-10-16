@@ -75,7 +75,7 @@ function BuildFooter() {
 }
 function StagingNotice(){
  if(buildEnvironment!=='staging')return null;
- return <Alert severity="error" variant="filled" square icon={false} sx={{borderRadius:0,justifyContent:'center',fontWeight:700,'& .MuiAlert-message':{py:0.5}}} action={<Button color="inherit" component="a" href={productionUrl} sx={{border:1,borderColor:'currentColor'}}>Main site &gt;</Button>}>This is the test version of this site. Visit the main site to signup.</Alert>;
+ return <Alert severity="error" variant="filled" square icon={false} sx={{borderRadius:0,justifyContent:'center',fontWeight:700,flexWrap:'wrap',minWidth:0,'& .MuiAlert-message':{py:0.5,minWidth:0,overflowWrap:'anywhere'},'& .MuiAlert-action':{ml:{xs:0,sm:2},mr:0,pt:0,maxWidth:'100%'}}} action={<Button color="inherit" component="a" href={productionUrl} sx={{border:1,borderColor:'currentColor'}}>Main site &gt;</Button>}>This is the test version of this site. Visit the main site to signup.</Alert>;
 }
 const magic = new URL(location.href).searchParams.get('magic');
 if (magic) history.replaceState(null,'','/login');
