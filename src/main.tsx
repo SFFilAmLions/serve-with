@@ -281,7 +281,9 @@ function UsersDirectory(){
  <Typography sx={{display:{xs:'block',sm:'none'}}}>{[p.first_name,p.last_name].filter(Boolean).join(' ')||p.email}</Typography>
  <Typography color="text.secondary" sx={{display:{xs:'none',lg:'block'},overflow:'hidden',textOverflow:'ellipsis'}}>{p.email}</Typography>
  </ListItemButton><Divider/></React.Fragment>)}{!people.length&&<Typography sx={{p:2}}>No matching users. Try a different name or email.</Typography>}{more&&<Button onClick={()=>void load(offset)}>Load more</Button>}</Box>
- </Box>{error&&<Alert severity="error">{error}</Alert>}</Stack>;
+ </Box>{error&&<Alert severity="error">{error}</Alert>}
+ <Fab variant="extended" color="primary" aria-label="Create user" onClick={()=>go('/admin/users/new')} sx={{position:'fixed',bottom:{xs:24,sm:32},right:{xs:24,sm:32},zIndex:10}}><Glyph type="person"/><Box component="span" sx={{ml:1}}>Create user</Box></Fab>
+ </Stack>;
 }
 
 function EventDetail({id,admin,me}:{id:string;admin:boolean;me:Me}){
