@@ -504,11 +504,17 @@ function AdminEventSignups({id}:{id:string}){
   try{await navigator.clipboard.writeText(new URL('/events/'+id,location.origin).toString());setNotice('Event link copied');}
   catch{setError('Unable to copy event link.');}
  };
- const search=async()=>{
-  setError('');
-  try{const response=await generatedApi.listAdminUsers({q:query});if(response.status!==200)throw Error((response.data as {error?:string}).error||'Unable to find users');setPeople((response.data as unknown as {users:typeof people}).users);}
-  catch(e){setError(e instanceof Error?e.message:'Unable to find users');}
- };
+ useEffect(()=>{
+   if(!query.trim())return;
+  let active=true;
+  const timer=setTimeout(()=>{
+   void generatedApi.listAdminUsers({q:query}).then(response=>{
+    if(response.status!==200)throw Error((response.data as {error?:string}).error||'Unable to find users');
+    if(active)setPeople((response.data as unknown as {users:typeof people}).users);
+   }).catch(e=>{if(active)setError(e instanceof Error?e.message:'Unable to find users')});
+   },300);
+   return()=>{active=false;clearTimeout(timer)};
+  },[query]);
  const act=async(kind:'signup'|'withdraw',userId:string)=>{
   if(busy)return;setBusy(true);setError('');setNotice('');
   try{
@@ -547,14 +553,12 @@ function AdminEventSignups({id}:{id:string}){
     </Card>}
    <Typography variant="h6" sx={{mt:3,mb:1}}>Add an attendee</Typography>
    <Button sx={{mb:1}} onClick={()=>go('/admin/users/new',{returnEventId:id})}>Create user</Button>
-   <Stack direction={{xs:'column',sm:'row'}} spacing={1}>
-    <TextField size="small" label="Search attendees by name or email" value={query} onChange={e=>setQuery(e.target.value)}/>
-    <Button onClick={()=>void search()}>Search users</Button>
-   </Stack>
-   {people.length>0&&<Autocomplete sx={{mt:1}} options={people} value={people.find(p=>p.id===selected)||null}
+   <Autocomplete sx={{mt:1}} options={people} value={people.find(p=>p.id===selected)||null}
+     filterOptions={options=>options}
      getOptionLabel={p=>[p.first_name,p.last_name].filter(Boolean).join(' ')||p.email||'Unnamed user'}
+     onInputChange={(_,value,reason)=>{if(reason==='input'){setQuery(value);setError('')}}}
      onChange={(_,p)=>setSelected(p?.id||'')}
-     renderInput={params=><TextField {...params} label="Select attendee"/>}/>}
+     renderInput={params=><TextField {...params} label="Search and select attendee" helperText="Start typing a name or email to search users"/>}/>
    <Button variant="contained" sx={{mt:1}} disabled={!selected||busy} onClick={()=>void act('signup',selected)}>Confirm signup</Button>
   </Box>
   <Box component="section" aria-labelledby="admin-event-history-heading">
