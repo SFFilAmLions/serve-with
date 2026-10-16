@@ -83,7 +83,9 @@ async function cloudflareUsage(env:Env):Promise<UsageProvider[]>{
       body:JSON.stringify({query,variables:{accountTag:env.USAGE_CLOUDFLARE_ACCOUNT_ID,datetimeStart:start.toISOString(),datetimeEnd:end.toISOString(),start:start.toISOString().slice(0,10),end:end.toISOString().slice(0,10)}})
     });
     if(!response.ok){console.info('usage-provider-debug',JSON.stringify({provider:'cloudflare',event:'http-error',status:response.status,environment}));return cloudflareUnavailable(scope,'The Cloudflare analytics service is currently unavailable');}
-    const payload=recordOf(await response.json()),data=recordOf(payload?.data),viewer=recordOf(data?.viewer),accounts=viewer?.accounts;
+    const payload=recordOf(await response.json());
+    if(!payload||Array.isArray(payload.errors)&&payload.errors.length>0)return cloudflareUnavailable(scope,'Cloudflare analytics returned an incomplete or unsuccessful query');
+    const data=recordOf(payload.data),viewer=recordOf(data?.viewer),accounts=viewer?.accounts;
     const account=Array.isArray(accounts)?recordOf(accounts[0]):null;
     const workerRows=account?.workersInvocationsAdaptive,d1Rows=account?.d1AnalyticsAdaptiveGroups;
     const workerRequests=Array.isArray(workerRows)?workerRows.reduce((total,row)=>total+(usageNumber(recordOf(recordOf(row)?.sum)?.requests)??0),0):null;
