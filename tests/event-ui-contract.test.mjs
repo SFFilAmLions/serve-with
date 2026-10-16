@@ -82,6 +82,6 @@ test('staging builds show a prominent route to production without affecting prod
  assert.match(source,/function StagingNotice/);
  assert.match(source,/buildEnvironment!=='staging'/);
  assert.match(source,/https:\/\/servewith\.sffilamlions\.org\//);
- assert.match(source,/Go to main site/);
+ assert.match(source,/Main site/);
  assert.match(source,/<StagingNotice\/>/);
 });
