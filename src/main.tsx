@@ -30,16 +30,16 @@ function Glyph({type,size=20}:{type:'sun'|'moon'|'system'|'person'|'swap'|'logou
     fontWeight:400,fontStyle:'normal',display:'inline-flex',fontFeatureSettings:'liga',
     fontVariationSettings:"'FILL' 0,'wght' 400,'GRAD' 0,'opsz' 20"}}>{symbols[type]}</Box>;
 }
-function AccountAvatar({email,name,size=28}:{email?:string;name?:string;size?:number}) {
+function AccountAvatar({email,name,size=28,revision=0}:{email?:string;name?:string;size?:number;revision?:number}) {
  const [src,setSrc]=useState('');
  useEffect(()=>{
   let active=true;
   if(!email){setSrc('');return;}
   void crypto.subtle.digest('SHA-256',new TextEncoder().encode(email.trim().toLowerCase()))
-   .then(buf=>{if(active)setSrc('https://www.gravatar.com/avatar/'+Array.from(new Uint8Array(buf)).map(x=>x.toString(16).padStart(2,'0')).join('')+'?d=404&s=64')})
+   .then(buf=>{if(active)setSrc('https://www.gravatar.com/avatar/'+Array.from(new Uint8Array(buf)).map(x=>x.toString(16).padStart(2,'0')).join('')+'?d=404&s=64&t='+revision)})
    .catch(()=>setSrc(''));
   return()=>{active=false};
- },[email]);
+ },[email,revision]);
  const initials=(name||email?.split('@')[0]||'').split(/[\s._-]+/).filter(Boolean).slice(0,2).map(word=>word[0].toUpperCase()).join('')||'?';
  return <Avatar src={src||undefined} alt={name||'Profile picture'} sx={{width:size,height:size,fontSize:Math.max(12,Math.round(size*.42))}}>{initials}</Avatar>;
 }
@@ -240,14 +240,22 @@ function AuthScreen({me,refresh}:{me:Me;refresh:()=>Promise<void>}){
 }
 function UserView({id,edit,backPath,canEditAvatar}:{id:string;edit:boolean;backPath:string;canEditAvatar:boolean}){
  const [user,setUser]=useState<any>(null),[message,setMessage]=useState(''),[first,setFirst]=useState(''),[last,setLast]=useState(''),[dob,setDob]=useState(''),[dirty,setDirty]=useState(false);
+ const [avatarRevision,setAvatarRevision]=useState(0);
+ const openAvatarEditor=(email:string)=>{
+  const library=(window as Window & {Gravatar?:{GravatarQuickEditorCore:new(options:{email:string;scope:string[];onProfileUpdated:()=>void})=>{open:()=>void}}}).Gravatar;
+  if(!library?.GravatarQuickEditorCore){setMessage('Avatar editor is unavailable. Please try again later.');return;}
+  try{new library.GravatarQuickEditorCore({email,scope:['avatars'],onProfileUpdated:()=>setAvatarRevision(value=>value+1)}).open()}
+  catch{setMessage('Could not open the avatar editor. Please check whether popups are blocked.');}
+ };
+
  useEffect(()=>{void generatedApi.getUser({id}).then(response=>{if(response.status!==200)throw Error((response.data as {error?:string}).error||'Unable to load user');const r=response.data as {user:any;canCorrectDob:boolean};setUser(r);setFirst(r.user.first_name||'');setLast(r.user.last_name||'');setDob(r.user.date_of_birth||'')}).catch(e=>setMessage(e.message))},[id]);
  if(message&&!user)return <Alert severity="error">{message}</Alert>;
  if(!user)return <Skeleton height={240}/>;
  const u=user.user;
  return <Stack spacing={3} sx={{my:4,maxWidth:760}}><Button size="small" startIcon={<Glyph type="back"/>} sx={{alignSelf:"flex-start"}} onClick={()=>go(backPath)}>{backPath==='/admin/users'?'Back to users':'Back to events'}</Button><Stack direction={{xs:'column',sm:'row'}} alignItems={{sm:'center'}} spacing={2}><Box sx={{position:'relative',width:96,height:96,flexShrink:0}}>
-  <AccountAvatar email={u.email||undefined} name={[u.first_name,u.last_name].filter(Boolean).join(' ')} size={96}/>
+  <AccountAvatar email={u.email||undefined} name={[u.first_name,u.last_name].filter(Boolean).join(' ')} size={96} revision={avatarRevision}/>
   {canEditAvatar&&u.email&&<Tooltip title={'Edit profile picture in Gravatar using '+u.email}>
-   <IconButton component="a" href="https://gravatar.com/profile/" target="_blank" rel="noopener noreferrer" aria-label="Edit profile picture in Gravatar"
+   <IconButton onClick={()=>openAvatarEditor(u.email)} aria-label="Edit profile picture in Gravatar"
     size="small" sx={{position:'absolute',right:-4,bottom:-4,bgcolor:'background.paper',boxShadow:2,border:'1px solid',borderColor:'divider','&:hover':{bgcolor:'action.hover'}}}>
     <Glyph type="edit" size={18}/>
    </IconButton>
