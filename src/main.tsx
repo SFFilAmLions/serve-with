@@ -48,12 +48,12 @@ function timeZoneOffsetMinutes(instant:number,zone:string) {
  const match=/^GMT([+-])(\d{2}):(\d{2})$/.exec(part||'');
  return part==='GMT'?0:match?(match[1]==='-'?-1:1)*(Number(match[2])*60+Number(match[3])):null;
 }
-function EventWhen({event}:{event:EventRecord}){
+function EventWhen({event,clockNow}:{event:EventRecord;clockNow?:number}){
  const date=(v:number)=>new Intl.DateTimeFormat('en-US',{weekday:'short',month:'short',day:'numeric',year:'numeric',timeZone:event.timezone}).format(v);
  const time=(v:number)=>new Intl.DateTimeFormat('en-US',{hour:'numeric',minute:'2-digit',timeZone:event.timezone}).format(v);
  const start=date(event.start_at),end=date(event.end_at);
  const abbreviated=new Intl.DateTimeFormat('en-US',{timeZone:event.timezone,timeZoneName:'short'}).formatToParts(event.start_at).find(p=>p.type==='timeZoneName')?.value||event.timezone;
- return <Stack spacing={1}><Typography>{start===end?start:start+' – '+end}</Typography><Typography variant="body2" color="text.secondary">{time(event.start_at)} – {time(event.end_at)}</Typography><Stack direction="row" gap={1} flexWrap="wrap"><Chip icon={<Glyph type="pin"/>} size="small" label={event.location} variant="outlined"/>{timeZoneOffsetMinutes(event.start_at,event.timezone)!==timeZoneOffsetMinutes(event.start_at,Intl.DateTimeFormat().resolvedOptions().timeZone)&&<Tooltip title={event.timezone}><Chip size="small" variant="outlined" label={abbreviated}/></Tooltip>}</Stack>{event.signups_count!==undefined&&<Typography variant="body2" color="text.secondary">
+ return <Stack spacing={1}><Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap" useFlexGap><Typography>{start===end?start:start+' – '+end}</Typography>{clockNow!==undefined&&<Chip size="small" variant="outlined" label={eventRelativeLabel(event.start_at,event.end_at,clockNow)}/>}</Stack><Typography variant="body2" color="text.secondary">{time(event.start_at)} – {time(event.end_at)}</Typography><Stack direction="row" gap={1} flexWrap="wrap"><Chip icon={<Glyph type="pin"/>} size="small" label={event.location} variant="outlined"/>{timeZoneOffsetMinutes(event.start_at,event.timezone)!==timeZoneOffsetMinutes(event.start_at,Intl.DateTimeFormat().resolvedOptions().timeZone)&&<Tooltip title={event.timezone}><Chip size="small" variant="outlined" label={abbreviated}/></Tooltip>}</Stack>{event.signups_count!==undefined&&<Typography variant="body2" color="text.secondary">
   {event.signups_count} {event.signups_count===1?'spot taken':'spots taken'} · {event.capacity===null?'No max attendance limit':event.spots_available===undefined?'Capacity information unavailable':event.spots_available+' spots available'}
  </Typography>}{event.signups_count!==undefined&&typeof event.capacity==='number'&&event.capacity>=0&&<LinearProgress variant="determinate" value={event.capacity===0?100:Math.min(100,Math.max(0,event.signups_count/event.capacity*100))} aria-label={`Attendance: ${event.signups_count} of ${event.capacity} spots filled`} sx={{height:8,borderRadius:4}}/>}</Stack>;
 }
@@ -338,18 +338,22 @@ function EventDetail({id,admin,me}:{id:string;admin:boolean;me:Me}){
  return <Stack spacing={2} sx={{my:4}}>
   <Button size="small" startIcon={<Glyph type="back"/>} sx={{alignSelf:"flex-start"}} onClick={()=>go(admin?"/admin/events":"/")}>Back to events</Button>
   <Typography variant="h4">{event.title}</Typography>
-  <EventWhen event={event}/>
-  <Typography variant="body2" color="text.secondary">{eventRelativeLabel(event.start_at,event.end_at,clockNow)}</Typography>
-  {error&&<Alert severity="error" role="alert">{error}</Alert>}
-  {notice&&<Alert severity="success" role="status">{notice}</Alert>}
-  {!closed&&(!full||signup)&&<Button variant="contained" disabled={busy} sx={{alignSelf:'flex-start'}} onClick={()=>void act(signup?'withdraw':'signup')}>
-   {signup?'Cancel registration as '+(me.firstName||'me'):eligible?'Sign up as '+(me.firstName||'me'):'Sign up'}
-  </Button>}
-  {closed&&<Alert severity="info">Signups closed when the event started.</Alert>}
-  {!closed&&full&&!signup&&<Alert severity="info">This event is full.</Alert>}
-  {signup&&<Box><Typography variant="h6">Participants</Typography>
-   {participants.map((participant,index)=><Typography key={index}>{participant.name}</Typography>)}
-  </Box>}
+  <Box sx={{display:'grid',gridTemplateColumns:{xs:'minmax(0,1fr)',md:'minmax(0,2fr) minmax(240px,1fr)'},gap:3,alignItems:'start'}}>
+   <Stack spacing={2} sx={{minWidth:0}}>
+    <EventWhen event={event} clockNow={clockNow}/>
+    {error&&<Alert severity="error" role="alert">{error}</Alert>}
+    {notice&&<Alert severity="success" role="status">{notice}</Alert>}
+    {!closed&&(!full||signup)&&<Button variant="contained" disabled={busy} sx={{alignSelf:'flex-start'}} onClick={()=>void act(signup?'withdraw':'signup')}>
+     {signup?'Cancel registration as '+(me.firstName||'me'):eligible?'Sign up as '+(me.firstName||'me'):'Sign up'}
+    </Button>}
+    {closed&&<Alert severity="info">Signups closed when the event started.</Alert>}
+    {!closed&&full&&!signup&&<Alert severity="info">This event is full.</Alert>}
+   </Stack>
+   {signup&&<Box component="aside" aria-label="Event participants" sx={{minWidth:0}}>
+    <Typography variant="h6" sx={{mb:1}}>Participants</Typography>
+    <Stack spacing={0.75}>{participants.map((participant,index)=><Typography key={index}>{participant.name}</Typography>)}</Stack>
+   </Box>}
+  </Box>
   
  </Stack>;
 }
