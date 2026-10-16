@@ -171,3 +171,12 @@ test('event time displays a clock glyph instead of raw ligature text',()=>{
  assert.match(source,/<Glyph type="clock"\/>/);
  assert.match(source,/link:'link'/);
 });
+
+test('admin event roster has one attendee search input with live user lookup',()=>{
+ const section=source.slice(source.indexOf('function AdminEventSignups('),source.indexOf('\nfunction ',source.indexOf('function AdminEventSignups(')+10));
+ assert.match(section,/label="Search and select attendee"/);
+ assert.match(section,/onInputChange=\{/);
+ assert.match(section,/generatedApi\.listAdminUsers\(\{q:query\}\)/);
+ assert.doesNotMatch(section,/label="Search attendees by name or email"/);
+ assert.doesNotMatch(section,/>Search users<\/Button>/);
+});
