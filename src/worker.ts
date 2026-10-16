@@ -38,11 +38,12 @@ const unavailableUsage=(name:string,scope:string,reason:string):UsageProvider=>(
 const recordOf=(value:unknown):Record<string,unknown>|null=>value!==null&&typeof value==='object'&&!Array.isArray(value)?value as Record<string,unknown>:null;
 const usageNumber=(value:unknown)=>typeof value==='number'&&Number.isFinite(value)&&value>=0?value:null;
 const usageTime=(value:unknown)=>typeof value==='string'&&Number.isFinite(Date.parse(value))?value:null;
+const usageEnvironment=(env:Env)=>env.ENVIRONMENT==='production'?'production':env.ENVIRONMENT==='staging'?'staging':'unknown';
 async function resendUsage(env:Env):Promise<UsageProvider>{
   if(!env.RESEND_USAGE_API_KEY)return unavailableUsage('Resend','account','A dedicated full-access usage credential has not been configured');
   try{
     const response=await fetch('https://api.resend.com/usage',{headers:{authorization:'Bearer '+env.RESEND_USAGE_API_KEY}});
-    if(!response.ok)return unavailableUsage('Resend','account','The Resend usage service is currently unavailable');
+    if(!response.ok){console.info('usage-provider-debug',JSON.stringify({provider:'resend',event:'http-error',status:response.status}));return unavailableUsage('Resend','account','The Resend usage service is currently unavailable');}
     const payload=recordOf(await response.json());
     const emails=recordOf(payload?.emails),daily=recordOf(emails?.daily);
     const used=usageNumber(daily?.used),limit=daily?.limit;
@@ -53,12 +54,13 @@ async function resendUsage(env:Env):Promise<UsageProvider>{
       remaining:confirmedLimit===null?null:Math.max(0,confirmedLimit-used),resetsAt:usageTime(daily?.resets_at),
       reason:confirmedLimit===null?'No daily email cap on the current Resend plan':'Daily email usage across the Resend account'
     };
-  }catch{return unavailableUsage('Resend','account','The Resend usage service could not be reached');}
+  }catch{console.info('usage-provider-debug',JSON.stringify({provider:'resend',event:'network-or-parse-error'}));return unavailableUsage('Resend','account','The Resend usage service could not be reached');}
 }
 async function cloudflareUsage(env:Env):Promise<[UsageProvider,UsageProvider]>{
+  const environment=usageEnvironment(env),workerScope=environment+' Worker',databaseScope=environment+' database';
   const unavailable=[
-    unavailableUsage('Cloudflare Workers','staging Worker','A read-only Cloudflare analytics credential has not been configured'),
-    unavailableUsage('Cloudflare D1','staging database','A read-only Cloudflare analytics credential has not been configured')
+    unavailableUsage('Cloudflare Workers',workerScope,'A read-only Cloudflare analytics credential has not been configured'),
+    unavailableUsage('Cloudflare D1',databaseScope,'A read-only Cloudflare analytics credential has not been configured')
   ] as [UsageProvider,UsageProvider];
   if(!env.CLOUDFLARE_ANALYTICS_API_TOKEN||!env.USAGE_CLOUDFLARE_ACCOUNT_ID||!env.USAGE_D1_DATABASE_ID||!env.USAGE_WORKER_NAME)return unavailable;
   const end=new Date(),start=new Date(end.getTime()-24*60*60*1000);
@@ -73,18 +75,19 @@ async function cloudflareUsage(env:Env):Promise<[UsageProvider,UsageProvider]>{
       method:'POST',headers:{authorization:'Bearer '+env.CLOUDFLARE_ANALYTICS_API_TOKEN,'content-type':'application/json'},
       body:JSON.stringify({query,variables:{accountTag:env.USAGE_CLOUDFLARE_ACCOUNT_ID,datetimeStart:start.toISOString(),datetimeEnd:end.toISOString(),start:start.toISOString().slice(0,10),end:end.toISOString().slice(0,10),scriptName:env.USAGE_WORKER_NAME,databaseId:env.USAGE_D1_DATABASE_ID}})
     });
-    if(!response.ok)return [unavailableUsage('Cloudflare Workers','staging Worker','The Cloudflare analytics service is currently unavailable'),unavailableUsage('Cloudflare D1','staging database','The Cloudflare analytics service is currently unavailable')];
+    if(!response.ok){console.info('usage-provider-debug',JSON.stringify({provider:'cloudflare',event:'http-error',status:response.status,environment}));return [unavailableUsage('Cloudflare Workers',workerScope,'The Cloudflare analytics service is currently unavailable'),unavailableUsage('Cloudflare D1',databaseScope,'The Cloudflare analytics service is currently unavailable')];}
     const payload=recordOf(await response.json()),data=recordOf(payload?.data),viewer=recordOf(data?.viewer),accounts=viewer?.accounts;
     const account=Array.isArray(accounts)?recordOf(accounts[0]):null;
     const workerRows=account?.workersInvocationsAdaptive,d1Rows=account?.d1AnalyticsAdaptiveGroups;
     const workerRequests=Array.isArray(workerRows)?workerRows.reduce((total,row)=>total+(usageNumber(recordOf(recordOf(row)?.sum)?.requests)??0),0):null;
     const d1Queries=Array.isArray(d1Rows)?d1Rows.reduce((total,row)=>{const sum=recordOf(recordOf(row)?.sum);return total+(usageNumber(sum?.readQueries)??0)+(usageNumber(sum?.writeQueries)??0)},0):null;
     if(workerRequests===null||d1Queries===null)return [unavailableUsage('Cloudflare Workers','staging Worker','The Cloudflare analytics response did not contain usable Worker metrics'),unavailableUsage('Cloudflare D1','staging database','The Cloudflare analytics response did not contain usable D1 metrics')];
+    console.info('usage-provider-debug',JSON.stringify({provider:'cloudflare',event:'metrics-loaded',environment,workerRows:Array.isArray(workerRows)?workerRows.length:0,d1Rows:Array.isArray(d1Rows)?d1Rows.length:0}));
     return [
-      {name:'Cloudflare Workers',scope:'staging Worker · rolling 24h',status:'available',used:workerRequests,limit:null,remaining:null,resetsAt:null,reason:'Worker invocations; Cloudflare plan limit not confirmed'},
-      {name:'Cloudflare D1',scope:'staging database · rolling 24h',status:'available',used:d1Queries,limit:null,remaining:null,resetsAt:null,reason:'Read and write queries; Cloudflare plan limit not confirmed'}
+      {name:'Cloudflare Workers',scope:workerScope+' · rolling 24h',status:'available',used:workerRequests,limit:null,remaining:null,resetsAt:null,reason:'Worker invocations; Cloudflare plan limit not confirmed'},
+      {name:'Cloudflare D1',scope:databaseScope+' · rolling 24h',status:'available',used:d1Queries,limit:null,remaining:null,resetsAt:null,reason:'Read and write queries; Cloudflare plan limit not confirmed'}
     ];
-  }catch{return [unavailableUsage('Cloudflare Workers','staging Worker','The Cloudflare analytics service could not be reached'),unavailableUsage('Cloudflare D1','staging database','The Cloudflare analytics service could not be reached')];}
+  }catch{console.info('usage-provider-debug',JSON.stringify({provider:'cloudflare',event:'network-or-parse-error',environment}));return [unavailableUsage('Cloudflare Workers',workerScope,'The Cloudflare analytics service could not be reached'),unavailableUsage('Cloudflare D1',databaseScope,'The Cloudflare analytics service could not be reached')];}
 }
 
 async function verifyTurnstile(request:Request,env:Env,token:unknown):Promise<boolean>{
