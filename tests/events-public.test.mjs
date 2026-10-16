@@ -697,6 +697,16 @@ test('verified magic-link claim reuses stub enrollment identity without granting
   assert.equal(h.sqlite.prepare('SELECT terms_accepted_at FROM users WHERE id=?').get(stubId).terms_accepted_at,null,'verification is not consent');
   assert.equal(h.sqlite.prepare('SELECT COUNT(*) n FROM agreement_acceptances WHERE user_id=?').get(stubId).n,0);
   assert.equal((await h.req('/api/events/'+eventId+'/signups','POST',{},session)).status,403,'uncompleted profile and policies still gate signup');
+  const versions=JSON.parse(readFileSync('src/generated/policy-versions.json','utf8'));
+  assert.equal((await h.req('/api/auth/agreements','POST',{accepted:true,termsVersion:versions.terms.version,privacyVersion:versions.privacy.version},session)).status,403,'claimant cannot consent before profile completion');
+  assert.equal((await h.req('/api/auth/profile','POST',{firstName:'Magic',lastName:'Claim',dateOfBirth:'1990-01-01'},session)).status,200,'claimant completes the ordinary profile workflow');
+  assert.equal(h.sqlite.prepare('SELECT claimed_at FROM user_stubs WHERE id=?').get(stubId).claimed_at,null,'profile completion alone does not finalize claiming');
+  assert.equal((await h.req('/api/events/'+eventId+'/signups','POST',{},session)).status,403,'profile completion does not bypass consent');
+  assert.equal((await h.req('/api/auth/agreements','POST',{accepted:true,termsVersion:versions.terms.version,privacyVersion:versions.privacy.version},session)).status,200,'claimant accepts policies via normal registration');
+  assert.ok(h.sqlite.prepare('SELECT claimed_at FROM user_stubs WHERE id=?').get(stubId).claimed_at!==null,'consent completes the claim');
+  assert.equal(h.sqlite.prepare('SELECT COUNT(*) n FROM agreement_acceptances WHERE user_id=?').get(stubId).n,1,'claimant consent is recorded only on explicit acceptance');
+  assert.equal((await h.req('/api/events/'+eventId+'/signups','POST',{},session)).status,409,'pre-claim enrollment remains active and cannot be duplicated');
+  assert.equal(h.sqlite.prepare('SELECT COUNT(*) n FROM event_signups WHERE user_id=? AND event_id=?').get(stubId,eventId).n,1,'claim does not reassign or duplicate historical signup');
   assert.notEqual((await h.req('/api/auth/magic','POST',{token})).status,200,'magic link must not be replayable');
  }finally{h.sqlite.close()}
 });
