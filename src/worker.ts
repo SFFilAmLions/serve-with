@@ -96,7 +96,7 @@ async function cloudflareUsage(env:Env):Promise<UsageProvider[]>{
       {name:'Cloudflare D1 rows read',scope,status:'available',used:d1RowsRead,limit:5000000,remaining:Math.max(0,5000000-d1RowsRead),resetsAt,reason:'All D1 rows read in this Cloudflare account; Workers Free daily limit'},
       {name:'Cloudflare D1 rows written',scope,status:'available',used:d1RowsWritten,limit:100000,remaining:Math.max(0,100000-d1RowsWritten),resetsAt,reason:'All D1 rows written in this Cloudflare account; Workers Free daily limit'}
     ];
-  }catch{console.info('usage-provider-debug',JSON.stringify({provider:'cloudflare',event:'network-or-parse-error',environment}));return cloudflareUnavailable(scope,'The Cloudflare analytics service could not be reached');}
+  }catch(error){console.info('usage-provider-debug',JSON.stringify({provider:'cloudflare',event:'network-or-parse-error',environment,error:error instanceof Error?error.message:'unknown'}));return cloudflareUnavailable(scope,'The Cloudflare analytics service could not be reached');}
 }
 const usageCacheKey=(env:Env)=>[
   usageEnvironment(env),env.USAGE_CLOUDFLARE_ACCOUNT_ID||'',
