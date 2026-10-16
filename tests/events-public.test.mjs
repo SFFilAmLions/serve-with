@@ -488,16 +488,22 @@ test('usage endpoint reports Cloudflare staging metrics only with scoped analyti
   const now=Date.now(),token='f'.repeat(64);
   const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode('test:'+token))),b=>b.toString(16).padStart(2,'0')).join('');
   h.sqlite.prepare('INSERT INTO sessions(token_hash,email,expires_at,created_at) VALUES(?,?,?,?)').run(hash,'lionaugust@icloud.com',now+600000,now);
+  let calls=0;
   globalThis.fetch=async(url,init)=>{
+   calls++;
    assert.equal(String(url),'https://api.cloudflare.com/client/v4/graphql');
    assert.equal(new Headers(init.headers).get('authorization'),'Bearer scoped-analytics-key');
    return new Response(JSON.stringify({data:{viewer:{accounts:[{workersInvocationsAdaptive:[{sum:{requests:21}}],d1AnalyticsAdaptiveGroups:[{sum:{readQueries:7,writeQueries:3}}]}]}}}),{status:200});
   };
-  const response=await h.req('/api/admin/usage','GET',undefined,'__Host-sw_session='+token,{CLOUDFLARE_ANALYTICS_API_TOKEN:'scoped-analytics-key',USAGE_CLOUDFLARE_ACCOUNT_ID:'account',USAGE_D1_DATABASE_ID:'database',USAGE_WORKER_NAME:'serve-with-staging'});
+  const settings={ENVIRONMENT:'staging',CLOUDFLARE_ANALYTICS_API_TOKEN:'scoped-analytics-key',USAGE_CLOUDFLARE_ACCOUNT_ID:'account',USAGE_D1_DATABASE_ID:'database',USAGE_WORKER_NAME:'serve-with-staging'};
+  const response=await h.req('/api/admin/usage','GET',undefined,'__Host-sw_session='+token,settings);
   assert.equal(response.status,200);
   const providers=(await response.json()).providers;
   assert.equal(providers.find(provider=>provider.name==='Cloudflare Workers').used,21);
   assert.equal(providers.find(provider=>provider.name==='Cloudflare D1').used,10);
+  assert.equal(providers.find(provider=>provider.name==='Cloudflare Workers').scope,'staging Worker · rolling 24h');
+  assert.equal((await h.req('/api/admin/usage','GET',undefined,'__Host-sw_session='+token,settings)).status,200);
+  assert.equal(calls,1,'a short-lived cache avoids a duplicate provider query');
  }finally{globalThis.fetch=originalFetch;h.sqlite.close();}
 });
 

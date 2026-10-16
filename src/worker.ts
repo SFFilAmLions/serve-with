@@ -32,6 +32,12 @@ type UsageProvider = {
   name:string; scope:string; status:'available'|'stale'|'unavailable';
   used:number|null; limit:number|null; remaining:number|null; resetsAt:string|null; reason?:string;
 };
+type UsageSnapshot = { collectedAt:string; expiresAt:number; providers:UsageProvider[] };
+// This is deliberately an isolate-local cache. It reduces provider traffic without
+// turning a provider outage into a fabricated zero, and does not persist any secret.
+const usageCache=new Map<string,UsageSnapshot>();
+const USAGE_CACHE_MS=5*60*1000;
+const USAGE_STALE_MS=15*60*1000;
 const unavailableUsage=(name:string,scope:string,reason:string):UsageProvider=>({
   name,scope,status:'unavailable',used:null,limit:null,remaining:null,resetsAt:null,reason
 });
@@ -81,13 +87,46 @@ async function cloudflareUsage(env:Env):Promise<[UsageProvider,UsageProvider]>{
     const workerRows=account?.workersInvocationsAdaptive,d1Rows=account?.d1AnalyticsAdaptiveGroups;
     const workerRequests=Array.isArray(workerRows)?workerRows.reduce((total,row)=>total+(usageNumber(recordOf(recordOf(row)?.sum)?.requests)??0),0):null;
     const d1Queries=Array.isArray(d1Rows)?d1Rows.reduce((total,row)=>{const sum=recordOf(recordOf(row)?.sum);return total+(usageNumber(sum?.readQueries)??0)+(usageNumber(sum?.writeQueries)??0)},0):null;
-    if(workerRequests===null||d1Queries===null)return [unavailableUsage('Cloudflare Workers','staging Worker','The Cloudflare analytics response did not contain usable Worker metrics'),unavailableUsage('Cloudflare D1','staging database','The Cloudflare analytics response did not contain usable D1 metrics')];
+    if(workerRequests===null||d1Queries===null)return [unavailableUsage('Cloudflare Workers',workerScope,'The Cloudflare analytics response did not contain usable Worker metrics'),unavailableUsage('Cloudflare D1',databaseScope,'The Cloudflare analytics response did not contain usable D1 metrics')];
     console.info('usage-provider-debug',JSON.stringify({provider:'cloudflare',event:'metrics-loaded',environment,workerRows:Array.isArray(workerRows)?workerRows.length:0,d1Rows:Array.isArray(d1Rows)?d1Rows.length:0}));
     return [
       {name:'Cloudflare Workers',scope:workerScope+' · rolling 24h',status:'available',used:workerRequests,limit:null,remaining:null,resetsAt:null,reason:'Worker invocations; Cloudflare plan limit not confirmed'},
       {name:'Cloudflare D1',scope:databaseScope+' · rolling 24h',status:'available',used:d1Queries,limit:null,remaining:null,resetsAt:null,reason:'Read and write queries; Cloudflare plan limit not confirmed'}
     ];
   }catch{console.info('usage-provider-debug',JSON.stringify({provider:'cloudflare',event:'network-or-parse-error',environment}));return [unavailableUsage('Cloudflare Workers',workerScope,'The Cloudflare analytics service could not be reached'),unavailableUsage('Cloudflare D1',databaseScope,'The Cloudflare analytics service could not be reached')];}
+}
+const usageCacheKey=(env:Env)=>[
+  usageEnvironment(env),env.USAGE_CLOUDFLARE_ACCOUNT_ID||'',env.USAGE_D1_DATABASE_ID||'',env.USAGE_WORKER_NAME||'',
+  env.CLOUDFLARE_ANALYTICS_API_TOKEN?'cloudflare-configured':'cloudflare-missing',
+  env.RESEND_USAGE_API_KEY?'resend-configured':'resend-missing'
+].join('|');
+const staleProvider=(provider:UsageProvider):UsageProvider=>({
+  ...provider,status:'stale',reason:'Last confirmed reading; the current provider request did not succeed'
+});
+async function usageSnapshot(env:Env):Promise<{collectedAt:string;providers:UsageProvider[]}>{
+  const now=Date.now(),key=usageCacheKey(env),cached=usageCache.get(key);
+  if(cached&&cached.expiresAt>now){
+    console.info('usage-provider-debug',JSON.stringify({provider:'all',event:'cache-hit',environment:usageEnvironment(env)}));
+    return {collectedAt:cached.collectedAt,providers:cached.providers};
+  }
+  const [[workersUsage,d1Usage],resend]=await Promise.all([cloudflareUsage(env),resendUsage(env)]);
+  const environment=usageEnvironment(env);
+  const current:UsageProvider[]=[
+    workersUsage,d1Usage,resend,
+    unavailableUsage('Turnstile',environment+' widget','No supported programmatic Turnstile quota endpoint is configured')
+  ];
+  const canUseStale=Boolean(cached&&now-cached.expiresAt<USAGE_STALE_MS-USAGE_CACHE_MS);
+  const providers=current.map(provider=>{
+    if(provider.status==='available'||!canUseStale)return provider;
+    const previous=cached?.providers.find(candidate=>candidate.name===provider.name&&candidate.status==='available');
+    return previous?staleProvider(previous):provider;
+  });
+  const collectedAt=new Date().toISOString();
+  if(current.some(provider=>provider.status==='available')){
+    usageCache.set(key,{collectedAt,expiresAt:now+USAGE_CACHE_MS,providers:current});
+  }
+  console.info('usage-provider-debug',JSON.stringify({provider:'all',event:canUseStale?'refresh-with-stale-fallback':'refresh',environment,available:current.filter(provider=>provider.status==='available').length,stale:providers.filter(provider=>provider.status==='stale').length}));
+  return {collectedAt,providers};
 }
 
 async function verifyTurnstile(request:Request,env:Env,token:unknown):Promise<boolean>{
@@ -418,17 +457,11 @@ async function legacyFetch(request: Request, env: Env): Promise<Response> {
         const environment=env.ENVIRONMENT==='production'?'production':env.ENVIRONMENT==='staging'?'staging':'unknown';
         // Provider integrations must fail closed: never substitute zero for an
         // unavailable reading, and never use deployment or sending credentials.
-        const [workersUsage,d1Usage]=await cloudflareUsage(env);
-        const providers:UsageProvider[]=[
-          workersUsage,
-          d1Usage,
-          await resendUsage(env),
-          unavailableUsage('Turnstile','staging widget','No supported programmatic Turnstile quota endpoint is configured')
-        ];
+        const usage=await usageSnapshot(env),providers=usage.providers;
         // Safe operational diagnostics: never log request cookies, credentials,
         // account IDs, emails, or provider response bodies.
         console.info('usage-provider-status',JSON.stringify({environment,providerCount:providers.length,available:providers.filter(provider=>provider.status==='available').map(provider=>provider.name)}));
-        return json({environment,collectedAt:new Date().toISOString(),providers});
+        return json({environment,collectedAt:usage.collectedAt,providers});
       }
 
       const adminSignupMatch=path.match(/^\/api\/admin\/events\/([0-9a-f-]{36})\/signups$/);

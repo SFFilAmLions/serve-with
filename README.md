@@ -73,7 +73,7 @@ The administrator-only **Usage & Quotas** page reads provider metrics without ex
 | `USAGE_D1_DATABASE_ID` | deployment variable | The D1 database ID for that environment only. |
 | `USAGE_WORKER_NAME` | deployment variable | The Worker name for that environment only. |
 
-`wrangler.jsonc` contains only the non-secret per-environment identifiers. Add secrets in the Cloudflare Worker dashboard under **Settings → Runtime variables and secrets**. The analytics token must be read-only and account-scoped; the application filters all queries to the configured Worker and database. A provider that cannot be queried must remain unavailable rather than being shown as zero usage.
+`wrangler.jsonc` contains only the non-secret per-environment identifiers. Add secrets in the Cloudflare Worker dashboard under **Settings → Runtime variables and secrets**. The analytics token must be read-only and account-scoped; the application filters all queries to the configured Worker and database. A provider that cannot be queried must remain unavailable rather than being shown as zero usage. Successful readings are cached in the active Worker isolate for five minutes; if a refresh fails, a previously confirmed reading may be labelled **stale** for up to fifteen minutes rather than misrepresented as current.
 
 ## Specifications and references
 
