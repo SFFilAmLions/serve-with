@@ -51,6 +51,10 @@ components:
           description: Unix epoch milliseconds
         version:
           type: integer
+        created_at:
+          type: integer
+          format: int64
+          description: Event creation time in Unix epoch milliseconds, when available
         capacity:
           type: [integer, 'null']
           minimum: 0
