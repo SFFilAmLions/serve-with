@@ -17,8 +17,6 @@ interface Env {
   RESEND_USAGE_API_KEY?: string;
   CLOUDFLARE_ANALYTICS_API_TOKEN?: string;
   USAGE_CLOUDFLARE_ACCOUNT_ID?: string;
-  USAGE_D1_DATABASE_ID?: string;
-  USAGE_WORKER_NAME?: string;
   AUTH_FROM_EMAIL?: string;
   ENVIRONMENT?: string;
   STAGING_REGISTRATION_EMAILS?: string;
@@ -62,41 +60,48 @@ async function resendUsage(env:Env):Promise<UsageProvider>{
     };
   }catch{console.info('usage-provider-debug',JSON.stringify({provider:'resend',event:'network-or-parse-error'}));return unavailableUsage('Resend','account','The Resend usage service could not be reached');}
 }
-async function cloudflareUsage(env:Env):Promise<[UsageProvider,UsageProvider]>{
-  const environment=usageEnvironment(env),workerScope=environment+' Worker',databaseScope=environment+' database';
-  const unavailable=[
-    unavailableUsage('Cloudflare Workers',workerScope,'A read-only Cloudflare analytics credential has not been configured'),
-    unavailableUsage('Cloudflare D1',databaseScope,'A read-only Cloudflare analytics credential has not been configured')
-  ] as [UsageProvider,UsageProvider];
-  if(!env.CLOUDFLARE_ANALYTICS_API_TOKEN||!env.USAGE_CLOUDFLARE_ACCOUNT_ID||!env.USAGE_D1_DATABASE_ID||!env.USAGE_WORKER_NAME)return unavailable;
-  const end=new Date(),start=new Date(end.getTime()-24*60*60*1000);
-  const query=`query ServeWithUsage($accountTag: string!, $datetimeStart: string!, $datetimeEnd: string!, $start: Date, $end: Date, $scriptName: string!, $databaseId: string!) {
+const cloudflareUnavailable=(scope:string,reason:string):UsageProvider[]=>[
+  unavailableUsage('Cloudflare Workers',scope,reason),
+  unavailableUsage('Cloudflare D1 rows read',scope,reason),
+  unavailableUsage('Cloudflare D1 rows written',scope,reason)
+];
+const nextUtcMidnight=(now:Date)=>new Date(Date.UTC(now.getUTCFullYear(),now.getUTCMonth(),now.getUTCDate()+1));
+async function cloudflareUsage(env:Env):Promise<UsageProvider[]>{
+  const environment=usageEnvironment(env),scope='Cloudflare account · current UTC day';
+  const unavailable=cloudflareUnavailable(scope,'A read-only Cloudflare analytics credential has not been configured');
+  if(!env.CLOUDFLARE_ANALYTICS_API_TOKEN||!env.USAGE_CLOUDFLARE_ACCOUNT_ID)return unavailable;
+  const end=new Date(),start=new Date(Date.UTC(end.getUTCFullYear(),end.getUTCMonth(),end.getUTCDate())),resetAt=nextUtcMidnight(end).toISOString();
+  const query=`query ServeWithUsage($accountTag: string!, $datetimeStart: string!, $datetimeEnd: string!, $start: Date, $end: Date) {
     viewer { accounts(filter: {accountTag: $accountTag}) {
-      workersInvocationsAdaptive(limit: 100, filter: {scriptName: $scriptName, datetime_geq: $datetimeStart, datetime_leq: $datetimeEnd}) { sum { requests } }
-      d1AnalyticsAdaptiveGroups(limit: 10000, filter: {date_geq: $start, date_leq: $end, databaseId: $databaseId}) { sum { readQueries writeQueries } }
+      workersInvocationsAdaptive(limit: 10000, filter: {datetime_geq: $datetimeStart, datetime_leq: $datetimeEnd}) { sum { requests } }
+      d1AnalyticsAdaptiveGroups(limit: 10000, filter: {date_geq: $start, date_leq: $end}) { sum { rowsRead rowsWritten } }
     } }
   }`;
   try{
     const response=await fetch('https://api.cloudflare.com/client/v4/graphql',{
       method:'POST',headers:{authorization:'Bearer '+env.CLOUDFLARE_ANALYTICS_API_TOKEN,'content-type':'application/json'},
-      body:JSON.stringify({query,variables:{accountTag:env.USAGE_CLOUDFLARE_ACCOUNT_ID,datetimeStart:start.toISOString(),datetimeEnd:end.toISOString(),start:start.toISOString().slice(0,10),end:end.toISOString().slice(0,10),scriptName:env.USAGE_WORKER_NAME,databaseId:env.USAGE_D1_DATABASE_ID}})
+      body:JSON.stringify({query,variables:{accountTag:env.USAGE_CLOUDFLARE_ACCOUNT_ID,datetimeStart:start.toISOString(),datetimeEnd:end.toISOString(),start:start.toISOString().slice(0,10),end:end.toISOString().slice(0,10)}})
     });
-    if(!response.ok){console.info('usage-provider-debug',JSON.stringify({provider:'cloudflare',event:'http-error',status:response.status,environment}));return [unavailableUsage('Cloudflare Workers',workerScope,'The Cloudflare analytics service is currently unavailable'),unavailableUsage('Cloudflare D1',databaseScope,'The Cloudflare analytics service is currently unavailable')];}
-    const payload=recordOf(await response.json()),data=recordOf(payload?.data),viewer=recordOf(data?.viewer),accounts=viewer?.accounts;
+    if(!response.ok){console.info('usage-provider-debug',JSON.stringify({provider:'cloudflare',event:'http-error',status:response.status,environment}));return cloudflareUnavailable(scope,'The Cloudflare analytics service is currently unavailable');}
+    const payload=recordOf(await response.json());
+    if(!payload||Array.isArray(payload.errors)&&payload.errors.length>0)return cloudflareUnavailable(scope,'Cloudflare analytics returned an incomplete or unsuccessful query');
+    const data=recordOf(payload.data),viewer=recordOf(data?.viewer),accounts=viewer?.accounts;
     const account=Array.isArray(accounts)?recordOf(accounts[0]):null;
     const workerRows=account?.workersInvocationsAdaptive,d1Rows=account?.d1AnalyticsAdaptiveGroups;
     const workerRequests=Array.isArray(workerRows)?workerRows.reduce((total,row)=>total+(usageNumber(recordOf(recordOf(row)?.sum)?.requests)??0),0):null;
-    const d1Queries=Array.isArray(d1Rows)?d1Rows.reduce((total,row)=>{const sum=recordOf(recordOf(row)?.sum);return total+(usageNumber(sum?.readQueries)??0)+(usageNumber(sum?.writeQueries)??0)},0):null;
-    if(workerRequests===null||d1Queries===null)return [unavailableUsage('Cloudflare Workers',workerScope,'The Cloudflare analytics response did not contain usable Worker metrics'),unavailableUsage('Cloudflare D1',databaseScope,'The Cloudflare analytics response did not contain usable D1 metrics')];
+    const d1RowsRead=Array.isArray(d1Rows)?d1Rows.reduce((total,row)=>total+(usageNumber(recordOf(recordOf(row)?.sum)?.rowsRead)??0),0):null;
+    const d1RowsWritten=Array.isArray(d1Rows)?d1Rows.reduce((total,row)=>total+(usageNumber(recordOf(recordOf(row)?.sum)?.rowsWritten)??0),0):null;
+    if(workerRequests===null||d1RowsRead===null||d1RowsWritten===null)return cloudflareUnavailable(scope,'The Cloudflare analytics response did not contain usable account usage metrics');
     console.info('usage-provider-debug',JSON.stringify({provider:'cloudflare',event:'metrics-loaded',environment,workerRows:Array.isArray(workerRows)?workerRows.length:0,d1Rows:Array.isArray(d1Rows)?d1Rows.length:0}));
     return [
-      {name:'Cloudflare Workers',scope:workerScope+' · rolling 24h',status:'available',used:workerRequests,limit:null,remaining:null,resetsAt:null,reason:'Worker invocations; Cloudflare plan limit not confirmed'},
-      {name:'Cloudflare D1',scope:databaseScope+' · rolling 24h',status:'available',used:d1Queries,limit:null,remaining:null,resetsAt:null,reason:'Read and write queries; Cloudflare plan limit not confirmed'}
+      {name:'Cloudflare Workers',scope,status:'available',used:workerRequests,limit:100000,remaining:Math.max(0,100000-workerRequests),resetsAt:resetAt,reason:'All Worker requests in this Cloudflare account; Workers Free daily limit'},
+      {name:'Cloudflare D1 rows read',scope,status:'available',used:d1RowsRead,limit:5000000,remaining:Math.max(0,5000000-d1RowsRead),resetsAt:resetAt,reason:'All D1 rows read in this Cloudflare account; Workers Free daily limit'},
+      {name:'Cloudflare D1 rows written',scope,status:'available',used:d1RowsWritten,limit:100000,remaining:Math.max(0,100000-d1RowsWritten),resetsAt:resetAt,reason:'All D1 rows written in this Cloudflare account; Workers Free daily limit'}
     ];
-  }catch{console.info('usage-provider-debug',JSON.stringify({provider:'cloudflare',event:'network-or-parse-error',environment}));return [unavailableUsage('Cloudflare Workers',workerScope,'The Cloudflare analytics service could not be reached'),unavailableUsage('Cloudflare D1',databaseScope,'The Cloudflare analytics service could not be reached')];}
+  }catch{console.info('usage-provider-debug',JSON.stringify({provider:'cloudflare',event:'network-or-parse-error',environment}));return cloudflareUnavailable(scope,'The Cloudflare analytics service could not be reached');}
 }
 const usageCacheKey=(env:Env)=>[
-  usageEnvironment(env),env.USAGE_CLOUDFLARE_ACCOUNT_ID||'',env.USAGE_D1_DATABASE_ID||'',env.USAGE_WORKER_NAME||'',
+  usageEnvironment(env),env.USAGE_CLOUDFLARE_ACCOUNT_ID||'',
   env.CLOUDFLARE_ANALYTICS_API_TOKEN?'cloudflare-configured':'cloudflare-missing',
   env.RESEND_USAGE_API_KEY?'resend-configured':'resend-missing'
 ].join('|');
@@ -109,10 +114,10 @@ async function usageSnapshot(env:Env):Promise<{collectedAt:string;providers:Usag
     console.info('usage-provider-debug',JSON.stringify({provider:'all',event:'cache-hit',environment:usageEnvironment(env)}));
     return {collectedAt:cached.collectedAt,providers:cached.providers};
   }
-  const [[workersUsage,d1Usage],resend]=await Promise.all([cloudflareUsage(env),resendUsage(env)]);
+  const [cloudflare,resend]=await Promise.all([cloudflareUsage(env),resendUsage(env)]);
   const environment=usageEnvironment(env);
   const current:UsageProvider[]=[
-    workersUsage,d1Usage,resend,
+    ...cloudflare,resend,
     unavailableUsage('Turnstile',environment+' widget','No supported programmatic Turnstile quota endpoint is configured')
   ];
   const canUseStale=Boolean(cached&&now-cached.expiresAt<USAGE_STALE_MS-USAGE_CACHE_MS);

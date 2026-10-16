@@ -17,13 +17,13 @@ import { type Draft, timeZones, validateDraft, emptyDraft, localInput } from './
 
 type EventRecord = { id:string; title:string; location:string; timezone:string; start_at:number; end_at:number; version:number; created_at?:number; capacity?:number|null; signups_count?:number; spots_available?:number|null };
 type View = 'upcoming'|'past';
-function Glyph({type,size=20}:{type:'sun'|'moon'|'system'|'person'|'swap'|'logout'|'login'|'pin'|'back'|'save'|'edit'|'copy'|'link'|'trash'|'github'|'events'|'users'|'usage'|'signups'|'calendar'|'attendance'|'withdraw';size?:18|20|24}) {
+function Glyph({type,size=20}:{type:'sun'|'moon'|'system'|'person'|'swap'|'logout'|'login'|'pin'|'back'|'save'|'edit'|'copy'|'link'|'trash'|'github'|'events'|'users'|'usage'|'signups'|'calendar'|'attendance'|'withdraw'|'clock';size?:18|20|24}) {
  const symbols={
   sun:'light_mode',moon:'dark_mode',system:'settings_brightness',
   person:'person',swap:'swap_horiz',logout:'logout',login:'login',
   pin:'location_on',back:'arrow_back',save:'save',edit:'edit',
   copy:'content_copy',link:'link',trash:'delete',github:'code',
-  events:'event',users:'group',usage:'monitoring',signups:'how_to_reg',calendar:'calendar_month',attendance:'groups',withdraw:'person_remove'
+  events:'event',users:'group',usage:'monitoring',signups:'how_to_reg',calendar:'calendar_month',attendance:'groups',withdraw:'person_remove',clock:'schedule'
  } as const;
  return <Box component="span" className="material-symbols-rounded" aria-hidden="true"
   sx={{fontFamily:'Material Symbols Rounded',fontSize:size,lineHeight:1,
@@ -53,7 +53,7 @@ function EventWhen({event,clockNow}:{event:EventRecord;clockNow?:number}){
  const time=(v:number)=>new Intl.DateTimeFormat('en-US',{hour:'numeric',minute:'2-digit',timeZone:event.timezone}).format(v);
  const start=date(event.start_at),end=date(event.end_at);
  const abbreviated=new Intl.DateTimeFormat('en-US',{timeZone:event.timezone,timeZoneName:'short'}).formatToParts(event.start_at).find(p=>p.type==='timeZoneName')?.value||event.timezone;
- return <Stack spacing={1}><Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap" useFlexGap><Stack direction="row" spacing={1} alignItems="center"><Glyph type="calendar"/><Typography>{start===end?start:start+' – '+end}</Typography></Stack>{clockNow!==undefined&&<Chip size="small" variant="outlined" label={eventRelativeLabel(event.start_at,event.end_at,clockNow)}/>}</Stack><Typography variant="body2" color="text.secondary">{time(event.start_at)} – {time(event.end_at)}</Typography><Stack direction="row" gap={1} flexWrap="wrap"><Stack direction="row" spacing={0.75} alignItems="center"><Glyph type="pin"/><Typography variant="body2" color="text.secondary">{event.location}</Typography></Stack>{timeZoneOffsetMinutes(event.start_at,event.timezone)!==timeZoneOffsetMinutes(event.start_at,Intl.DateTimeFormat().resolvedOptions().timeZone)&&<Tooltip title={event.timezone}><Chip size="small" variant="outlined" label={abbreviated}/></Tooltip>}</Stack>{event.signups_count!==undefined&&<Typography variant="body2" color="text.secondary">
+ return <Stack spacing={1}><Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap" useFlexGap><Stack direction="row" spacing={1} alignItems="center"><Glyph type="calendar"/><Typography>{start===end?start:start+' – '+end}</Typography></Stack>{clockNow!==undefined&&<Chip size="small" variant="outlined" label={eventRelativeLabel(event.start_at,event.end_at,clockNow)}/>}</Stack><Stack direction="row" spacing={1} alignItems="center"><Glyph type="clock"/><Typography variant="body2" color="text.secondary">{time(event.start_at)} – {time(event.end_at)}</Typography></Stack><Stack direction="row" gap={1} flexWrap="wrap"><Stack direction="row" spacing={0.75} alignItems="center"><Glyph type="pin"/><Typography variant="body2" color="text.secondary">{event.location}</Typography></Stack>{timeZoneOffsetMinutes(event.start_at,event.timezone)!==timeZoneOffsetMinutes(event.start_at,Intl.DateTimeFormat().resolvedOptions().timeZone)&&<Tooltip title={event.timezone}><Chip size="small" variant="outlined" label={abbreviated}/></Tooltip>}</Stack>{event.signups_count!==undefined&&<Typography variant="body2" color="text.secondary">
   {event.signups_count} {event.signups_count===1?'spot taken':'spots taken'} · {event.capacity===null?'No max attendance limit':event.spots_available===undefined?'Capacity information unavailable':event.spots_available+' spots available'}
  </Typography>}{event.signups_count!==undefined&&typeof event.capacity==='number'&&event.capacity>=0&&<LinearProgress variant="determinate" value={event.capacity===0?100:Math.min(100,Math.max(0,event.signups_count/event.capacity*100))} aria-label={`Attendance: ${event.signups_count} of ${event.capacity} spots filled`} sx={{height:8,borderRadius:4}}/>}</Stack>;
 }
@@ -504,11 +504,17 @@ function AdminEventSignups({id}:{id:string}){
   try{await navigator.clipboard.writeText(new URL('/events/'+id,location.origin).toString());setNotice('Event link copied');}
   catch{setError('Unable to copy event link.');}
  };
- const search=async()=>{
-  setError('');
-  try{const response=await generatedApi.listAdminUsers({q:query});if(response.status!==200)throw Error((response.data as {error?:string}).error||'Unable to find users');setPeople((response.data as unknown as {users:typeof people}).users);}
-  catch(e){setError(e instanceof Error?e.message:'Unable to find users');}
- };
+ useEffect(()=>{
+   if(!query.trim())return;
+  let active=true;
+  const timer=setTimeout(()=>{
+   void generatedApi.listAdminUsers({q:query}).then(response=>{
+    if(response.status!==200)throw Error((response.data as {error?:string}).error||'Unable to find users');
+    if(active)setPeople((response.data as unknown as {users:typeof people}).users);
+   }).catch(e=>{if(active)setError(e instanceof Error?e.message:'Unable to find users')});
+   },300);
+   return()=>{active=false;clearTimeout(timer)};
+  },[query]);
  const act=async(kind:'signup'|'withdraw',userId:string)=>{
   if(busy)return;setBusy(true);setError('');setNotice('');
   try{
@@ -547,14 +553,12 @@ function AdminEventSignups({id}:{id:string}){
     </Card>}
    <Typography variant="h6" sx={{mt:3,mb:1}}>Add an attendee</Typography>
    <Button sx={{mb:1}} onClick={()=>go('/admin/users/new',{returnEventId:id})}>Create user</Button>
-   <Stack direction={{xs:'column',sm:'row'}} spacing={1}>
-    <TextField size="small" label="Search attendees by name or email" value={query} onChange={e=>setQuery(e.target.value)}/>
-    <Button onClick={()=>void search()}>Search users</Button>
-   </Stack>
-   {people.length>0&&<Autocomplete sx={{mt:1}} options={people} value={people.find(p=>p.id===selected)||null}
+   <Autocomplete sx={{mt:1}} options={people} value={people.find(p=>p.id===selected)||null}
+     filterOptions={options=>options}
      getOptionLabel={p=>[p.first_name,p.last_name].filter(Boolean).join(' ')||p.email||'Unnamed user'}
+     onInputChange={(_,value,reason)=>{if(reason==='input'){setQuery(value);setError('')}}}
      onChange={(_,p)=>setSelected(p?.id||'')}
-     renderInput={params=><TextField {...params} label="Select attendee"/>}/>}
+     renderInput={params=><TextField {...params} label="Search and select attendee" helperText="Start typing a name or email to search users"/>}/>
    <Button variant="contained" sx={{mt:1}} disabled={!selected||busy} onClick={()=>void act('signup',selected)}>Confirm signup</Button>
   </Box>
   <Box component="section" aria-labelledby="admin-event-history-heading">
@@ -637,6 +641,8 @@ function UsageDashboard(){
  const [data,setData]=useState<{environment:string;collectedAt:string;providers:{name:string;scope:string;status:string;used:number|null;limit:number|null;remaining:number|null;resetsAt:string|null;reason?:string}[]}|null>(null);
  const [error,setError]=useState(''),[loading,setLoading]=useState(true);
  const [diagnostic,setDiagnostic]=useState('No provider request has completed yet.');
+ const [clockNow,setClockNow]=useState(Date.now());
+ useEffect(()=>{const interval=setInterval(()=>setClockNow(Date.now()),60000);return()=>clearInterval(interval)},[]);
  const refresh=async()=>{
   setLoading(true);setError('');
   try{
@@ -660,6 +666,8 @@ function UsageDashboard(){
    <Box sx={{display:'grid',gridTemplateColumns:{xs:'1fr',md:'repeat(2,minmax(0,1fr))'},gap:2}}>
     {data.providers.map(provider=>{
      const fraction=provider.used!==null&&provider.limit!==null&&provider.limit>0?provider.used/provider.limit:null;
+     const resetAt=provider.resetsAt===null?null:Date.parse(provider.resetsAt);
+     const resetLabel=resetAt!==null&&Number.isFinite(resetAt)&&resetAt>clockNow?'Resets '+eventRelativeLabel(resetAt,resetAt+1,clockNow).toLowerCase():null;
      return <Card key={provider.name} variant="outlined"><CardContent>
       <Typography variant="h6">{provider.name}</Typography>
       <Typography variant="body2" color="text.secondary">Scope: {provider.scope}</Typography>
@@ -667,6 +675,8 @@ function UsageDashboard(){
       {provider.used!==null?<Typography>Used: {provider.used}</Typography>:<Typography>Usage: Unknown</Typography>}
       <Typography>Limit: {provider.limit===null?'Unknown':provider.limit}</Typography>
       <Typography>Remaining: {provider.remaining===null?'Unknown':provider.remaining}</Typography>
+      {fraction!==null&&<Box sx={{mt:1}}><LinearProgress variant="determinate" value={Math.min(100,Math.max(0,fraction*100))} color={fraction>=0.95?'error':fraction>=0.8?'warning':'primary'} aria-label={`Usage: ${provider.used} of ${provider.limit}`} sx={{height:8,borderRadius:4}}/><Typography variant="body2" color="text.secondary" sx={{mt:0.5}}>{Math.round(fraction*100)}% of quota used</Typography></Box>}
+      {resetLabel&&<Typography variant="body2" color="text.secondary" title={new Date(resetAt!).toLocaleString()}>{resetLabel}</Typography>}
       {fraction!==null&&fraction>=0.8&&<Alert severity={fraction>=0.95?'error':'warning'}>{fraction>=0.95?'Critical':'High'} utilization ({Math.round(fraction*100)}%)</Alert>}
       {provider.reason&&<Typography variant="body2" color="text.secondary">{provider.reason}</Typography>}
      </CardContent></Card>

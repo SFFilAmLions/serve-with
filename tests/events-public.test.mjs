@@ -458,7 +458,7 @@ test('usage endpoint hides provider credentials and never fabricates limits',asy
   const response=await h.req('/api/admin/usage','GET',undefined,'__Host-sw_session='+token);
   assert.equal(response.status,200);
   const data=await response.json();
-  assert.equal(data.providers.length,4);
+  assert.equal(data.providers.length,5);
   assert.ok(data.providers.every(p=>p.status==='unavailable'&&p.used===null&&p.limit===null&&p.remaining===null));
   assert.equal(JSON.stringify(data).includes('fake'),false);
  }finally{h.sqlite.close();}
@@ -482,7 +482,7 @@ test('usage endpoint reports Resend daily quota only with the dedicated usage ke
  }finally{globalThis.fetch=originalFetch;h.sqlite.close();}
 });
 
-test('usage endpoint reports Cloudflare staging metrics only with scoped analytics configuration',async()=>{
+test('usage endpoint reports Cloudflare Free-plan account usage for the current UTC day',async()=>{
  const h=harness(),originalFetch=globalThis.fetch;
  try{
   const now=Date.now(),token='f'.repeat(64);
@@ -490,18 +490,22 @@ test('usage endpoint reports Cloudflare staging metrics only with scoped analyti
   h.sqlite.prepare('INSERT INTO sessions(token_hash,email,expires_at,created_at) VALUES(?,?,?,?)').run(hash,'lionaugust@icloud.com',now+600000,now);
   let calls=0;
   globalThis.fetch=async(url,init)=>{
-   calls++;
-   assert.equal(String(url),'https://api.cloudflare.com/client/v4/graphql');
-   assert.equal(new Headers(init.headers).get('authorization'),'Bearer scoped-analytics-key');
-   return new Response(JSON.stringify({data:{viewer:{accounts:[{workersInvocationsAdaptive:[{sum:{requests:21}}],d1AnalyticsAdaptiveGroups:[{sum:{readQueries:7,writeQueries:3}}]}]}}}),{status:200});
+    calls++;
+    assert.equal(String(url),'https://api.cloudflare.com/client/v4/graphql');
+    assert.equal(new Headers(init.headers).get('authorization'),'Bearer scoped-analytics-key');
+    return new Response(JSON.stringify({data:{viewer:{accounts:[{workersInvocationsAdaptive:[{sum:{requests:21}}],d1AnalyticsAdaptiveGroups:[{sum:{rowsRead:700,rowsWritten:30}}]}]}}}),{status:200});
   };
-  const settings={ENVIRONMENT:'staging',CLOUDFLARE_ANALYTICS_API_TOKEN:'scoped-analytics-key',USAGE_CLOUDFLARE_ACCOUNT_ID:'account',USAGE_D1_DATABASE_ID:'database',USAGE_WORKER_NAME:'serve-with-staging'};
+  const settings={ENVIRONMENT:'staging',CLOUDFLARE_ANALYTICS_API_TOKEN:'scoped-analytics-key',USAGE_CLOUDFLARE_ACCOUNT_ID:'account'};
   const response=await h.req('/api/admin/usage','GET',undefined,'__Host-sw_session='+token,settings);
   assert.equal(response.status,200);
   const providers=(await response.json()).providers;
-  assert.equal(providers.find(provider=>provider.name==='Cloudflare Workers').used,21);
-  assert.equal(providers.find(provider=>provider.name==='Cloudflare D1').used,10);
-  assert.equal(providers.find(provider=>provider.name==='Cloudflare Workers').scope,'staging Worker · rolling 24h');
+  const workers=providers.find(provider=>provider.name==='Cloudflare Workers');
+  assert.deepEqual({...workers,resetsAt:null},{name:'Cloudflare Workers',scope:'Cloudflare account · current UTC day',status:'available',used:21,limit:100000,remaining:99979,resetsAt:null,reason:'All Worker requests in this Cloudflare account; Workers Free daily limit'});
+  assert.equal(providers.find(provider=>provider.name==='Cloudflare D1 rows read').used,700);
+  assert.equal(providers.find(provider=>provider.name==='Cloudflare D1 rows read').limit,5000000);
+  assert.equal(providers.find(provider=>provider.name==='Cloudflare D1 rows written').used,30);
+  assert.equal(providers.find(provider=>provider.name==='Cloudflare D1 rows written').limit,100000);
+  assert.match(workers.resetsAt,/T00:00:00\.000Z$/);
   assert.equal((await h.req('/api/admin/usage','GET',undefined,'__Host-sw_session='+token,settings)).status,200);
   assert.equal(calls,1,'a short-lived cache avoids a duplicate provider query');
  }finally{globalThis.fetch=originalFetch;h.sqlite.close();}
@@ -954,7 +958,22 @@ test('staging provides experimental Usage & Quotas without inventing provider us
   assert.equal(response.status,200,'authorized staging admin can inspect experimental usage status');
   const data=await response.json();
   assert.equal(data.environment,'staging');
-  assert.equal(data.providers.length,4);
+  assert.equal(data.providers.length,5);
   assert.ok(data.providers.every(provider=>provider.status==='unavailable'&&provider.used===null&&provider.limit===null&&provider.remaining===null),'unknown readings must not be fabricated');
  }finally{h.sqlite.close()}
+});
+
+test('Cloudflare usage rejects partial GraphQL data with errors instead of reporting false quotas',async()=>{
+ const h=harness(),originalFetch=globalThis.fetch;
+ try{
+  const now=Date.now(),token='a'.repeat(64);
+  const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode('test:'+token))),b=>b.toString(16).padStart(2,'0')).join('');
+  h.sqlite.prepare('INSERT INTO sessions(token_hash,email,expires_at,created_at) VALUES(?,?,?,?)').run(hash,'lionaugust@icloud.com',now+600000,now);
+  globalThis.fetch=async()=>new Response(JSON.stringify({errors:[{message:'analytics access denied'}],data:{viewer:{accounts:[{workersInvocationsAdaptive:[{sum:{requests:21}}],d1AnalyticsAdaptiveGroups:[{sum:{rowsRead:7,rowsWritten:3}}]}]}}}),{status:200});
+  const response=await h.req('/api/admin/usage','GET',undefined,'__Host-sw_session='+token,{ENVIRONMENT:'staging',CLOUDFLARE_ANALYTICS_API_TOKEN:'partial-query-token',USAGE_CLOUDFLARE_ACCOUNT_ID:'partial-graphql-errors-test-account'});
+  assert.equal(response.status,200);
+  const providers=(await response.json()).providers.filter(provider=>provider.name.startsWith('Cloudflare'));
+  assert.equal(providers.length,3);
+  assert.ok(providers.every(provider=>provider.status==='unavailable'&&provider.used===null&&provider.limit===null));
+ }finally{globalThis.fetch=originalFetch;h.sqlite.close();}
 });

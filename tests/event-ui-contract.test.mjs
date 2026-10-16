@@ -92,7 +92,7 @@ test('staging builds show a prominent route to production without affecting prod
 
 test('tab icons are present in the subsetted Google Material Symbols font',()=>{
  const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
- for(const icon of ['event','group','monitoring','how_to_reg'])assert.match(html,new RegExp('(?:,|=)'+icon+'(?:,|&amp;)'),icon);
+ for(const icon of ['event','group','monitoring','how_to_reg','link','schedule'])assert.match(html,new RegExp('(?:,|=)'+icon+'(?:,|&amp;)'),icon);
 });
 
 test('profile picture edit uses an accessible pencil control only for the profile owner',()=>{
@@ -109,7 +109,6 @@ test('profile picture edit uses an accessible pencil control only for the profil
  const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
  assert.match(html,/@gravatar-com\/quick-editor@0\.8\.0/);
 });
-
 test('admin event details link and creation history remain available without redundant menu signup',()=>{
  assert.match(source,/key:'event-created'/);
  assert.match(source,/action:'Event created'/);
@@ -165,4 +164,19 @@ test('all back navigation controls display a prominent arrow',()=>{
  assert.match(source,/<IconButton aria-label="Back" onClick=\{close\}><Glyph type="back" size=\{24\}\/><\/IconButton>/);
  assert.match(source,/Back to admin events<\/Button>/);
  assert.doesNotMatch(source,/startIcon=\{<Glyph type="back"\/>\}/);
+});
+
+test('event time displays a clock glyph instead of raw ligature text',()=>{
+ assert.match(source,/clock:'schedule'/);
+ assert.match(source,/<Glyph type="clock"\/>/);
+ assert.match(source,/link:'link'/);
+});
+
+test('admin event roster has one attendee search input with live user lookup',()=>{
+ const section=source.slice(source.indexOf('function AdminEventSignups('),source.indexOf('\nfunction ',source.indexOf('function AdminEventSignups(')+10));
+ assert.match(section,/label="Search and select attendee"/);
+ assert.match(section,/onInputChange=\{/);
+ assert.match(section,/generatedApi\.listAdminUsers\(\{q:query\}\)/);
+ assert.doesNotMatch(section,/label="Search attendees by name or email"/);
+ assert.doesNotMatch(section,/>Search users<\/Button>/);
 });
