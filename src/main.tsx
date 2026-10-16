@@ -577,7 +577,7 @@ type SignupHistoryItem={id:string;event_id:string;created_at:number;deleted_at:n
 function MySignups({me}:{me:Me}){
  const [items,setItems]=useState<SignupHistoryItem[]>([]);
  const [view,setView]=useState<'upcoming'|'past'|'cancelled'>('upcoming');
- const [error,setError]=useState(''),[loading,setLoading]=useState(true);
+ const [error,setError]=useState(''),[notice,setNotice]=useState(''),[loading,setLoading]=useState(true);
  useEffect(()=>{
   if(!me.authenticated||!me.profileComplete||!me.agreementCurrent){setLoading(false);return;}
   let active=true;
@@ -590,6 +590,10 @@ function MySignups({me}:{me:Me}){
  },[me.authenticated,me.profileComplete,me.agreementCurrent]);
  if(!me.authenticated||!me.profileComplete||!me.agreementCurrent)
   return <Stack sx={{my:4}} spacing={2}><Typography variant="h4">My signups</Typography><Alert severity="info">Sign in and complete your account to see your event signups.</Alert><Button onClick={()=>go('/login')}>Complete account</Button></Stack>;
+ const copyEventLink=async(id:string)=>{
+  try{await navigator.clipboard.writeText(new URL('/events/'+id,location.origin).toString());setNotice('Event link copied');}
+  catch{setError('Unable to copy the event link. Please copy it from your browser address bar.');}
+ };
  const activeEventIds=new Set(items.filter(item=>item.deleted_at===null).map(item=>item.event_id));
  const latestByEvent=new Map<string,SignupHistoryItem>();
  for(const item of items){
@@ -619,10 +623,11 @@ function MySignups({me}:{me:Me}){
        <EventWhen event={event}/>
        <Typography variant="body2" color="text.secondary" sx={{mt:1}}>{item.deleted_at!==null?'Cancelled '+new Date(item.deleted_at).toLocaleString():'Signed up '+new Date(item.created_at).toLocaleString()}</Typography>
       </CardContent>
-      <CardActions sx={{justifyContent:'flex-end',px:2,pb:2}}><Button size="small" onClick={()=>go('/events/'+item.event_id)}>Details</Button></CardActions>
+      <CardActions sx={{justifyContent:'flex-end',px:2,pb:2}}><Button size="small" onClick={()=>go('/events/'+item.event_id)}>Details</Button><Tooltip title="Copy public event link"><IconButton size="small" aria-label={'Copy link to '+item.title} onClick={()=>void copyEventLink(item.event_id)}><Glyph type="link"/></IconButton></Tooltip></CardActions>
      </Card>;
     })}
    </Box>}
+  <Snackbar open={!!notice} autoHideDuration={4500} onClose={()=>setNotice('')} anchorOrigin={{vertical:'bottom',horizontal:'center'}}><Alert severity="success" onClose={()=>setNotice('')}>{notice}</Alert></Snackbar>
  </Box>;
 }
 
