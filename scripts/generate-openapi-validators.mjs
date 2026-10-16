@@ -49,7 +49,7 @@ function check(raw: unknown,value: unknown): boolean {
  if(schema.type==='object') {
   if(!value||typeof value!=='object'||Array.isArray(value))return false;
   const object=value as Record<string,unknown>;
-  for(const key of schema.required??[])if(!(key in object))return false;
+  for(const key of schema.required??[])if(!Object.hasOwn(object,key))return false;
   for(const [key,child] of Object.entries(object)){
    const property=schema.properties?.[key];
    if(property){if(!check(property,child))return false;continue;}
