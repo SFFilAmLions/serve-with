@@ -144,3 +144,13 @@ test('the GitHub build footer is placed after flex-growing main content',()=>{
  assert.match(source,/component="main" sx=\{\{flex:1,width:'100%'\}\}/);
  assert.match(source,/<BuildFooter\/><\/Container><\/Box><\/ThemeProvider>/);
 });
+
+test('event listings and details show accessible visual cues without location chip',()=>{
+ assert.match(source,/<Glyph type="calendar"\/>/);
+ assert.match(source,/<Glyph type="pin"\/><Typography variant="body2"/);
+ assert.doesNotMatch(source,/<Chip icon=\{<Glyph type="pin"\/>\}/);
+ assert.match(source,/<Glyph type="attendance" size=\{24\}\/>/);
+ assert.match(source,/startIcon=\{<Glyph type=\{signup\?'withdraw':'signups'\}\/>\}/);
+ const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
+ for(const name of ['calendar_month','groups','person_remove'])assert.ok(html.includes(name),name);
+});
