@@ -8,11 +8,13 @@
   <style>body{margin:0} .skip{position:absolute;left:-9999px} .skip:focus{left:1rem;top:1rem;z-index:99;background:white;padding:1rem}</style>
 </head>
 <body>
-  <a class="skip" href="#api-reference">Skip to API reference</a>
-  <main id="api-reference" aria-label="Serve With Lions API reference"></main>
+  <a class="skip" href="#api-reference-root">Skip to API reference</a>
+  <!-- Scalar reserves #api-reference for its legacy auto-mount API. Use a
+       distinct target because this page initializes Scalar explicitly below. -->
+  <main id="api-reference-root" aria-label="Serve With Lions API reference"></main>
   <script type="module">
     import { createApiReference } from 'https://cdn.jsdelivr.net/npm/@scalar/api-reference@1.73.1/esm.js';
-    createApiReference('#api-reference', {
+    createApiReference('#api-reference-root', {
       url: '/api/openapi.json',
       hideClientButton: false
     });

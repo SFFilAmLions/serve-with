@@ -18,5 +18,8 @@ test('Scalar documentation references only the deployed same-origin JSON endpoin
  const html=readFileSync('public/api/docs/index.html','utf8');
  assert.match(html,/url: '\/api\/openapi\.json'/);
  assert.match(html,/@scalar\/api-reference@1\.73\.1/);
+ assert.match(html,/id="api-reference-root"/);
+ assert.match(html,/createApiReference\('#api-reference-root'/);
+ assert.doesNotMatch(html,/id="api-reference"/,'avoid Scalar legacy auto-mount alongside the explicit mount');
  assert.doesNotMatch(html,/proxyUrl:/);
 });
