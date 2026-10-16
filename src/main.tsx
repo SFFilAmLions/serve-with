@@ -467,6 +467,7 @@ function AdminCreateUser(){
 
 function AdminEventSignups({id}:{id:string}){
  const [entries,setEntries]=useState<{id:string;user_id:string;first_name:string|null;last_name:string|null;email:string|null;created_at:number;deleted_at:number|null}[]>([]);
+ const [eventDetails,setEventDetails]=useState<EventRecord|null>(null);
  const [query,setQuery]=useState(''),[people,setPeople]=useState<{id:string;first_name:string|null;last_name:string|null;email:string|null}[]>([]);
  const [selected,setSelected]=useState(''),[error,setError]=useState(''),[notice,setNotice]=useState(''),[busy,setBusy]=useState(false);
  useEffect(()=>{
@@ -479,6 +480,7 @@ function AdminEventSignups({id}:{id:string}){
   setEntries((result.data as {signups:typeof entries}).signups);
  };
  useEffect(()=>{void load().catch(e=>setError(e instanceof Error?e.message:'Unable to load roster'))},[id]);
+ useEffect(()=>{let active=true;void generatedApi.getEvent({id}).then(response=>{if(response.status!==200)throw Error('Unable to load event details');if(active)setEventDetails((response.data as {event:EventRecord}).event)}).catch(e=>{if(active)setError(e instanceof Error?e.message:'Unable to load event details')});return()=>{active=false}},[id]);
  const search=async()=>{
   setError('');
   try{const response=await generatedApi.listAdminUsers({q:query});if(response.status!==200)throw Error((response.data as {error?:string}).error||'Unable to find users');setPeople((response.data as unknown as {users:typeof people}).users);}
@@ -493,24 +495,57 @@ function AdminEventSignups({id}:{id:string}){
    await load();setNotice(kind==='signup'?'Attendee signed up':'Attendee withdrawn');
   }catch(e){setError(e instanceof Error?e.message:'Signup update failed');}finally{setBusy(false);}
  };
- return <Stack spacing={2} sx={{my:4}}>
+ const active=entries.filter(entry=>entry.deleted_at===null);
+ const timeline=entries.flatMap(entry=>{
+  const name=[entry.first_name,entry.last_name].filter(Boolean).join(' ')||'Unnamed attendee';
+  return [{key:entry.id+'-signup',time:entry.created_at,name,action:'Signed up',userId:entry.user_id},
+   ...(entry.deleted_at===null?[]:[{key:entry.id+'-withdraw',time:entry.deleted_at,name,action:'Withdrew',userId:entry.user_id}])];
+ }).sort((a,b)=>b.time-a.time);
+ return <Stack spacing={3} sx={{my:4,pb:8}}>
   <Button sx={{alignSelf:'flex-start'}} onClick={()=>go('/admin/events')}>Back to admin events</Button>
-  <Stack direction="row" alignItems="center" spacing={2}><Typography variant="h4" sx={{flexGrow:1}}>Manage event signups</Typography><Fab variant="extended" size="medium" color="primary" aria-label="Edit event" onClick={()=>go('/admin/events/'+id+'/edit')}><Glyph type="edit"/> <Box component="span" sx={{ml:1}}>Edit</Box></Fab></Stack>
+  <Typography variant="h4">{eventDetails?.title||'Event management'}</Typography>
   {error&&<Alert severity="error" role="alert">{error}</Alert>}
   {notice&&<Alert severity="success" role="status">{notice}</Alert>}
-  <Typography variant="h6">Add an attendee</Typography>
-  <Button sx={{alignSelf:'flex-start'}} onClick={()=>go('/admin/users/new',{returnEventId:id})}>Create user</Button>
-  <Stack direction={{xs:'column',sm:'row'}} spacing={1}>
-   <TextField size="small" label="Search attendees by name or email" value={query} onChange={e=>setQuery(e.target.value)}/>
-   <Button onClick={()=>void search()}>Search users</Button>
-  </Stack>
-  {people.length>0&&<Autocomplete options={people} value={people.find(p=>p.id===selected)||null}
-    getOptionLabel={p=>[p.first_name,p.last_name].filter(Boolean).join(' ')||p.email||'Unnamed user'}
-    onChange={(_,p)=>setSelected(p?.id||'')}
-    renderInput={params=><TextField {...params} label="Select attendee"/>}/>}
-  <Button variant="contained" sx={{alignSelf:'flex-start'}} disabled={!selected||busy} onClick={()=>void act('signup',selected)}>Confirm signup</Button>
-  <Typography variant="h6">Roster and history</Typography>
-  {entries.length===0?<Typography>No signups yet.</Typography>:<Card variant="outlined"><TableContainer><Table size="small" aria-label="Event roster and registration history"><TableHead><TableRow><TableCell>Attendee</TableCell><TableCell sx={{display:{xs:'none',md:'table-cell'}}}>Email</TableCell><TableCell>Status</TableCell><TableCell sx={{display:{xs:'none',sm:'table-cell'}}}>Registered</TableCell><TableCell align="right">Actions</TableCell></TableRow></TableHead><TableBody>{entries.map(entry=><TableRow key={entry.id} hover sx={{cursor:'pointer'}} onClick={()=>go('/users/'+entry.user_id)}><TableCell>{[entry.first_name,entry.last_name].filter(Boolean).join(' ')||'Unnamed attendee'}</TableCell><TableCell sx={{display:{xs:'none',md:'table-cell'}}}>{entry.email||'No email'}</TableCell><TableCell>{entry.deleted_at===null?'Active':'Cancelled'}</TableCell><TableCell sx={{display:{xs:'none',sm:'table-cell'}}}>{new Date(entry.created_at).toLocaleString()}{entry.deleted_at!==null&&<><br/>Cancelled {new Date(entry.deleted_at).toLocaleString()}</>}</TableCell><TableCell align="right">{entry.deleted_at===null&&<Button size="small" color="error" disabled={busy} onClick={event=>{event.stopPropagation();void act('withdraw',entry.user_id)}}>Cancel registration</Button>}</TableCell></TableRow>)}</TableBody></Table></TableContainer></Card>}
+  <Box component="section" aria-labelledby="admin-event-details-heading">
+   <Typography id="admin-event-details-heading" variant="h5" sx={{mb:2}}>Details</Typography>
+   {eventDetails?<EventWhen event={eventDetails}/>:<Skeleton height={100}/>}
+  </Box>
+  <Box component="section" aria-labelledby="admin-event-roster-heading">
+   <Typography id="admin-event-roster-heading" variant="h5" sx={{mb:1}}>Roster ({active.length})</Typography>
+   {active.length===0?<Typography color="text.secondary">No one is currently signed up.</Typography>:
+    <Card variant="outlined" component="ul" sx={{listStyle:'none',p:0,m:0}}>
+     {active.map(entry=><Box component="li" key={entry.id} sx={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:2,p:2,borderBottom:'1px solid',borderColor:'divider'}}>
+      <Box sx={{minWidth:0}}><Button sx={{p:0,textAlign:'left'}} onClick={()=>go('/users/'+entry.user_id)}>{[entry.first_name,entry.last_name].filter(Boolean).join(' ')||'Unnamed attendee'}</Button><Typography variant="body2" color="text.secondary">{entry.email||'No email address'}</Typography></Box>
+      <Button size="small" color="error" disabled={busy} onClick={()=>void act('withdraw',entry.user_id)}>Withdraw</Button>
+     </Box>)}
+    </Card>}
+   <Typography variant="h6" sx={{mt:3,mb:1}}>Add an attendee</Typography>
+   <Button sx={{mb:1}} onClick={()=>go('/admin/users/new',{returnEventId:id})}>Create user</Button>
+   <Stack direction={{xs:'column',sm:'row'}} spacing={1}>
+    <TextField size="small" label="Search attendees by name or email" value={query} onChange={e=>setQuery(e.target.value)}/>
+    <Button onClick={()=>void search()}>Search users</Button>
+   </Stack>
+   {people.length>0&&<Autocomplete sx={{mt:1}} options={people} value={people.find(p=>p.id===selected)||null}
+     getOptionLabel={p=>[p.first_name,p.last_name].filter(Boolean).join(' ')||p.email||'Unnamed user'}
+     onChange={(_,p)=>setSelected(p?.id||'')}
+     renderInput={params=><TextField {...params} label="Select attendee"/>}/>}
+   <Button variant="contained" sx={{mt:1}} disabled={!selected||busy} onClick={()=>void act('signup',selected)}>Confirm signup</Button>
+  </Box>
+  <Box component="section" aria-labelledby="admin-event-history-heading">
+   <Typography id="admin-event-history-heading" variant="h5" sx={{mb:1}}>History</Typography>
+   <Typography variant="body2" color="text.secondary" sx={{mb:2}}>Signup and withdrawal history. Actor information is not recorded for these changes.</Typography>
+   {timeline.length===0?<Typography color="text.secondary">No signup activity yet.</Typography>:
+    <Box component="ol" sx={{listStyle:'none',m:0,pl:2,borderLeft:'2px solid',borderColor:'divider'}}>
+     {timeline.map(item=><Box component="li" key={item.key} sx={{position:'relative',pl:2,pb:3,'&:before':{content:'""',position:'absolute',left:-23,top:7,width:12,height:12,borderRadius:'50%',bgcolor:item.action==='Signed up'?'success.main':'text.secondary'}}}>
+      <Typography fontWeight={600}>{item.action}: {item.name}</Typography>
+      <Typography variant="body2" color="text.secondary"><time dateTime={new Date(item.time).toISOString()}>{new Date(item.time).toLocaleString()}</time></Typography>
+     </Box>)}
+    </Box>}
+  </Box>
+  <Fab variant="extended" color="primary" aria-label="Edit event" onClick={()=>go('/admin/events/'+id+'/edit')}
+   sx={{position:'fixed',bottom:{xs:24,sm:32},right:{xs:24,sm:32},zIndex:10}}>
+   <Glyph type="edit"/><Box component="span" sx={{ml:1}}>Edit</Box>
+  </Fab>
  </Stack>;
 }
 
