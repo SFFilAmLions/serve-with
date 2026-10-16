@@ -550,7 +550,7 @@ function UsageDashboard(){
  useEffect(()=>{void refresh()},[]);
  return <Stack spacing={2} sx={{my:4}}>
   <Typography variant="h4">Usage &amp; Quotas</Typography>
-  <Alert severity="warning">Experimental: provider usage integrations are not yet complete. These values may be unavailable or inaccurate until verified against each provider. Unknown is not zero.</Alert>
+  <Alert severity="warning" role="status">Experimental: provider usage integrations are not yet complete. These values may be unavailable or inaccurate until verified against each provider. Unknown is not zero.</Alert>
   <Box component="details" sx={{p:1,border:1,borderColor:'divider',borderRadius:1}}><Box component="summary" sx={{cursor:'pointer'}}>Integration diagnostics (no credentials or account identifiers)</Box><Box component="pre" sx={{whiteSpace:'pre-wrap',overflowWrap:'anywhere',fontSize:12}}>{diagnostic}</Box></Box>
   <Typography variant="body2" color="text.secondary">Usage may be shared across an account or specific to an application. Limits are shown only when confirmed by a provider.</Typography>
   <Button sx={{alignSelf:'flex-start'}} disabled={loading} onClick={()=>void refresh()}>Refresh status</Button>
