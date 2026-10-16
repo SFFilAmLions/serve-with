@@ -5,7 +5,7 @@ import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { TimePicker } from '@mui/x-date-pickers/TimePicker';
-import { AppBar, Box, Button, CircularProgress, LinearProgress, Dialog, DialogActions, DialogContent, DialogTitle, Alert, Autocomplete, Snackbar, Checkbox, FormControlLabel, Container, CssBaseline, Stack, TextField, ThemeProvider, Typography, useMediaQuery, IconButton, Menu, MenuItem, ListItemButton, Divider, Tooltip, Skeleton, Card, CardContent, CardActions, Chip, Avatar, ToggleButtonGroup, ToggleButton, Fab, Table, TableBody, TableCell, TableContainer, TableHead, TableRow } from '@mui/material';
+import { AppBar, Box, Button, CircularProgress, LinearProgress, Dialog, DialogActions, DialogContent, DialogTitle, Alert, Autocomplete, Snackbar, Checkbox, FormControlLabel, Container, CssBaseline, Stack, TextField, ThemeProvider, Typography, useMediaQuery, IconButton, Menu, MenuItem, ListItemButton, Divider, Tooltip, Skeleton, Card, CardContent, CardActions, Chip, Avatar, ToggleButtonGroup, ToggleButton, Fab } from '@mui/material';
 import './style.css';
 import policyMetadata from './generated/policy-versions.json';
 import privacyPolicy from '../policies/privacy/approved-draft.md?raw';
