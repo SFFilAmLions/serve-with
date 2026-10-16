@@ -92,11 +92,11 @@ async function cloudflareUsage(env:Env):Promise<UsageProvider[]>{
     if(workerRequests===null||d1RowsRead===null||d1RowsWritten===null)return cloudflareUnavailable(scope,'The Cloudflare analytics response did not contain usable account usage metrics');
     console.info('usage-provider-debug',JSON.stringify({provider:'cloudflare',event:'metrics-loaded',environment,workerRows:Array.isArray(workerRows)?workerRows.length:0,d1Rows:Array.isArray(d1Rows)?d1Rows.length:0}));
     return [
-      {name:'Cloudflare Workers',scope,status:'available',used:workerRequests,limit:100000,remaining:Math.max(0,100000-workerRequests),resetsAt,reason:'All Worker requests in this Cloudflare account; Workers Free daily limit'},
-      {name:'Cloudflare D1 rows read',scope,status:'available',used:d1RowsRead,limit:5000000,remaining:Math.max(0,5000000-d1RowsRead),resetsAt,reason:'All D1 rows read in this Cloudflare account; Workers Free daily limit'},
-      {name:'Cloudflare D1 rows written',scope,status:'available',used:d1RowsWritten,limit:100000,remaining:Math.max(0,100000-d1RowsWritten),resetsAt,reason:'All D1 rows written in this Cloudflare account; Workers Free daily limit'}
+      {name:'Cloudflare Workers',scope,status:'available',used:workerRequests,limit:100000,remaining:Math.max(0,100000-workerRequests),resetsAt:resetAt,reason:'All Worker requests in this Cloudflare account; Workers Free daily limit'},
+      {name:'Cloudflare D1 rows read',scope,status:'available',used:d1RowsRead,limit:5000000,remaining:Math.max(0,5000000-d1RowsRead),resetsAt:resetAt,reason:'All D1 rows read in this Cloudflare account; Workers Free daily limit'},
+      {name:'Cloudflare D1 rows written',scope,status:'available',used:d1RowsWritten,limit:100000,remaining:Math.max(0,100000-d1RowsWritten),resetsAt:resetAt,reason:'All D1 rows written in this Cloudflare account; Workers Free daily limit'}
     ];
-  }catch(error){console.info('usage-provider-debug',JSON.stringify({provider:'cloudflare',event:'network-or-parse-error',environment,error:error instanceof Error?error.message:'unknown'}));return cloudflareUnavailable(scope,'The Cloudflare analytics service could not be reached');}
+  }catch{console.info('usage-provider-debug',JSON.stringify({provider:'cloudflare',event:'network-or-parse-error',environment}));return cloudflareUnavailable(scope,'The Cloudflare analytics service could not be reached');}
 }
 const usageCacheKey=(env:Env)=>[
   usageEnvironment(env),env.USAGE_CLOUDFLARE_ACCOUNT_ID||'',
