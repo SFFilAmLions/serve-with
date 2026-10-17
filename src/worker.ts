@@ -422,8 +422,13 @@ async function legacyFetch(request: Request, env: Env): Promise<Response> {
       if (!/^[0-9a-f-]{36}$/.test(id)) return json({error:'Not found'},404);
       if (!subject.admin && subject.user.id!==id) return json({error:'Not found'},404);
       const target=await env.AUTH_DB.prepare('SELECT id,email,first_name,last_name,date_of_birth,email_verified_at,created_at,updated_at FROM users WHERE id=?').bind(id).first();
-      if (!target) return json({error:'Not found'},404);
-      if (request.method==='GET') return json({user:target,canCorrectDob:subject.admin});
+      // Unclaimed attendee identities are stored separately from verified users.
+      // Never expose a stub to a non-administrator or after it has been claimed.
+      const stub=!target&&subject.admin
+        ?await env.AUTH_DB.prepare('SELECT id,email,first_name,last_name,date_of_birth,created_at,updated_at FROM user_stubs WHERE id=? AND claimed_at IS NULL').bind(id).first()
+        :null;
+      if (!target&&!stub) return json({error:'Not found'},404);
+      if (request.method==='GET') return json({user:target||stub,canCorrectDob:subject.admin&&!!target,isStub:!!stub});
       if (request.method!=='PUT') return json({error:'Method not allowed'},405);
       if (!originOk(request) || request.headers.get('sec-fetch-site')==='cross-site') return error();
       try {
