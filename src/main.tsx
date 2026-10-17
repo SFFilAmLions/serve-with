@@ -557,6 +557,7 @@ function AdminEventSignups({id}:{id:string}){
      getOptionLabel={p=>[p.first_name,p.last_name].filter(Boolean).join(' ')||p.email||'Unnamed user'}
      onInputChange={(_,value,reason)=>{if(reason==='input'){setQuery(value);setError('')}}}
      onChange={(_,p)=>setSelected(p?.id||'')}
+     noOptionsText={<Stack spacing={1} alignItems="flex-start" sx={{p:1}}><Typography variant="body2">No matching users found.</Typography><Button size="small" variant="outlined" onMouseDown={e=>e.preventDefault()} onClick={()=>go('/admin/users/new',{returnEventId:id})}>Create new user</Button></Stack>}
      renderInput={params=><TextField {...params} label="Search and select attendee" helperText="Start typing a name or email to search users"/>}/>
    <Stack direction="row" spacing={1} sx={{mt:2}} flexWrap="wrap" useFlexGap>
     <Button variant="contained" disabled={!selected||busy} onClick={()=>void act('signup',selected)}>Confirm signup</Button>
