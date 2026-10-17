@@ -37,10 +37,11 @@ function harness() {
   sqlite.exec(readFileSync('migrations/0004_users_and_agreements.sql','utf8'));
   sqlite.exec(readFileSync('migrations/0005_event_signups.sql','utf8'));
   sqlite.exec('BEGIN;'+readFileSync('migrations/0006_unclaimed_users.sql','utf8')+'COMMIT;');
+  sqlite.exec(readFileSync('migrations/0007_remove_date_of_birth.sql','utf8'));
   const versionTerms=JSON.parse(readFileSync('src/generated/policy-versions.json','utf8')).terms.version, versionPrivacy=JSON.parse(readFileSync('src/generated/policy-versions.json','utf8')).privacy.version;
   // Event regressions retain an already-completed authorized administrator session.
-  sqlite.prepare('INSERT INTO users(id,email,first_name,last_name,date_of_birth,email_verified_at,created_at,updated_at,terms_accepted_at,accepted_terms_version,accepted_privacy_version) VALUES(?,?,?,?,?,?,?,?,?,?,?)')
-    .run('11111111-1111-4111-8111-111111111111','lionaugust@icloud.com','Admin','Example','1990-01-01',1,1,1,1,versionTerms,versionPrivacy);
+  sqlite.prepare('INSERT INTO users(id,email,first_name,last_name,email_verified_at,created_at,updated_at,terms_accepted_at,accepted_terms_version,accepted_privacy_version) VALUES(?,?,?,?,?,?,?,?,?,?)')
+    .run('11111111-1111-4111-8111-111111111111','lionaugust@icloud.com','Admin','Example',1,1,1,1,versionTerms,versionPrivacy);
   const adapter = { prepare(sql) { const statement = sqlite.prepare(sql); return {
     bind(...args) { return {
       all: async () => ({ results: statement.all(...args) }),
@@ -709,8 +710,8 @@ test('a signed-in nonparticipant cannot read another event roster or administrat
   h.insert(eventB,now+600000,now+900000);
   const attendeeId='77777777-7777-4777-8777-777777777777',email='ordinary@example.org',token='7'.repeat(64);
   const versions=JSON.parse(readFileSync('src/generated/policy-versions.json','utf8'));
-  h.sqlite.prepare('INSERT INTO users(id,email,first_name,last_name,date_of_birth,email_verified_at,created_at,updated_at,terms_accepted_at,accepted_terms_version,accepted_privacy_version) VALUES(?,?,?,?,?,?,?,?,?,?,?)')
-   .run(attendeeId,email,'Ordinary','Member','1990-01-01',now,now,now,now,versions.terms.version,versions.privacy.version);
+  h.sqlite.prepare('INSERT INTO users(id,email,first_name,last_name,email_verified_at,created_at,updated_at,terms_accepted_at,accepted_terms_version,accepted_privacy_version) VALUES(?,?,?,?,?,?,?,?,?,?)')
+   .run(attendeeId,email,'Ordinary','Member',now,now,now,now,versions.terms.version,versions.privacy.version);
   const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode('test:'+token))),b=>b.toString(16).padStart(2,'0')).join('');
   h.sqlite.prepare('INSERT INTO sessions(token_hash,email,expires_at,created_at) VALUES(?,?,?,?)').run(hash,email,now+600000,now);
   const cookie='__Host-sw_session='+token;
