@@ -273,13 +273,13 @@ async function sessionSubject(request: Request, env: Env): Promise<Subject | nul
   const id = session.user_id || await resolveUser(db,email,now);
   if (!session.user_id) await db.prepare('UPDATE sessions SET user_id=? WHERE token_hash=? AND user_id IS NULL AND expires_at>?')
     .bind(id,hash,now).run();
-  const user = await db.prepare('SELECT id,email,first_name,last_name,date_of_birth,email_verified_at,terms_accepted_at,accepted_terms_version,accepted_privacy_version FROM users WHERE id=?')
+  const user = await db.prepare('SELECT id,email,first_name,last_name,email_verified_at,terms_accepted_at,accepted_terms_version,accepted_privacy_version FROM users WHERE id=?')
     .bind(id).first<UserRow>();
   if (!user || normalize(user.email) !== email) return null;
   return {user,admin:allowed.has(email)};
 }
 const policyVersions = (_env: Env) => ({terms:policyMetadata.terms.version,privacy:policyMetadata.privacy.version});
-const profileReady = (u: UserRow) => Boolean(u.first_name && u.last_name && validDob(u.date_of_birth));
+const profileReady = (u: UserRow) => Boolean(u.first_name && u.last_name);
 const agreementReady = (u: UserRow, versions: {terms:string;privacy:string}|null) =>
   Boolean(versions && u.terms_accepted_at && u.accepted_terms_version === versions.terms && u.accepted_privacy_version === versions.privacy);
 const privilegeReady = (subject: Subject, env: Env) => Boolean(subject.user.email_verified_at && profileReady(subject.user) && agreementReady(subject.user,policyVersions(env)));
@@ -294,18 +294,6 @@ async function loginEligible(email:string,env:Env,db:D1Database):Promise<boolean
 }
 
 const validName = (x: unknown): x is string => typeof x === 'string' && x.trim().length >= 1 && x.trim().length <= 100;
-// Apply the minimum age at profile creation and administrator DOB corrections.
-const meetsMinimumAge = (dob: string, now = new Date()): boolean => {
-  const today = Temporal.PlainDate.from(now.toISOString().slice(0,10));
-  const birthday = Temporal.PlainDate.from(dob);
-  return Temporal.PlainDate.compare(birthday.add({years:13}),today) <= 0;
-};
-const validDob = (x: unknown): x is string => {
-  if (typeof x !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(x)) return false;
-  try { return Temporal.PlainDate.from(x).toString() === x && meetsMinimumAge(x); }
-  catch { return false; }
-};
-
 async function legacyFetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
     const path = url.pathname;
@@ -421,11 +409,11 @@ async function legacyFetch(request: Request, env: Env): Promise<Response> {
       const id=path.slice('/api/users/'.length);
       if (!/^[0-9a-f-]{36}$/.test(id)) return json({error:'Not found'},404);
       if (!subject.admin && subject.user.id!==id) return json({error:'Not found'},404);
-      const target=await env.AUTH_DB.prepare('SELECT id,email,first_name,last_name,date_of_birth,email_verified_at,created_at,updated_at FROM users WHERE id=?').bind(id).first();
+      const target=await env.AUTH_DB.prepare('SELECT id,email,first_name,last_name,email_verified_at,created_at,updated_at FROM users WHERE id=?').bind(id).first();
       // Unclaimed attendee identities are stored separately from verified users.
       // Never expose a stub to a non-administrator or after it has been claimed.
       const stub=!target&&subject.admin
-        ?await env.AUTH_DB.prepare('SELECT id,email,first_name,last_name,date_of_birth,created_at,updated_at FROM user_stubs WHERE id=? AND claimed_at IS NULL').bind(id).first()
+        ?await env.AUTH_DB.prepare('SELECT id,email,first_name,last_name,created_at,updated_at FROM user_stubs WHERE id=? AND claimed_at IS NULL').bind(id).first()
         :null;
       if (!target&&!stub) return json({error:'Not found'},404);
       if (request.method==='GET') return json({user:target||stub,canCorrectDob:subject.admin&&!!target,isStub:!!stub});
@@ -435,9 +423,7 @@ async function legacyFetch(request: Request, env: Env): Promise<Response> {
         const body=await bodyOf(request);
         if (!validName(body.firstName)||!validName(body.lastName)) return json({error:'Invalid name'},422);
         if (stub) {
-          // A stub is not a registered account. Keep DOB read-only until a
-          // participation-identity audit workflow is implemented.
-          if ('dateOfBirth' in body) return json({error:'DOB correction unavailable for unclaimed attendees'},403);
+          if ('dateOfBirth' in body) return json({error:'Date of birth is no longer collected'},422);
           if (!validateOperationBody('updateUser',{firstName:body.firstName.trim(),lastName:body.lastName.trim()}))
             return json({error:'Invalid user'},422);
           const result=await env.AUTH_DB.prepare(
@@ -446,25 +432,12 @@ async function legacyFetch(request: Request, env: Env): Promise<Response> {
           if(result.meta.changes!==1)return json({error:'Attendee has been claimed or changed'},409);
           return json({saved:true});
         }
-        if ('dateOfBirth' in body && (!subject.admin || !validDob(body.dateOfBirth))) return json({error:'Invalid or unauthorized DOB correction'},403);
+        if ('dateOfBirth' in body) return json({error:'Date of birth is no longer collected'},422);
         if(!validateOperationBody('updateUser',{
-          firstName:(body.firstName as string).trim(),lastName:(body.lastName as string).trim(),
-          ...('dateOfBirth' in body?{dateOfBirth:body.dateOfBirth}:{})
+          firstName:(body.firstName as string).trim(),lastName:(body.lastName as string).trim()
         }))return json({error:'Invalid user'},422);
-        const now=Date.now();
-        if ('dateOfBirth' in body) {
-          const old=target as {date_of_birth:string|null};
-          if (old.date_of_birth!==body.dateOfBirth) {
-            await env.AUTH_DB.batch([
-              env.AUTH_DB.prepare('UPDATE users SET first_name=?,last_name=?,date_of_birth=?,updated_at=? WHERE id=?').bind(body.firstName.trim(),body.lastName.trim(),body.dateOfBirth,now,id),
-              env.AUTH_DB.prepare('INSERT INTO user_dob_audit(id,subject_user_id,actor_user_id,changed_at) VALUES(?,?,?,?)').bind(crypto.randomUUID(),id,subject.user.id,now)
-            ]);
-          } else {
-            await env.AUTH_DB.prepare('UPDATE users SET first_name=?,last_name=?,updated_at=? WHERE id=?').bind(body.firstName.trim(),body.lastName.trim(),now,id).run();
-          }
-        } else {
-          await env.AUTH_DB.prepare('UPDATE users SET first_name=?,last_name=?,updated_at=? WHERE id=?').bind(body.firstName.trim(),body.lastName.trim(),now,id).run();
-        }
+        await env.AUTH_DB.prepare('UPDATE users SET first_name=?,last_name=?,updated_at=? WHERE id=?')
+          .bind(body.firstName.trim(),body.lastName.trim(),Date.now(),id).run();
         return json({saved:true});
       } catch {return error();}
     }
@@ -511,7 +484,7 @@ async function legacyFetch(request: Request, env: Env): Promise<Response> {
         // with the same OpenAPI-derived schema used to generate the client.
         if(!validateOperationBody(request.method==='POST'?'adminSignUpAttendee':'adminWithdrawAttendee',{userId}))
           return json({error:'Invalid attendee'},422);
-        const target=await db.prepare(`SELECT id,email,first_name,last_name,date_of_birth,email_verified_at,
+        const target=await db.prepare(`SELECT id,email,first_name,last_name,email_verified_at,
           terms_accepted_at,accepted_terms_version,accepted_privacy_version FROM users WHERE id=?`)
           .bind(userId).first<UserRow>();
         const stub=await db.prepare('SELECT id FROM user_stubs WHERE id=? AND claimed_at IS NULL')
@@ -549,12 +522,9 @@ async function legacyFetch(request: Request, env: Env): Promise<Response> {
           const emailValue=submittedEmail===undefined||submittedEmail===null||submittedEmail===''?null:normalize(submittedEmail);
           if(emailValue!==null&&(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailValue)||emailValue.length>254))
             return json({error:'Invalid email'},422);
-          const dobValue=body.dateOfBirth===undefined||body.dateOfBirth===null||body.dateOfBirth===''?null:body.dateOfBirth;
-          if(dobValue!==null&&!validDob(dobValue))return json({error:'Invalid date of birth'},422);
-          // Validate normalized legacy-compatible input, never unauthenticated raw input.
+          if ('dateOfBirth' in body) return json({error:'Date of birth is no longer collected'},422);
           if(!validateOperationBody('createAdminUserStub',{
-            firstName:(body.firstName as string).trim(),lastName:(body.lastName as string).trim(),
-            email:emailValue,dateOfBirth:dobValue
+            firstName:(body.firstName as string).trim(),lastName:(body.lastName as string).trim(),email:emailValue
           }))return json({error:'Invalid user'},422);
           const id=crypto.randomUUID(),now=Date.now();
           try{
@@ -565,11 +535,11 @@ async function legacyFetch(request: Request, env: Env): Promise<Response> {
             await env.AUTH_DB.batch([
               env.AUTH_DB.prepare('INSERT INTO participation_identities(id) VALUES(?)').bind(id),
               env.AUTH_DB.prepare(`INSERT INTO user_stubs
-                (id,email,first_name,last_name,date_of_birth,created_at,updated_at)
-                VALUES(?,?,?,?,?,?,?)`).bind(id,emailValue,body.firstName.trim(),body.lastName.trim(),dobValue,now,now)
+                (id,email,first_name,last_name,created_at,updated_at)
+                VALUES(?,?,?,?,?,?)`).bind(id,emailValue,body.firstName.trim(),body.lastName.trim(),now,now)
             ]);
           }catch{return json({error:'Unable to create user; email may already be in use'},409)}
-          return json({user:{id,email:emailValue,firstName:body.firstName.trim(),lastName:body.lastName.trim(),dateOfBirth:dobValue,isStub:true}},201);
+          return json({user:{id,email:emailValue,firstName:body.firstName.trim(),lastName:body.lastName.trim(),isStub:true}},201);
         }
         if (request.method!=='GET') return json({error:'Method not allowed'},405);
         const sort=url.searchParams.get('sort')==='first'?'first_name':'last_name';
@@ -691,16 +661,15 @@ async function legacyFetch(request: Request, env: Env): Promise<Response> {
       if (path === '/api/auth/profile') {
         const subject = await sessionSubject(request, env);
         if (!subject || !subject.user.email_verified_at) return json({ error:'Authentication required' },401);
-        if (!validName(body.firstName) || !validName(body.lastName) || !validDob(body.dateOfBirth))
-          return json({ error:'Invalid profile' },422);
+        if (!validName(body.firstName) || !validName(body.lastName)) return json({error:'Invalid profile'},422);
+        if ('dateOfBirth' in body) return json({error:'Date of birth is no longer collected'},422);
         if(!validateOperationBody('completeProfile',{
-          firstName:(body.firstName as string).trim(),lastName:(body.lastName as string).trim(),dateOfBirth:body.dateOfBirth
+          firstName:(body.firstName as string).trim(),lastName:(body.lastName as string).trim()
         }))return json({error:'Invalid profile'},422);
         const now=Date.now(), u=subject.user;
-        // Initial DOB is write-once here; later admin correction is a separate audited workflow.
-        const result=await db.prepare('UPDATE users SET first_name=?,last_name=?,date_of_birth=?,updated_at=? WHERE id=? AND date_of_birth IS NULL')
-          .bind(body.firstName.trim(),body.lastName.trim(),body.dateOfBirth,now,u.id).run();
-        if (result.meta.changes !== 1) return json({ error:'Profile already initialized' },409);
+        const result=await db.prepare('UPDATE users SET first_name=?,last_name=?,updated_at=? WHERE id=? AND (first_name IS NULL OR last_name IS NULL)')
+          .bind(body.firstName.trim(),body.lastName.trim(),now,u.id).run();
+        if (result.meta.changes !== 1) return json({error:'Profile already initialized'},409);
         return json({ profileComplete:true });
       }
       if (path === '/api/auth/agreements') {
