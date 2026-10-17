@@ -180,3 +180,12 @@ test('admin event roster has one attendee search input with live user lookup',()
  assert.doesNotMatch(section,/label="Search attendees by name or email"/);
  assert.doesNotMatch(section,/>Search users<\/Button>/);
 });
+
+
+test('initial profile date of birth supports typed YYYY-MM-DD entry',()=>{
+ const section=source.slice(source.indexOf('function AuthScreen('),source.indexOf('function UserView('));
+ assert.match(section,/label="Date of birth" type="text"/);
+ assert.match(section,/placeholder="YYYY-MM-DD"/);
+ assert.match(section,/pattern:"\[0-9\]\{4\}-\[0-9\]\{2\}-\[0-9\]\{2\}"/);
+ assert.doesNotMatch(section,/label="Date of birth" type="date"/);
+});
