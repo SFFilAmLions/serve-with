@@ -531,6 +531,19 @@ test('admin creates email-optional unverified user without consent or login',asy
   assert.equal(created.email,null);assert.equal(created.isStub,true);
   const saved=h.sqlite.prepare('SELECT email,claimed_at FROM user_stubs WHERE id=?').get(created.id);
   assert.equal(saved.email,null);assert.equal(saved.claimed_at,null);
+  const detailPath='/api/users/'+created.id;
+  const detailResponse=await h.req(detailPath,'GET',undefined,cookie);
+  assert.equal(detailResponse.status,200,'admin can open email-less attendee profile');
+  const detail=await detailResponse.json();
+  assert.equal(detail.user.email,null);
+  assert.equal(detail.user.id,created.id);
+  assert.equal(detail.isStub,true);
+  assert.equal(detail.canCorrectDob,false);
+  assert.equal((await h.req(detailPath,'GET')).status,401,'anonymous profile access denied');
+  assert.equal((await h.req(detailPath,'PUT',{firstName:'Alexis',lastName:'Volunteer'},cookie)).status,200);
+  assert.equal(h.sqlite.prepare('SELECT first_name FROM user_stubs WHERE id=?').get(created.id).first_name,'Alexis');
+  assert.equal((await h.req(detailPath,'PUT',{firstName:'Alexis',lastName:'Volunteer',dateOfBirth:'1990-01-01'},cookie)).status,403,'stub DOB correction is not silently unaudited');
+
   assert.equal(h.sqlite.prepare('SELECT COUNT(*) n FROM users WHERE id=?').get(created.id).n,0);
   assert.equal(h.sqlite.prepare('SELECT COUNT(*) n FROM agreement_acceptances WHERE user_id=?').get(created.id).n,0);
   assert.equal(h.sqlite.prepare('SELECT COUNT(*) n FROM sessions WHERE user_id=?').get(created.id).n,0);
