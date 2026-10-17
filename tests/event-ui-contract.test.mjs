@@ -188,3 +188,16 @@ test('profile omits birth date and confirms minimum registration age',()=>{
  assert.match(source,/I confirm I am at least 13 years old/);
  assert.match(source,/Parental permission may be required for specific events/);
 });
+
+test('registration combines name and terms consent in one onboarding form',()=>{
+ const section=source.slice(source.indexOf('function OnboardingForm('),source.indexOf('function UserView('));
+ assert.match(section,/Complete registration/);
+ assert.match(section,/First name/);
+ assert.match(section,/Last name/);
+ assert.match(section,/Terms of Use/);
+ assert.match(section,/Privacy Policy/);
+ assert.match(section,/Checkbox required/);
+ assert.match(section,/submitJson\('\/api\/auth\/profile'/);
+ assert.match(section,/submitJson\('\/api\/auth\/agreements'/);
+ assert.match(source,/me\.authenticated&&\(!me\.profileComplete\|\|!me\.agreementCurrent\)/);
+});
