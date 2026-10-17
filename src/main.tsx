@@ -552,14 +552,16 @@ function AdminEventSignups({id}:{id:string}){
      </Box>)}
     </Card>}
    <Typography variant="h6" sx={{mt:3,mb:1}}>Add an attendee</Typography>
-   <Button sx={{mb:1}} onClick={()=>go('/admin/users/new',{returnEventId:id})}>Create user</Button>
    <Autocomplete sx={{mt:1}} options={people} value={people.find(p=>p.id===selected)||null}
      filterOptions={options=>options}
      getOptionLabel={p=>[p.first_name,p.last_name].filter(Boolean).join(' ')||p.email||'Unnamed user'}
      onInputChange={(_,value,reason)=>{if(reason==='input'){setQuery(value);setError('')}}}
      onChange={(_,p)=>setSelected(p?.id||'')}
      renderInput={params=><TextField {...params} label="Search and select attendee" helperText="Start typing a name or email to search users"/>}/>
-   <Button variant="contained" sx={{mt:1}} disabled={!selected||busy} onClick={()=>void act('signup',selected)}>Confirm signup</Button>
+   <Stack direction="row" spacing={1} sx={{mt:2}} flexWrap="wrap" useFlexGap>
+    <Button variant="contained" disabled={!selected||busy} onClick={()=>void act('signup',selected)}>Confirm signup</Button>
+    <Button variant="outlined" disabled={busy} onClick={()=>go('/admin/users/new',{returnEventId:id})}>Create user</Button>
+   </Stack>
   </Box>
   <Box component="section" aria-labelledby="admin-event-history-heading">
    <Typography id="admin-event-history-heading" variant="h5" sx={{mb:1}}>History</Typography>
