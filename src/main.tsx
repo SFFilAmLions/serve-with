@@ -239,7 +239,7 @@ function AuthScreen({me,refresh}:{me:Me;refresh:()=>Promise<void>}){
  </Stack>;
 }
 function UserView({id,edit,backPath,canEditAvatar}:{id:string;edit:boolean;backPath:string;canEditAvatar:boolean}){
- const [user,setUser]=useState<any>(null),[message,setMessage]=useState(''),[first,setFirst]=useState(''),[last,setLast]=useState(''),[dob,setDob]=useState(''),[dirty,setDirty]=useState(false);
+ const [user,setUser]=useState<any>(null),[message,setMessage]=useState(''),[first,setFirst]=useState(''),[last,setLast]=useState(''),[dirty,setDirty]=useState(false);
  const [avatarRevision,setAvatarRevision]=useState(0);
  const openAvatarEditor=(email:string)=>{
   const library=(window as Window & {Gravatar?:{GravatarQuickEditorCore:new(options:{email:string;scope:string[];onProfileUpdated:()=>void})=>{open:()=>void}}}).Gravatar;
@@ -452,7 +452,7 @@ function AgreementCompletion({me,refresh}:{me:Me;refresh:()=>Promise<void>}) {
 }
 
 function AdminCreateUser(){
- const [first,setFirst]=useState(''),[last,setLast]=useState(''),[email,setEmail]=useState(''),[dob,setDob]=useState('');
+ const [first,setFirst]=useState(''),[last,setLast]=useState(''),[email,setEmail]=useState('');
  const [busy,setBusy]=useState(false),[error,setError]=useState('');
  const returnEventId=(history.state as {returnEventId?:string}|null)?.returnEventId;
  const submit=async()=>{
