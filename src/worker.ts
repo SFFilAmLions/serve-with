@@ -253,7 +253,7 @@ async function sendEmail(env: Env, email: string, code: string, link: string): P
 
 type UserRow = {
   id: string; email: string; first_name: string | null; last_name: string | null;
-  date_of_birth: string | null; email_verified_at: number | null;
+  email_verified_at: number | null;
   terms_accepted_at: number | null; accepted_terms_version: string | null; accepted_privacy_version: string | null;
 };
 type Subject = { user: UserRow; admin: boolean };
