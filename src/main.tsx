@@ -232,10 +232,34 @@ function AuthScreen({me,refresh}:{me:Me;refresh:()=>Promise<void>}){
  {!me.authenticated&&turnstileKey&&<LoginChallenge key={captchaRound} siteKey={turnstileKey} onToken={setCaptchaToken}/>}
  {!me.authenticated&&(stage==='email'?<Box component="form" onSubmit={e=>{e.preventDefault();void work(async()=>{const r=await requestCode();setMessage(r.message);setStage('code')})}}><Stack spacing={2}><TextField required type="email" label="Email" value={email} onChange={e=>setEmail(e.target.value)} autoComplete="email"/><Button variant="contained" type="submit" disabled={busy||!captchaReady||Boolean(turnstileKey&&!captchaToken)}>Continue</Button></Stack></Box>:
  <Stack spacing={2}><Typography>Check your email at {email}</Typography><Box component="form" onSubmit={e=>{e.preventDefault();void work(async()=>{await submitJson('/api/auth/verify',{email,code});await refresh()})}}><Stack spacing={2}><TextField required label="Eight-digit code" value={code} inputProps={{inputMode:'numeric',maxLength:8,pattern:'[0-9]{8}'}} onChange={e=>setCode(e.target.value)}/><Button type="submit" disabled={busy}>Continue</Button></Stack></Box><Button disabled={busy||!captchaReady||Boolean(turnstileKey&&!captchaToken)} onClick={()=>void work(async()=>{await requestCode();setMessage('If eligible, a new code will arrive shortly.')})}>Resend code</Button><Button onClick={()=>{setStage('email');setCode('');setMessage('')}}>Use a different email</Button></Stack>)}
- {me.authenticated&&!me.profileComplete&&<Stack spacing={2} component="form" onSubmit={e=>{e.preventDefault();void work(async()=>{await submitJson('/api/auth/profile',{firstName:first,lastName:last});await refresh()})}}><Typography variant="h6">Complete your profile</Typography><TextField required label="First name" value={first} onChange={e=>setFirst(e.target.value)}/><TextField required label="Last name" value={last} onChange={e=>setLast(e.target.value)}/><Button disabled={busy} type="submit" variant="contained">Save profile</Button></Stack>}
- {me.authenticated&&me.profileComplete&&!me.agreementCurrent&&<AgreementCompletion me={me} refresh={refresh}/>}
+ {me.authenticated&&(!me.profileComplete||!me.agreementCurrent)&&<OnboardingForm me={me} refresh={refresh}/>}
  {me.authenticated&&me.profileComplete&&me.agreementCurrent&&<Button onClick={()=>go('/')}>Continue to events</Button>}
  {message&&<Alert role="status" severity="info">{message}</Alert>}
+ </Stack>;
+}
+function OnboardingForm({me,refresh}:{me:Me;refresh:()=>Promise<void>}){
+ const [first,setFirst]=useState(''),[last,setLast]=useState(''),[checked,setChecked]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState('');
+ const versions=me.requiredVersions;
+ const needsProfile=!me.profileComplete;
+ const submit=async(e:React.FormEvent)=>{
+  e.preventDefault();
+  if(busy||!checked||!versions||needsProfile&&(!first.trim()||!last.trim()))return;
+  setBusy(true);setError('');
+  try{
+   if(needsProfile)await submitJson('/api/auth/profile',{firstName:first,lastName:last});
+   await submitJson('/api/auth/agreements',{accepted:true,termsVersion:versions.terms,privacyVersion:versions.privacy});
+   await refresh();
+  }catch(e){setError(e instanceof Error?e.message:'Unable to complete registration')}
+  finally{setBusy(false)}
+ };
+ return <Stack spacing={2} component="form" onSubmit={e=>void submit(e)} sx={{maxWidth:650}}>
+  <Typography variant="h6">{needsProfile?'Complete registration':'Review updated policies'}</Typography>
+  {needsProfile&&<><TextField required label="First name" value={first} onChange={e=>setFirst(e.target.value)}/><TextField required label="Last name" value={last} onChange={e=>setLast(e.target.value)}/></>}
+  <Typography>Read the <a href="/terms" target="_blank" rel="noopener noreferrer">Terms of Use</a> and <a href="/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a> before continuing.</Typography>
+  <FormControlLabel control={<Checkbox required checked={checked} onChange={e=>setChecked(e.target.checked)}/>} label="I confirm I am at least 13 years old, agree to the Terms of Use, and acknowledge the Privacy Policy. Parental permission may be required for specific events."/>
+  {!versions&&<Alert severity="warning">Required policy versions are unavailable. Registration cannot be completed.</Alert>}
+  {error&&<Alert severity="error" role="alert">{error}</Alert>}
+  <Button type="submit" variant="contained" disabled={busy||!checked||!versions}>{needsProfile?'Complete registration':'Accept and continue'}</Button>
  </Stack>;
 }
 function UserView({id,edit,backPath,canEditAvatar}:{id:string;edit:boolean;backPath:string;canEditAvatar:boolean}){
