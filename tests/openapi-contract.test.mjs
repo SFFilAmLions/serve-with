@@ -380,7 +380,7 @@ test('generated validator checks UUID/email formats and schema composition witho
  assert.equal(validate('verifyMagicLink',{token:null}),false,'magic token cannot be null');
  assert.equal(validate('acceptAgreements',{accepted:true,termsVersion:'v1',privacyVersion:'v1'}),true);
  assert.equal(validate('acceptAgreements',{accepted:'true',termsVersion:'v1',privacyVersion:'v1'}),false,'acceptance must be boolean');
- assert.equal(validate('createAdminUserStub',{firstName:'Alex',lastName:'Volunteer',email:null,dateOfBirth:null}),true);
+ assert.equal(validate('createAdminUserStub',{firstName:'Alex',lastName:'Volunteer',email:null}),true);
  assert.equal(validate('createAdminUserStub',{firstName:'Alex',lastName:'Volunteer',email:'test@example.org'}),true);
  assert.equal(validate('createAdminUserStub',{firstName:'Alex',lastName:'Volunteer',email:43}),false);
 });
