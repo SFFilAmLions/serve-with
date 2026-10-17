@@ -434,6 +434,18 @@ async function legacyFetch(request: Request, env: Env): Promise<Response> {
       try {
         const body=await bodyOf(request);
         if (!validName(body.firstName)||!validName(body.lastName)) return json({error:'Invalid name'},422);
+        if (stub) {
+          // A stub is not a registered account. Keep DOB read-only until a
+          // participation-identity audit workflow is implemented.
+          if ('dateOfBirth' in body) return json({error:'DOB correction unavailable for unclaimed attendees'},403);
+          if (!validateOperationBody('updateUser',{firstName:body.firstName.trim(),lastName:body.lastName.trim()}))
+            return json({error:'Invalid user'},422);
+          const result=await env.AUTH_DB.prepare(
+            'UPDATE user_stubs SET first_name=?,last_name=?,updated_at=? WHERE id=? AND claimed_at IS NULL'
+          ).bind(body.firstName.trim(),body.lastName.trim(),Date.now(),id).run();
+          if(result.meta.changes!==1)return json({error:'Attendee has been claimed or changed'},409);
+          return json({saved:true});
+        }
         if ('dateOfBirth' in body && (!subject.admin || !validDob(body.dateOfBirth))) return json({error:'Invalid or unauthorized DOB correction'},403);
         if(!validateOperationBody('updateUser',{
           firstName:(body.firstName as string).trim(),lastName:(body.lastName as string).trim(),
