@@ -192,7 +192,7 @@ const submitJson=async(path:string,body:Record<string,unknown>)=>{
   ?await generatedApi.requestSignIn({body:{email:string('email'),turnstileToken:string('turnstileToken')}})
   :path==='/api/auth/magic'?await generatedApi.verifyMagicLink({body:{token:string('token')}})
   :path==='/api/auth/verify'?await generatedApi.verifyCode({body:{email:string('email'),code:string('code')}})
-  :path==='/api/auth/profile'?await generatedApi.completeProfile({body:{firstName:string('firstName'),lastName:string('lastName'),dateOfBirth:string('dateOfBirth')}})
+  :path==='/api/auth/profile'?await generatedApi.completeProfile({body:{firstName:string('firstName'),lastName:string('lastName')}})
   :path==='/api/auth/agreements'?await generatedApi.acceptAgreements({body:{accepted:body.accepted===true,termsVersion:string('termsVersion'),privacyVersion:string('privacyVersion')}})
   :{status:400,data:{error:'Unknown API operation'}};
  if(result.status<200||result.status>=300)throw Error((result.data as {error?:string}).error||'Request failed');
@@ -218,7 +218,7 @@ function LoginChallenge({siteKey,onToken}:{siteKey:string;onToken:(token:string)
 
 function AuthScreen({me,refresh}:{me:Me;refresh:()=>Promise<void>}){
  const [email,setEmail]=useState(''),[code,setCode]=useState(''),[stage,setStage]=useState<'email'|'code'>('email'),[busy,setBusy]=useState(false);
- const [message,setMessage]=useState(''),[first,setFirst]=useState(''),[last,setLast]=useState(''),[dob,setDob]=useState('');
+ const [message,setMessage]=useState(''),[first,setFirst]=useState(''),[last,setLast]=useState('');
  const [turnstileKey,setTurnstileKey]=useState<string|null>(null),[captchaReady,setCaptchaReady]=useState(false),[captchaToken,setCaptchaToken]=useState(''),[captchaRound,setCaptchaRound]=useState(0);
  useEffect(()=>{void generatedApi.getTurnstileConfig().then(r=>{if(r.status!==200)throw Error('Unable to load verification settings');const data=r.data as {siteKey:string|null};setTurnstileKey(data.siteKey||null);setCaptchaReady(true)}).catch(()=>setCaptchaReady(false))},[]);
  const requestCode=async()=>{if(!captchaReady||(turnstileKey&&!captchaToken))throw Error('Complete the security check first');try{return await submitJson('/api/auth/request',{email,turnstileToken:captchaToken})}finally{setCaptchaToken('');setCaptchaRound(n=>n+1)}};
@@ -232,7 +232,7 @@ function AuthScreen({me,refresh}:{me:Me;refresh:()=>Promise<void>}){
  {!me.authenticated&&turnstileKey&&<LoginChallenge key={captchaRound} siteKey={turnstileKey} onToken={setCaptchaToken}/>}
  {!me.authenticated&&(stage==='email'?<Box component="form" onSubmit={e=>{e.preventDefault();void work(async()=>{const r=await requestCode();setMessage(r.message);setStage('code')})}}><Stack spacing={2}><TextField required type="email" label="Email" value={email} onChange={e=>setEmail(e.target.value)} autoComplete="email"/><Button variant="contained" type="submit" disabled={busy||!captchaReady||Boolean(turnstileKey&&!captchaToken)}>Continue</Button></Stack></Box>:
  <Stack spacing={2}><Typography>Check your email at {email}</Typography><Box component="form" onSubmit={e=>{e.preventDefault();void work(async()=>{await submitJson('/api/auth/verify',{email,code});await refresh()})}}><Stack spacing={2}><TextField required label="Eight-digit code" value={code} inputProps={{inputMode:'numeric',maxLength:8,pattern:'[0-9]{8}'}} onChange={e=>setCode(e.target.value)}/><Button type="submit" disabled={busy}>Continue</Button></Stack></Box><Button disabled={busy||!captchaReady||Boolean(turnstileKey&&!captchaToken)} onClick={()=>void work(async()=>{await requestCode();setMessage('If eligible, a new code will arrive shortly.')})}>Resend code</Button><Button onClick={()=>{setStage('email');setCode('');setMessage('')}}>Use a different email</Button></Stack>)}
- {me.authenticated&&!me.profileComplete&&<Stack spacing={2} component="form" onSubmit={e=>{e.preventDefault();void work(async()=>{await submitJson('/api/auth/profile',{firstName:first,lastName:last,dateOfBirth:dob});await refresh()})}}><Typography variant="h6">Complete your profile</Typography><TextField required label="First name" value={first} onChange={e=>setFirst(e.target.value)}/><TextField required label="Last name" value={last} onChange={e=>setLast(e.target.value)}/><TextField required label="Date of birth" type="text" placeholder="YYYY-MM-DD" helperText="Enter your birth date as YYYY-MM-DD (for example, 1990-05-21)." inputProps={{inputMode:"numeric",pattern:"[0-9]{4}-[0-9]{2}-[0-9]{2}",maxLength:10,autoComplete:"bday"}} value={dob} onChange={e=>setDob(e.target.value)}/><Button disabled={busy} type="submit" variant="contained">Save profile</Button></Stack>}
+ {me.authenticated&&!me.profileComplete&&<Stack spacing={2} component="form" onSubmit={e=>{e.preventDefault();void work(async()=>{await submitJson('/api/auth/profile',{firstName:first,lastName:last});await refresh()})}}><Typography variant="h6">Complete your profile</Typography><TextField required label="First name" value={first} onChange={e=>setFirst(e.target.value)}/><TextField required label="Last name" value={last} onChange={e=>setLast(e.target.value)}/><Button disabled={busy} type="submit" variant="contained">Save profile</Button></Stack>}
  {me.authenticated&&me.profileComplete&&!me.agreementCurrent&&<AgreementCompletion me={me} refresh={refresh}/>}
  {me.authenticated&&me.profileComplete&&me.agreementCurrent&&<Button onClick={()=>go('/')}>Continue to events</Button>}
  {message&&<Alert role="status" severity="info">{message}</Alert>}
@@ -248,7 +248,7 @@ function UserView({id,edit,backPath,canEditAvatar}:{id:string;edit:boolean;backP
   catch{setMessage('Could not open the avatar editor. Please check whether popups are blocked.');}
  };
 
- useEffect(()=>{void generatedApi.getUser({id}).then(response=>{if(response.status!==200)throw Error((response.data as {error?:string}).error||'Unable to load user');const r=response.data as {user:any;canCorrectDob:boolean};setUser(r);setFirst(r.user.first_name||'');setLast(r.user.last_name||'');setDob(r.user.date_of_birth||'')}).catch(e=>setMessage(e.message))},[id]);
+ useEffect(()=>{void generatedApi.getUser({id}).then(response=>{if(response.status!==200)throw Error((response.data as {error?:string}).error||'Unable to load user');const r=response.data as {user:any;isStub?:boolean};setUser(r);setFirst(r.user.first_name||'');setLast(r.user.last_name||'');}).catch(e=>setMessage(e.message))},[id]);
  if(message&&!user)return <Alert severity="error">{message}</Alert>;
  if(!user)return <Skeleton height={240}/>;
  const u=user.user;
@@ -261,7 +261,7 @@ function UserView({id,edit,backPath,canEditAvatar}:{id:string;edit:boolean;backP
    </IconButton>
   </Tooltip>}
  </Box><Box sx={{flexGrow:1}}><Typography variant="h4">{u.first_name} {u.last_name}</Typography><Typography color="text.secondary">{u.email||'No email address'}</Typography></Box>{!edit&&<Fab variant="extended" size="medium" color="primary" aria-label="Edit profile" onClick={()=>go('/users/'+id+'/edit')}><Glyph type="edit"/> <Box component="span" sx={{ml:1}}>Edit</Box></Fab>}</Stack>
- {edit?<Stack spacing={2} component="form" sx={{maxWidth:480,width:'100%'}} onSubmit={ev=>{ev.preventDefault();void generatedApi.updateUser({id,body:{firstName:first,lastName:last,...(user.canCorrectDob?{dateOfBirth:dob}:{})}}).then(response=>{if(response.status!==200)throw Error((response.data as {error?:string}).error||'Unable to update user');go('/users/'+id)}).catch(e=>setMessage(e.message))}}><TextField label="First name" value={first} onChange={e=>{setFirst(e.target.value);setDirty(true)}}/><TextField label="Last name" value={last} onChange={e=>{setLast(e.target.value);setDirty(true)}}/><TextField label="Email" value={u.email||''} disabled/>{user.canCorrectDob?<TextField label="Date of birth" type="date" slotProps={{inputLabel:{shrink:true}}} value={dob} onChange={e=>{setDob(e.target.value);setDirty(true)}}/>:<TextField label="Date of birth" value={dob} disabled/>}<Stack direction="row" spacing={1}><Button type="submit" variant="contained">Save</Button><Button onClick={()=>{if(!dirty||confirm('Discard changes?'))go('/users/'+id)}}>Cancel</Button></Stack></Stack>:<Stack spacing={0.5}><Typography>Email: {u.email||'No email address'}</Typography><Typography>Date of birth: {u.date_of_birth||'Not set'}</Typography></Stack>}
+ {edit?<Stack spacing={2} component="form" sx={{maxWidth:480,width:'100%'}} onSubmit={ev=>{ev.preventDefault();void generatedApi.updateUser({id,body:{firstName:first,lastName:last,}}).then(response=>{if(response.status!==200)throw Error((response.data as {error?:string}).error||'Unable to update user');go('/users/'+id)}).catch(e=>setMessage(e.message))}}><TextField label="First name" value={first} onChange={e=>{setFirst(e.target.value);setDirty(true)}}/><TextField label="Last name" value={last} onChange={e=>{setLast(e.target.value);setDirty(true)}}/><TextField label="Email" value={u.email||''} disabled/><Stack direction="row" spacing={1}><Button type="submit" variant="contained">Save</Button><Button onClick={()=>{if(!dirty||confirm('Discard changes?'))go('/users/'+id)}}>Cancel</Button></Stack></Stack>:<Stack spacing={0.5}><Typography>Email: {u.email||'No email address'}</Typography></Stack>}
  {user.isStub&&<Alert severity="info">Unclaimed attendee record — this person has not verified an email address or completed account setup.</Alert>}{message&&<Alert severity="error">{message}</Alert>}</Stack>;
 }
 function UsersDirectory(){
@@ -444,7 +444,7 @@ function AgreementCompletion({me,refresh}:{me:Me;refresh:()=>Promise<void>}) {
  return <Stack spacing={2} sx={{mt:3,maxWidth:650}}>
   <Typography variant="h6">Review and accept current policies</Typography>
   <Typography>Read the <a href="/terms" target="_blank" rel="noopener noreferrer">Terms of Use</a> and <a href="/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a> (version {versions?.terms||policyVersion.terms.version}).</Typography>
-  <FormControlLabel control={<Checkbox checked={checked} onChange={e=>setChecked(e.target.checked)}/>} label="I have read and agree to the Terms of Use and acknowledge the Privacy Policy."/>
+  <FormControlLabel control={<Checkbox checked={checked} onChange={e=>setChecked(e.target.checked)}/>} label="I confirm I am at least 13 years old, agree to the Terms of Use, and acknowledge the Privacy Policy. Parental permission may be required for specific events."/>
   {!versions&&<Alert severity="warning">Required policy versions are unavailable. Acceptance is disabled.</Alert>}
   {error&&<Alert severity="error" role="alert">{error}</Alert>}
   <Button variant="contained" disabled={!checked||!versions||saving} onClick={()=>void submit()}>Accept and continue</Button>
@@ -460,7 +460,7 @@ function AdminCreateUser(){
   try{
    const response=await generatedApi.createAdminUserStub({body:{
      firstName:first,lastName:last,...(email.trim()?{email:email.trim()}:{}),
-     ...(dob?{dateOfBirth:dob}:{})
+
    }});
    if(response.status!==201)throw Error((response.data as {error?:string}).error||'Unable to create user');
    const user=(response.data as {user:{id:string;firstName:string;lastName:string;email:string|null}}).user;
@@ -471,12 +471,12 @@ function AdminCreateUser(){
  };
  return <Stack spacing={2} sx={{my:4,maxWidth:650}}>
   <Typography variant="h4">Create user</Typography>
-  <Typography color="text.secondary">Create an unclaimed attendee record. Names are required; email and date of birth are optional. No account verification or policy acceptance is performed on the person's behalf.</Typography>
+  <Typography color="text.secondary">Create an unclaimed attendee record. Names are required; email is optional. No account verification or policy acceptance is performed on the person's behalf.</Typography>
   {error&&<Alert severity="error" role="alert">{error}</Alert>}
   <TextField required label="First name" value={first} onChange={e=>setFirst(e.target.value)}/>
   <TextField required label="Last name" value={last} onChange={e=>setLast(e.target.value)}/>
   <TextField label="Email (optional)" type="email" value={email} onChange={e=>setEmail(e.target.value)}/>
-  <TextField label="Date of birth (optional)" type="date" slotProps={{inputLabel:{shrink:true}}} value={dob} onChange={e=>setDob(e.target.value)}/>
+
   <Stack direction="row" spacing={2}>
    <Button onClick={()=>go(returnEventId?'/admin/events/'+returnEventId:'/admin/users')}>Cancel</Button>
    <Button variant="contained" disabled={busy||!first.trim()||!last.trim()} onClick={()=>void submit()}>Create unclaimed user</Button>
