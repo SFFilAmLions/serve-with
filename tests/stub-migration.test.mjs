@@ -29,6 +29,9 @@ test('additive nullable-email stubs preserve existing identity foreign keys and 
   assert.equal(d.prepare('SELECT user_id FROM agreement_acceptances').get().user_id,legacyId);
   assert.equal(d.prepare('SELECT user_id FROM event_signups').get().user_id,legacyId);
   assert.equal(d.prepare('SELECT subject_user_id FROM user_dob_audit').get().subject_user_id,legacyId);
+  d.exec(readFileSync('migrations/0007_remove_date_of_birth.sql','utf8'));
+  assert.equal(d.prepare('PRAGMA table_info(users)').all().some(c=>c.name==='date_of_birth'),false);
+  assert.equal(d.prepare('PRAGMA table_info(user_stubs)').all().some(c=>c.name==='date_of_birth'),false);
   d.prepare('INSERT INTO participation_identities(id) VALUES(?)').run(stubId);
   d.prepare('INSERT INTO user_stubs(id,email,first_name,last_name,created_at,updated_at) VALUES(?,?,?,?,?,?)')
    .run(stubId,null,'Alex','Volunteer',50,50);
