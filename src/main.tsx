@@ -192,7 +192,7 @@ const submitJson=async(path:string,body:Record<string,unknown>)=>{
   ?await generatedApi.requestSignIn({body:{email:string('email'),turnstileToken:string('turnstileToken')}})
   :path==='/api/auth/magic'?await generatedApi.verifyMagicLink({body:{token:string('token')}})
   :path==='/api/auth/verify'?await generatedApi.verifyCode({body:{email:string('email'),code:string('code')}})
-  :path==='/api/auth/profile'?await generatedApi.completeProfile({body:{firstName:string('firstName'),lastName:string('lastName'),dateOfBirth:string('dateOfBirth')}})
+  :path==='/api/auth/profile'?await generatedApi.completeProfile({body:{firstName:string('firstName'),lastName:string('lastName')}})
   :path==='/api/auth/agreements'?await generatedApi.acceptAgreements({body:{accepted:body.accepted===true,termsVersion:string('termsVersion'),privacyVersion:string('privacyVersion')}})
   :{status:400,data:{error:'Unknown API operation'}};
  if(result.status<200||result.status>=300)throw Error((result.data as {error?:string}).error||'Request failed');
@@ -218,7 +218,7 @@ function LoginChallenge({siteKey,onToken}:{siteKey:string;onToken:(token:string)
 
 function AuthScreen({me,refresh}:{me:Me;refresh:()=>Promise<void>}){
  const [email,setEmail]=useState(''),[code,setCode]=useState(''),[stage,setStage]=useState<'email'|'code'>('email'),[busy,setBusy]=useState(false);
- const [message,setMessage]=useState(''),[first,setFirst]=useState(''),[last,setLast]=useState(''),[dob,setDob]=useState('');
+ const [message,setMessage]=useState(''),[first,setFirst]=useState(''),[last,setLast]=useState('');
  const [turnstileKey,setTurnstileKey]=useState<string|null>(null),[captchaReady,setCaptchaReady]=useState(false),[captchaToken,setCaptchaToken]=useState(''),[captchaRound,setCaptchaRound]=useState(0);
  useEffect(()=>{void generatedApi.getTurnstileConfig().then(r=>{if(r.status!==200)throw Error('Unable to load verification settings');const data=r.data as {siteKey:string|null};setTurnstileKey(data.siteKey||null);setCaptchaReady(true)}).catch(()=>setCaptchaReady(false))},[]);
  const requestCode=async()=>{if(!captchaReady||(turnstileKey&&!captchaToken))throw Error('Complete the security check first');try{return await submitJson('/api/auth/request',{email,turnstileToken:captchaToken})}finally{setCaptchaToken('');setCaptchaRound(n=>n+1)}};
@@ -232,14 +232,38 @@ function AuthScreen({me,refresh}:{me:Me;refresh:()=>Promise<void>}){
  {!me.authenticated&&turnstileKey&&<LoginChallenge key={captchaRound} siteKey={turnstileKey} onToken={setCaptchaToken}/>}
  {!me.authenticated&&(stage==='email'?<Box component="form" onSubmit={e=>{e.preventDefault();void work(async()=>{const r=await requestCode();setMessage(r.message);setStage('code')})}}><Stack spacing={2}><TextField required type="email" label="Email" value={email} onChange={e=>setEmail(e.target.value)} autoComplete="email"/><Button variant="contained" type="submit" disabled={busy||!captchaReady||Boolean(turnstileKey&&!captchaToken)}>Continue</Button></Stack></Box>:
  <Stack spacing={2}><Typography>Check your email at {email}</Typography><Box component="form" onSubmit={e=>{e.preventDefault();void work(async()=>{await submitJson('/api/auth/verify',{email,code});await refresh()})}}><Stack spacing={2}><TextField required label="Eight-digit code" value={code} inputProps={{inputMode:'numeric',maxLength:8,pattern:'[0-9]{8}'}} onChange={e=>setCode(e.target.value)}/><Button type="submit" disabled={busy}>Continue</Button></Stack></Box><Button disabled={busy||!captchaReady||Boolean(turnstileKey&&!captchaToken)} onClick={()=>void work(async()=>{await requestCode();setMessage('If eligible, a new code will arrive shortly.')})}>Resend code</Button><Button onClick={()=>{setStage('email');setCode('');setMessage('')}}>Use a different email</Button></Stack>)}
- {me.authenticated&&!me.profileComplete&&<Stack spacing={2} component="form" onSubmit={e=>{e.preventDefault();void work(async()=>{await submitJson('/api/auth/profile',{firstName:first,lastName:last,dateOfBirth:dob});await refresh()})}}><Typography variant="h6">Complete your profile</Typography><TextField required label="First name" value={first} onChange={e=>setFirst(e.target.value)}/><TextField required label="Last name" value={last} onChange={e=>setLast(e.target.value)}/><TextField required label="Date of birth" type="date" slotProps={{inputLabel:{shrink:true}}} value={dob} onChange={e=>setDob(e.target.value)}/><Button disabled={busy} type="submit" variant="contained">Save profile</Button></Stack>}
- {me.authenticated&&me.profileComplete&&!me.agreementCurrent&&<AgreementCompletion me={me} refresh={refresh}/>}
+ {me.authenticated&&(!me.profileComplete||!me.agreementCurrent)&&<OnboardingForm me={me} refresh={refresh}/>}
  {me.authenticated&&me.profileComplete&&me.agreementCurrent&&<Button onClick={()=>go('/')}>Continue to events</Button>}
  {message&&<Alert role="status" severity="info">{message}</Alert>}
  </Stack>;
 }
+function OnboardingForm({me,refresh}:{me:Me;refresh:()=>Promise<void>}){
+ const [first,setFirst]=useState(''),[last,setLast]=useState(''),[checked,setChecked]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState('');
+ const versions=me.requiredVersions;
+ const needsProfile=!me.profileComplete;
+ const submit=async(e:{preventDefault:()=>void})=>{
+  e.preventDefault();
+  if(busy||!checked||!versions||needsProfile&&(!first.trim()||!last.trim()))return;
+  setBusy(true);setError('');
+  try{
+   if(needsProfile)await submitJson('/api/auth/profile',{firstName:first,lastName:last});
+   await submitJson('/api/auth/agreements',{accepted:true,termsVersion:versions.terms,privacyVersion:versions.privacy});
+   await refresh();
+  }catch(e){setError(e instanceof Error?e.message:'Unable to complete registration')}
+  finally{setBusy(false)}
+ };
+ return <Stack spacing={2} component="form" onSubmit={e=>void submit(e)} sx={{maxWidth:650}}>
+  <Typography variant="h6">{needsProfile?'Complete registration':'Review updated policies'}</Typography>
+  {needsProfile&&<><TextField required label="First name" value={first} onChange={e=>setFirst(e.target.value)}/><TextField required label="Last name" value={last} onChange={e=>setLast(e.target.value)}/></>}
+  <Typography>Read the <a href="/terms" target="_blank" rel="noopener noreferrer">Terms of Use</a> and <a href="/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a> before continuing.</Typography>
+  <FormControlLabel control={<Checkbox required checked={checked} onChange={e=>setChecked(e.target.checked)}/>} label="I confirm I am at least 13 years old, agree to the Terms of Use, and acknowledge the Privacy Policy. Parental permission may be required for specific events."/>
+  {!versions&&<Alert severity="warning">Required policy versions are unavailable. Registration cannot be completed.</Alert>}
+  {error&&<Alert severity="error" role="alert">{error}</Alert>}
+  <Button type="submit" variant="contained" disabled={busy||!checked||!versions}>{needsProfile?'Complete registration':'Accept and continue'}</Button>
+ </Stack>;
+}
 function UserView({id,edit,backPath,canEditAvatar}:{id:string;edit:boolean;backPath:string;canEditAvatar:boolean}){
- const [user,setUser]=useState<any>(null),[message,setMessage]=useState(''),[first,setFirst]=useState(''),[last,setLast]=useState(''),[dob,setDob]=useState(''),[dirty,setDirty]=useState(false);
+ const [user,setUser]=useState<any>(null),[message,setMessage]=useState(''),[first,setFirst]=useState(''),[last,setLast]=useState(''),[dirty,setDirty]=useState(false);
  const [avatarRevision,setAvatarRevision]=useState(0);
  const openAvatarEditor=(email:string)=>{
   const library=(window as Window & {Gravatar?:{GravatarQuickEditorCore:new(options:{email:string;scope:string[];onProfileUpdated:()=>void})=>{open:()=>void}}}).Gravatar;
@@ -248,7 +272,7 @@ function UserView({id,edit,backPath,canEditAvatar}:{id:string;edit:boolean;backP
   catch{setMessage('Could not open the avatar editor. Please check whether popups are blocked.');}
  };
 
- useEffect(()=>{void generatedApi.getUser({id}).then(response=>{if(response.status!==200)throw Error((response.data as {error?:string}).error||'Unable to load user');const r=response.data as {user:any;canCorrectDob:boolean};setUser(r);setFirst(r.user.first_name||'');setLast(r.user.last_name||'');setDob(r.user.date_of_birth||'')}).catch(e=>setMessage(e.message))},[id]);
+ useEffect(()=>{void generatedApi.getUser({id}).then(response=>{if(response.status!==200)throw Error((response.data as {error?:string}).error||'Unable to load user');const r=response.data as {user:any;isStub?:boolean};setUser(r);setFirst(r.user.first_name||'');setLast(r.user.last_name||'');}).catch(e=>setMessage(e.message))},[id]);
  if(message&&!user)return <Alert severity="error">{message}</Alert>;
  if(!user)return <Skeleton height={240}/>;
  const u=user.user;
@@ -261,8 +285,8 @@ function UserView({id,edit,backPath,canEditAvatar}:{id:string;edit:boolean;backP
    </IconButton>
   </Tooltip>}
  </Box><Box sx={{flexGrow:1}}><Typography variant="h4">{u.first_name} {u.last_name}</Typography><Typography color="text.secondary">{u.email||'No email address'}</Typography></Box>{!edit&&<Fab variant="extended" size="medium" color="primary" aria-label="Edit profile" onClick={()=>go('/users/'+id+'/edit')}><Glyph type="edit"/> <Box component="span" sx={{ml:1}}>Edit</Box></Fab>}</Stack>
- {edit?<Stack spacing={2} component="form" sx={{maxWidth:480,width:'100%'}} onSubmit={ev=>{ev.preventDefault();void generatedApi.updateUser({id,body:{firstName:first,lastName:last,...(user.canCorrectDob?{dateOfBirth:dob}:{})}}).then(response=>{if(response.status!==200)throw Error((response.data as {error?:string}).error||'Unable to update user');go('/users/'+id)}).catch(e=>setMessage(e.message))}}><TextField label="First name" value={first} onChange={e=>{setFirst(e.target.value);setDirty(true)}}/><TextField label="Last name" value={last} onChange={e=>{setLast(e.target.value);setDirty(true)}}/><TextField label="Email" value={u.email||''} disabled/>{user.canCorrectDob?<TextField label="Date of birth" type="date" slotProps={{inputLabel:{shrink:true}}} value={dob} onChange={e=>{setDob(e.target.value);setDirty(true)}}/>:<TextField label="Date of birth" value={dob} disabled/>}<Stack direction="row" spacing={1}><Button type="submit" variant="contained">Save</Button><Button onClick={()=>{if(!dirty||confirm('Discard changes?'))go('/users/'+id)}}>Cancel</Button></Stack></Stack>:<Stack spacing={0.5}><Typography>Email: {u.email||'No email address'}</Typography><Typography>Date of birth: {u.date_of_birth||'Not set'}</Typography></Stack>}
- {message&&<Alert severity="error">{message}</Alert>}</Stack>;
+ {edit?<Stack spacing={2} component="form" sx={{maxWidth:480,width:'100%'}} onSubmit={ev=>{ev.preventDefault();void generatedApi.updateUser({id,body:{firstName:first,lastName:last,}}).then(response=>{if(response.status!==200)throw Error((response.data as {error?:string}).error||'Unable to update user');go('/users/'+id)}).catch(e=>setMessage(e.message))}}><TextField label="First name" value={first} onChange={e=>{setFirst(e.target.value);setDirty(true)}}/><TextField label="Last name" value={last} onChange={e=>{setLast(e.target.value);setDirty(true)}}/><TextField label="Email" value={u.email||''} disabled/><Stack direction="row" spacing={1}><Button type="submit" variant="contained">Save</Button><Button onClick={()=>{if(!dirty||confirm('Discard changes?'))go('/users/'+id)}}>Cancel</Button></Stack></Stack>:<Stack spacing={0.5}><Typography>Email: {u.email||'No email address'}</Typography></Stack>}
+ {user.isStub&&<Alert severity="info">Unclaimed attendee record — this person has not verified an email address or completed account setup.</Alert>}{message&&<Alert severity="error">{message}</Alert>}</Stack>;
 }
 function UsersDirectory(){
  const [people,setPeople]=useState<any[]>([]),[query,setQuery]=useState(()=>sessionStorage.getItem('sw-users-q')||''),[sort,setSort]=useState<'first'|'last'>(()=>sessionStorage.getItem('sw-users-sort')==='first'?'first':'last'),[direction,setDirection]=useState<'asc'|'desc'>(()=>sessionStorage.getItem('sw-users-direction')==='desc'?'desc':'asc'),[offset,setOffset]=useState(0),[more,setMore]=useState(false),[error,setError]=useState('');
@@ -444,7 +468,7 @@ function AgreementCompletion({me,refresh}:{me:Me;refresh:()=>Promise<void>}) {
  return <Stack spacing={2} sx={{mt:3,maxWidth:650}}>
   <Typography variant="h6">Review and accept current policies</Typography>
   <Typography>Read the <a href="/terms" target="_blank" rel="noopener noreferrer">Terms of Use</a> and <a href="/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a> (version {versions?.terms||policyVersion.terms.version}).</Typography>
-  <FormControlLabel control={<Checkbox checked={checked} onChange={e=>setChecked(e.target.checked)}/>} label="I have read and agree to the Terms of Use and acknowledge the Privacy Policy."/>
+  <FormControlLabel control={<Checkbox checked={checked} onChange={e=>setChecked(e.target.checked)}/>} label="I confirm I am at least 13 years old, agree to the Terms of Use, and acknowledge the Privacy Policy. Parental permission may be required for specific events."/>
   {!versions&&<Alert severity="warning">Required policy versions are unavailable. Acceptance is disabled.</Alert>}
   {error&&<Alert severity="error" role="alert">{error}</Alert>}
   <Button variant="contained" disabled={!checked||!versions||saving} onClick={()=>void submit()}>Accept and continue</Button>
@@ -452,7 +476,7 @@ function AgreementCompletion({me,refresh}:{me:Me;refresh:()=>Promise<void>}) {
 }
 
 function AdminCreateUser(){
- const [first,setFirst]=useState(''),[last,setLast]=useState(''),[email,setEmail]=useState(''),[dob,setDob]=useState('');
+ const [first,setFirst]=useState(''),[last,setLast]=useState(''),[email,setEmail]=useState('');
  const [busy,setBusy]=useState(false),[error,setError]=useState('');
  const returnEventId=(history.state as {returnEventId?:string}|null)?.returnEventId;
  const submit=async()=>{
@@ -460,7 +484,7 @@ function AdminCreateUser(){
   try{
    const response=await generatedApi.createAdminUserStub({body:{
      firstName:first,lastName:last,...(email.trim()?{email:email.trim()}:{}),
-     ...(dob?{dateOfBirth:dob}:{})
+
    }});
    if(response.status!==201)throw Error((response.data as {error?:string}).error||'Unable to create user');
    const user=(response.data as {user:{id:string;firstName:string;lastName:string;email:string|null}}).user;
@@ -471,12 +495,12 @@ function AdminCreateUser(){
  };
  return <Stack spacing={2} sx={{my:4,maxWidth:650}}>
   <Typography variant="h4">Create user</Typography>
-  <Typography color="text.secondary">Create an unclaimed attendee record. Names are required; email and date of birth are optional. No account verification or policy acceptance is performed on the person's behalf.</Typography>
+  <Typography color="text.secondary">Create an unclaimed attendee record. Names are required; email is optional. No account verification or policy acceptance is performed on the person's behalf.</Typography>
   {error&&<Alert severity="error" role="alert">{error}</Alert>}
   <TextField required label="First name" value={first} onChange={e=>setFirst(e.target.value)}/>
   <TextField required label="Last name" value={last} onChange={e=>setLast(e.target.value)}/>
   <TextField label="Email (optional)" type="email" value={email} onChange={e=>setEmail(e.target.value)}/>
-  <TextField label="Date of birth (optional)" type="date" slotProps={{inputLabel:{shrink:true}}} value={dob} onChange={e=>setDob(e.target.value)}/>
+
   <Stack direction="row" spacing={2}>
    <Button onClick={()=>go(returnEventId?'/admin/events/'+returnEventId:'/admin/users')}>Cancel</Button>
    <Button variant="contained" disabled={busy||!first.trim()||!last.trim()} onClick={()=>void submit()}>Create unclaimed user</Button>
@@ -552,14 +576,17 @@ function AdminEventSignups({id}:{id:string}){
      </Box>)}
     </Card>}
    <Typography variant="h6" sx={{mt:3,mb:1}}>Add an attendee</Typography>
-   <Button sx={{mb:1}} onClick={()=>go('/admin/users/new',{returnEventId:id})}>Create user</Button>
    <Autocomplete sx={{mt:1}} options={people} value={people.find(p=>p.id===selected)||null}
      filterOptions={options=>options}
      getOptionLabel={p=>[p.first_name,p.last_name].filter(Boolean).join(' ')||p.email||'Unnamed user'}
      onInputChange={(_,value,reason)=>{if(reason==='input'){setQuery(value);setError('')}}}
      onChange={(_,p)=>setSelected(p?.id||'')}
+     noOptionsText={<Stack spacing={1} alignItems="flex-start" sx={{p:1}}><Typography variant="body2">No matching users found.</Typography><Button size="small" variant="outlined" onMouseDown={e=>e.preventDefault()} onClick={()=>go('/admin/users/new',{returnEventId:id})}>Create new user</Button></Stack>}
      renderInput={params=><TextField {...params} label="Search and select attendee" helperText="Start typing a name or email to search users"/>}/>
-   <Button variant="contained" sx={{mt:1}} disabled={!selected||busy} onClick={()=>void act('signup',selected)}>Confirm signup</Button>
+   <Stack direction="row" spacing={1} sx={{mt:2}} flexWrap="wrap" useFlexGap>
+    <Button variant="contained" disabled={!selected||busy} onClick={()=>void act('signup',selected)}>Confirm signup</Button>
+    <Button variant="outlined" disabled={busy} onClick={()=>go('/admin/users/new',{returnEventId:id})}>Create user</Button>
+   </Stack>
   </Box>
   <Box component="section" aria-labelledby="admin-event-history-heading">
    <Typography id="admin-event-history-heading" variant="h5" sx={{mb:1}}>History</Typography>
