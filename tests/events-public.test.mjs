@@ -542,7 +542,7 @@ test('admin creates email-optional unverified user without consent or login',asy
   assert.equal((await h.req(detailPath,'GET')).status,401,'anonymous profile access denied');
   assert.equal((await h.req(detailPath,'PUT',{firstName:'Alexis',lastName:'Volunteer'},cookie)).status,200);
   assert.equal(h.sqlite.prepare('SELECT first_name FROM user_stubs WHERE id=?').get(created.id).first_name,'Alexis');
-  assert.equal((await h.req(detailPath,'PUT',{firstName:'Alexis',lastName:'Volunteer',dateOfBirth:'1990-01-01'},cookie)).status,403,'stub DOB correction is not silently unaudited');
+  assert.equal((await h.req(detailPath,'PUT',{firstName:'Alexis',lastName:'Volunteer',dateOfBirth:'1990-01-01'},cookie)).status,422,'DOB is no longer accepted');
 
   assert.equal(h.sqlite.prepare('SELECT COUNT(*) n FROM users WHERE id=?').get(created.id).n,0);
   assert.equal(h.sqlite.prepare('SELECT COUNT(*) n FROM agreement_acceptances WHERE user_id=?').get(created.id).n,0);
@@ -759,7 +759,7 @@ test('verified magic-link claim reuses stub enrollment identity without granting
   assert.equal((await h.req('/api/events/'+eventId+'/signups','POST',{},session)).status,403,'uncompleted profile and policies still gate signup');
   const versions=JSON.parse(readFileSync('src/generated/policy-versions.json','utf8'));
   assert.equal((await h.req('/api/auth/agreements','POST',{accepted:true,termsVersion:versions.terms.version,privacyVersion:versions.privacy.version},session)).status,403,'claimant cannot consent before profile completion');
-  assert.equal((await h.req('/api/auth/profile','POST',{firstName:'Magic',lastName:'Claim',dateOfBirth:'1990-01-01'},session)).status,200,'claimant completes the ordinary profile workflow');
+  assert.equal((await h.req('/api/auth/profile','POST',{firstName:'Magic',lastName:'Claim'},session)).status,200,'claimant completes the ordinary profile workflow');
   assert.equal(h.sqlite.prepare('SELECT claimed_at FROM user_stubs WHERE id=?').get(stubId).claimed_at,null,'profile completion alone does not finalize claiming');
   assert.equal((await h.req('/api/events/'+eventId+'/signups','POST',{},session)).status,403,'profile completion does not bypass consent');
   assert.equal((await h.req('/api/auth/agreements','POST',{accepted:true,termsVersion:versions.terms.version,privacyVersion:versions.privacy.version},session)).status,200,'claimant accepts policies via normal registration');
