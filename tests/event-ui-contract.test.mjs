@@ -182,10 +182,9 @@ test('admin event roster has one attendee search input with live user lookup',()
 });
 
 
-test('initial profile date of birth supports typed YYYY-MM-DD entry',()=>{
- const section=source.slice(source.indexOf('function AuthScreen('),source.indexOf('function UserView('));
- assert.match(section,/label="Date of birth" type="text"/);
- assert.match(section,/placeholder="YYYY-MM-DD"/);
- assert.match(section,/pattern:"\[0-9\]\{4\}-\[0-9\]\{2\}-\[0-9\]\{2\}"/);
- assert.doesNotMatch(section,/label="Date of birth" type="date"/);
+test('profile omits birth date and confirms minimum registration age',()=>{
+ assert.doesNotMatch(source,/label="Date of birth"/);
+ assert.doesNotMatch(source,/dateOfBirth:/);
+ assert.match(source,/I confirm I am at least 13 years old/);
+ assert.match(source,/Parental permission may be required for specific events/);
 });
