@@ -234,7 +234,7 @@ async function sendEmail(env: Env, email: string, code: string, link: string): P
   const response = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { 'authorization': `Bearer ${env.RESEND_API_KEY}`, 'content-type': 'application/json' },
-    body: JSON.stringify({ from: env.AUTH_FROM_EMAIL, to: [email], subject: 'Sign in to Serve With', text: `Your one-time code is ${code}. It expires in 10 minutes.\n\nOr open this link, then confirm sign-in: ${link}\n\nIf you did not request this, ignore this email.` }),
+    body: JSON.stringify({ from: env.AUTH_FROM_EMAIL, to: [email], subject: 'Sign in to Serve With', text: `Click this link to sign in to Serve With:\n${link}\n\nOr enter this eight-digit verification code on the sign-in page you opened earlier:\n${code}\n\nThe link and code expire in 10 minutes. If you did not request this email, you can safely ignore it.` }),
   });
   if (!response.ok) {
     // Avoid logging the request payload, email recipient, OTP, magic link, API key, or raw provider response.
