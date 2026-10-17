@@ -241,7 +241,7 @@ function OnboardingForm({me,refresh}:{me:Me;refresh:()=>Promise<void>}){
  const [first,setFirst]=useState(''),[last,setLast]=useState(''),[checked,setChecked]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState('');
  const versions=me.requiredVersions;
  const needsProfile=!me.profileComplete;
- const submit=async(e:React.FormEvent)=>{
+ const submit=async(e:{preventDefault:()=>void})=>{
   e.preventDefault();
   if(busy||!checked||!versions||needsProfile&&(!first.trim()||!last.trim()))return;
   setBusy(true);setError('');
