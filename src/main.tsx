@@ -250,7 +250,7 @@ function LoginChallenge({siteKey,onToken}:{siteKey:string;onToken:(token:string)
 
 function AuthScreen({me,refresh}:{me:Me;refresh:()=>Promise<void>}){
  const [email,setEmail]=useState(''),[code,setCode]=useState(''),[stage,setStage]=useState<'email'|'code'>('email'),[busy,setBusy]=useState(false);
- const [message,setMessage]=useState(''),[first,setFirst]=useState(''),[last,setLast]=useState('');
+ const [message,setMessage]=useState('');
  const [turnstileKey,setTurnstileKey]=useState<string|null>(null),[captchaReady,setCaptchaReady]=useState(false),[captchaToken,setCaptchaToken]=useState(''),[captchaRound,setCaptchaRound]=useState(0);
  useEffect(()=>{void generatedApi.getTurnstileConfig().then(r=>{if(r.status!==200)throw Error('Unable to load verification settings');const data=r.data as {siteKey:string|null};setTurnstileKey(data.siteKey||null);setCaptchaReady(true)}).catch(()=>setCaptchaReady(false))},[]);
  const requestCode=async()=>{if(!captchaReady||(turnstileKey&&!captchaToken))throw Error('Complete the security check first');try{return await submitJson('/api/auth/request',{email,turnstileToken:captchaToken})}finally{setCaptchaToken('');setCaptchaRound(n=>n+1)}};
@@ -484,28 +484,6 @@ function PolicyPage({kind}:{kind:'terms'|'privacy'}) {
   <Typography sx={{mt:3}}><a href={kind==='terms'?'/privacy':'/terms'}>Read the {kind==='terms'?'Privacy Policy':'Terms of Use'}</a></Typography>
  </Box>;
 }
-function AgreementCompletion({me,refresh}:{me:Me;refresh:()=>Promise<void>}) {
- const [checked,setChecked]=useState(false),[saving,setSaving]=useState(false),[error,setError]=useState('');
- const versions=me.requiredVersions;
- const submit=async()=>{
-  if(!checked||!versions)return;
-  setSaving(true);setError('');
-  try {
-   await submitJson('/api/auth/agreements',{accepted:true,termsVersion:versions.terms,privacyVersion:versions.privacy});
-   await refresh();
-  } catch(e) {setError(e instanceof Error?e.message:'Could not save acceptance');setChecked(false)}
-  finally {setSaving(false)}
- };
- return <Stack spacing={2} sx={{mt:3,maxWidth:650}}>
-  <Typography variant="h6">Review and accept current policies</Typography>
-  <Typography>Read the <a href="/terms" target="_blank" rel="noopener noreferrer">Terms of Use</a> and <a href="/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a> (version {versions?.terms||policyVersion.terms.version}).</Typography>
-  <FormControlLabel control={<Checkbox checked={checked} onChange={e=>setChecked(e.target.checked)}/>} label="I confirm I am at least 13 years old, agree to the Terms of Use, and acknowledge the Privacy Policy. Parental permission may be required for specific events."/>
-  {!versions&&<Alert severity="warning">Required policy versions are unavailable. Acceptance is disabled.</Alert>}
-  {error&&<Alert severity="error" role="alert">{error}</Alert>}
-  <Button variant="contained" disabled={!checked||!versions||saving} onClick={()=>void submit()}>Accept and continue</Button>
- </Stack>;
-}
-
 function AdminCreateUser(){
  const [first,setFirst]=useState(''),[last,setLast]=useState(''),[email,setEmail]=useState('');
  const [busy,setBusy]=useState(false),[error,setError]=useState('');
