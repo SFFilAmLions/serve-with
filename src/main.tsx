@@ -79,7 +79,7 @@ function PageHeader({title,description,back,action,children}:PageHeaderProps){
   {back&&<Button size="small" startIcon={<Glyph type="back" size={24}/>} sx={{alignSelf:'flex-start'}} onClick={back.onClick}>{back.label}</Button>}
   <Stack direction={{xs:'column',sm:'row'}} spacing={2} alignItems={{sm:'flex-start'}} justifyContent="space-between">
    <Box sx={{minWidth:0}}><Typography variant="h4" component="h1">{title}</Typography>{description&&<Typography color="text.secondary" sx={{mt:0.5}}>{description}</Typography>}</Box>
-   {action&&<Box sx={{flexShrink:0,alignSelf:{xs:'flex-start',sm:'center'}}>{action}</Box>}
+   {action&&<Box sx={{flexShrink:0,alignSelf:{xs:'flex-start',sm:'center'}}}>{action}</Box>}
   </Stack>
   {children}
  </Stack>;
@@ -180,7 +180,7 @@ function EventList({admin}:{admin:boolean}){
  useEffect(()=>{let active=true;setLoading(true);setError('');generatedApi.listEvents({view}).then(result=>{if(result.status!==200)throw Error('Unable to load events');return result.data as {events:EventRecord[]}}).then(d=>{if(active)setEvents(d.events)}).catch(e=>{if(active)setError(String(e.message))}).finally(()=>{if(active)setLoading(false)});return()=>{active=false}},[view,revision]);
  return <Box component="section" aria-label="Events" sx={{mb:5}}>
   <SegmentedNavigation value={view} onChange={setView} label="Event timeline" items={[{value:'upcoming',label:'Upcoming'},{value:'past',label:'Past'}]}/>
-  <ContentState loading={loading} error={error} errorAction={<Button sx={{alignSelf:'flex-start'}} onClick={()=>reload(n=>n+1)}>Retry</Button>} empty={events.length===0?<><Typography variant="h6">{view==='upcoming'?'No upcoming events':'No past events yet.'}</Typography>{view==='upcoming'&&<Typography color="text.secondary">Check back soon for new opportunities to serve.</Typography>}</>}>
+  <ContentState loading={loading} error={error} errorAction={<Button sx={{alignSelf:'flex-start'}} onClick={()=>reload(n=>n+1)}>Retry</Button>} empty={events.length===0?<><Typography variant="h6">{view==='upcoming'?'No upcoming events':'No past events yet.'}</Typography>{view==='upcoming'&&<Typography color="text.secondary">Check back soon for new opportunities to serve.</Typography>}</>:undefined}>
    <Box sx={{display:'grid',gridTemplateColumns:{xs:'1fr',md:'repeat(2,minmax(0,1fr))'},gap:2,pt:3}}>{events.map(e=><EventCard key={e.id} event={e} onDetails={()=>go(admin?'/admin/events/'+e.id:'/events/'+e.id)} onCopy={()=>void copyEventLink(e)} actions={admin?<><Button size="small" startIcon={<Glyph type="edit"/>} onClick={()=>go('/admin/events/'+e.id+'/edit')}>Edit</Button><Button size="small" onClick={()=>go('/admin/events/'+e.id)}>Signups</Button><IconButton size="small" aria-label={'Duplicate '+e.title} onClick={()=>go('/admin/events/new',{duplicate:e})}><Glyph type="copy"/></IconButton><IconButton size="small" color="error" aria-label={'Delete '+e.title} onClick={event=>{deleteTrigger.current=event.currentTarget;setToDelete(e);setDeleteError('')}}><Glyph type="trash"/></IconButton></>:undefined}/>)}</Box>
   </ContentState>
  {editor.open&&<Editor key={editor.event?.id||'new'} event={editor.event} onClose={closeEditor} onSaved={()=>{setNotice(editor.event?'Event updated':'Event created');closeEditor();reload(n=>n+1)}} onReload={()=>{closeEditor();reload(n=>n+1)}}/>}
@@ -672,7 +672,7 @@ function MySignups({me}:{me:Me}){
  return <Box component="section" aria-label="My signups" sx={{mb:5}}>
   <PageHeader title="My signups"/>
   <SegmentedNavigation value={view} onChange={setView} label="Signup timeline" items={[{value:'upcoming',label:'Upcoming'},{value:'past',label:'Past'},{value:'cancelled',label:'Cancelled'}]}/>
-  <ContentState loading={loading} error={error} empty={filtered.length===0?<Typography variant="h6">{view==='cancelled'?'No cancelled signups.':view==='past'?'No past signups.':'No upcoming signups.'}</Typography>}>
+  <ContentState loading={loading} error={error} empty={filtered.length===0?<Typography variant="h6">{view==='cancelled'?'No cancelled signups.':view==='past'?'No past signups.':'No upcoming signups.'}</Typography>:undefined}>
    <Box sx={{display:'grid',gridTemplateColumns:{xs:'1fr',md:'repeat(2,minmax(0,1fr))'},gap:2,pt:3}}>
     {filtered.map(item=>{
      const event:EventRecord={id:item.event_id,title:item.title,location:item.location,timezone:item.timezone,start_at:item.start_at,end_at:item.end_at,version:1,capacity:item.capacity,signups_count:item.signups_count,spots_available:item.capacity===null?null:Math.max(0,item.capacity-item.signups_count)};
