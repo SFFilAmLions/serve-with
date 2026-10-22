@@ -64,7 +64,9 @@ function harness() {
   return {req,sent,sqlite,env,close};
 }
 function credentials(mail) {
-  const code = mail.text.match(/one-time code is (\d{8})/)[1];
+  // Copy may change, but the code must remain an eight-digit value immediately
+  // before the expiry notice in the transactional message.
+  const code = mail.text.match(/(\d{8})\n\nThe link and code expire/)[1];
   const token = new URL(mail.text.match(/https:\/\/[^\s]+/)[0]).searchParams.get('magic');
   return {code,token};
 }
