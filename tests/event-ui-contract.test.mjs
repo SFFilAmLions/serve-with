@@ -52,6 +52,15 @@ test('SDDW-005 Material controls preserve the approved UI choices',()=>{
  assert.doesNotMatch(source,/Alphabetical directory navigation/);
  assert.equal((source.match(/>Save event<\/Button>/g)||[]).length,1);
 });
+test('design-system primitives keep page hierarchy and repeated event states consistent',()=>{
+ for(const component of ['function PageHeader','function SegmentedNavigation','function ContentState','function FormPage','function EventCard']){
+  assert.ok(source.includes(component),component);
+ }
+ assert.match(source,/<PageHeader title="My signups"\/>/);
+ assert.match(source,/<PageHeader title="Usage & Quotas"/);
+ assert.match(source,/<ContentState loading=\{loading\}/);
+ assert.match(source,/<EventCard key=\{item\.event_id\}/);
+});
 test('Turnstile UI requests a fresh token for each login email',()=>{
  assert.match(source,/action:'request-login'/);
  assert.match(source,/siteKey=\{turnstileKey\}/);
@@ -133,7 +142,7 @@ test('My Signups mirrors the event grid and separates active, past and unrejoine
  assert.match(source,/const latestByEvent=new Map<string,SignupHistoryItem>/);
  assert.match(source,/view==='cancelled'\?!activeEventIds\.has\(item\.event_id\)&&item\.deleted_at!==null/);
  assert.match(source,/view==='upcoming'\?item\.end_at>now:item\.end_at<=now/);
- assert.match(source,/value="cancelled">Cancelled/);
+ assert.match(source,/label:'Cancelled'/);
  assert.match(source,/gridTemplateColumns:\{xs:'1fr',md:'repeat\(2,minmax\(0,1fr\)\)'\}/);
  assert.match(source,/<EventWhen event=\{event\}\/>/);
 });
@@ -179,4 +188,25 @@ test('admin event roster has one attendee search input with live user lookup',()
  assert.match(section,/generatedApi\.listAdminUsers\(\{q:query\}\)/);
  assert.doesNotMatch(section,/label="Search attendees by name or email"/);
  assert.doesNotMatch(section,/>Search users<\/Button>/);
+});
+
+
+test('profile omits birth date and confirms minimum registration age',()=>{
+ assert.doesNotMatch(source,/label="Date of birth"/);
+ assert.doesNotMatch(source,/dateOfBirth:/);
+ assert.match(source,/I confirm I am at least 13 years old/);
+ assert.match(source,/Parental permission may be required for specific events/);
+});
+
+test('registration combines name and terms consent in one onboarding form',()=>{
+ const section=source.slice(source.indexOf('function OnboardingForm('),source.indexOf('function UserView('));
+ assert.match(section,/Complete registration/);
+ assert.match(section,/First name/);
+ assert.match(section,/Last name/);
+ assert.match(section,/Terms of Use/);
+ assert.match(section,/Privacy Policy/);
+ assert.match(section,/Checkbox required/);
+ assert.match(section,/submitJson\('\/api\/auth\/profile'/);
+ assert.match(section,/submitJson\('\/api\/auth\/agreements'/);
+ assert.match(source,/me\.authenticated&&\(!me\.profileComplete\|\|!me\.agreementCurrent\)/);
 });

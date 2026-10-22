@@ -109,6 +109,18 @@ Claiming uses **ordinary verified-email sign-in and account creation/reactivatio
 
 Proposed `/admin/usage` UI and admin-protected read-only API defined in YAML. Backend provider adapters retrieve Cloudflare Workers/D1 analytics, Resend sending usage, and Turnstile metrics *only to the extent presently supported by the account's plan and APIs*. Validate actual API/plan access in a spike before promising every metric. Query credentials live in Worker secrets, preferably scoped separately from transactional email credentials; no client secrets. A 5–15 minute cache reduces rate/cost; provide `collectedAt`, `stale`, `source`, `scope`, `unit`, `period`, `used`, and nullable `limit`/`remaining` with clear unknown semantics. Avoid replacing failed readings with zero. Do not combine account-wide totals with per-Worker totals under one label. Warn at 80%/95% only when a valid denominator exists. Provider failures do not block signup or login. No automated alerts in this increment.
 
+## D. Experience design system and component enforcement
+
+The repository-level [design system](../../docs/design-system.md) defines visual semantics, page families and the component contract for this milestone. It supplements the UI requirements; it does not change product behavior, authorization or API contracts.
+
+The implementation should first consolidate repeated layout/interaction rules into shared React components: `AppShell`, `PageHeader`, `SegmentedNavigation`, `EventCard`, `EventFacts`, `ContentState`, `DataTable`, `FormPage` and `StatusMetricCard`. Components are implementation aids, not an invitation to place business rules or authorization decisions in the client.
+
+`AppShell` owns the shared header, appearance/account controls, attendee/admin segmented navigation, environment notice and quiet status footer. It receives route-aware context so workspace switching preserves an event identifier when one exists. `PageHeader` owns the optional back action, title, supporting metadata and one primary-action slot. Pages must supply semantic titles and accessible action labels; the component must not infer permission.
+
+`EventCard` and `EventFacts` centralize event list/history anatomy and its calendar/time/location/capacity semantics. Directory data uses a semantic desktop table with a labeled stacked-row narrow-screen presentation. Form pages use a constrained-width layout with standard field/action spacing. Usage cards render a progress bar only when the API has supplied a reliable denominator, and use the shared relative-time formatter for known resets.
+
+Migration is family-by-family, retaining existing route components until each family has visual, keyboard, theme and behavior regression coverage. Styling must be token/component driven rather than page-local overrides wherever a standard is defined. Existing MUI components remain the accessible base; do not replace their focus, modal, input or menu behavior with custom equivalents without an accessibility review.
+
 ## Risks and required proofs
 
 1. **Highest:** OpenAPI 3.1 server interface generation must actually work in a Cloudflare Worker and support runtime validation; resolve before refactoring existing endpoints.
@@ -116,6 +128,7 @@ Proposed `/admin/usage` UI and admin-protected read-only API defined in YAML. Ba
 3. **High:** Existing schema's email uniqueness/nullability, profile readiness and email verification must support stubs without weakening ordinary login. Avoid double identity creation.
 4. **High:** Provider API availability, account-wide quotas, scope of credentials and provider cost are variable; mark unsupported values unavailable.
 5. **Moderate:** Magic-link round-trips, SPA route redirects, and accessible toast/countdown states need browser tests.
+6. **Moderate:** Shared visual components can unintentionally alter responsive layout, focus order or permission-gated action availability; migrate incrementally with route-level behavior tests.
 
 ## Implementation / approval boundaries
 

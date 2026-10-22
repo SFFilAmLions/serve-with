@@ -9,7 +9,6 @@ When you register for Serve With, we collect:
 
 - Your first and last name.
 - Your email address.
-- Your date of birth.
 - Records of your acceptance of our Terms of Use and Privacy Policy.
 
 We also process information needed to authenticate accounts, protect the website, and maintain secure sessions.
@@ -22,12 +21,12 @@ We use your information to:
 
 - Create, verify, and manage your account.
 - Organize club events and volunteer opportunities.
-- Determine age eligibility for activities with age restrictions.
+- Record your declaration that you meet the 13-year minimum registration age.
 - Communicate with you about accounts, events, and volunteer activities.
 - Protect the website against unauthorized access and misuse.
 - Maintain necessary administrative and participation records.
 
-We use your date of birth for account records and age-eligibility checks.
+We do not request a date of birth for account registration. Individual events may separately require age eligibility confirmation or parental permission.
 
 ### 3. Who Can Access or Receive Your Information
 
@@ -47,7 +46,7 @@ We do not sell your personal information.
 
 Serve With registration is available only to individuals **13 years of age or older**.
 
-Some activities may have higher minimum ages or additional participation requirements. We may use your date of birth to determine eligibility.
+Some activities may have higher minimum ages or additional participation requirements. Event organizers may set additional age restrictions or require parental permission for particular activities.
 
 Serve With is not intended for children under 13. If we learn that an account belongs to a child under 13, we will review and take appropriate action, including removal of personal information as required by applicable law.
 
@@ -71,7 +70,7 @@ We will communicate the outcome of the request, including any information that m
 
 You may review your profile and update supported account information through Serve With.
 
-For corrections to information you cannot edit yourself, including your date of birth, or to make a privacy-related request, contact **secretary@sffilamlions.org**.
+For corrections to information you cannot edit yourself, or to make a privacy-related request, contact **secretary@sffilamlions.org**.
 
 ### 8. Changes to This Policy
 

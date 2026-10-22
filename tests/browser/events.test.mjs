@@ -75,18 +75,16 @@ test('magic link automatically POSTs once and scrubs the browser URL',async()=>{
  }finally{await browser.close()}
 });
 
-test('incomplete verified profile stays on the login flow without policy fabrication',async()=>{
+test('incomplete verified profile stays on the login flow without collecting date of birth',async()=>{
  const incomplete={...admin,profileComplete:false,agreementCurrent:false,privileged:false};
  const {browser,page}=await context(incomplete);
  try{
   await page.route('**/api/auth/profile',r=>r.fulfill({json:{profileComplete:true}}));
   await page.goto(base+'/login');
-  await page.getByRole('heading',{name:'Complete your profile'}).waitFor();
+  await page.getByRole('heading',{name:'Complete registration'}).waitFor();
   await page.getByRole('textbox',{name:'First name'}).fill('Test');
   await page.getByRole('textbox',{name:'Last name'}).fill('Person');
-  await page.locator('input[type="date"]').fill('1990-05-02');
-  assert.equal(await page.getByText(/Date of birth/).count()>0,true);
-  await page.getByRole('button',{name:'Save profile'}).click();
+  assert.equal(await page.getByLabel('Date of birth').count(),0);
  }finally{await browser.close()}
 });
 
@@ -163,7 +161,8 @@ test('directory is paginated, searchable, sortable, and links to canonical profi
   assert.equal(new URL(page.url()).pathname,'/users/'+adminId);
   await page.getByRole('heading',{name:'Admin Example'}).waitFor();
   await page.getByRole('button',{name:'Edit profile',exact:true}).click();
-  await page.getByLabel('Date of birth').waitFor();
+  await page.getByRole('textbox',{name:'First name'}).waitFor();
+  assert.equal(await page.getByLabel('Date of birth').count(),0);
  }finally{await browser.close()}
 });
 

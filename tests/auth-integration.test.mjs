@@ -33,6 +33,7 @@ function database() {
   sqlite.exec(readFileSync('migrations/0002_auth_rate_limits.sql','utf8'));
   sqlite.exec(readFileSync('migrations/0004_users_and_agreements.sql','utf8'));
   sqlite.exec('BEGIN;'+readFileSync('migrations/0006_unclaimed_users.sql','utf8')+'COMMIT;');
+  sqlite.exec(readFileSync('migrations/0007_remove_date_of_birth.sql','utf8'));
   sqlite.exec('PRAGMA foreign_keys=ON');
   const adapter = { prepare(sql) { const stmt = sqlite.prepare(sql); return {
     bind(...params) { return { first: async () => stmt.get(...params) || null,
@@ -63,7 +64,9 @@ function harness() {
   return {req,sent,sqlite,env,close};
 }
 function credentials(mail) {
-  const code = mail.text.match(/one-time code is (\d{8})/)[1];
+  // Copy may change, but the code must remain an eight-digit value immediately
+  // before the expiry notice in the transactional message.
+  const code = mail.text.match(/(\d{8})\n\nThe link and code expire/)[1];
   const token = new URL(mail.text.match(/https:\/\/[^\s]+/)[0]).searchParams.get('magic');
   return {code,token};
 }
@@ -79,7 +82,7 @@ test('OTP signs in, creates secure session, protects dashboard and revokes on lo
     const cookie = login.headers.get('set-cookie');
     assert.match(cookie,/__Host-sw_session=.*HttpOnly; Secure; SameSite=Strict/);
     assert.equal((await h.req('/api/admin/dashboard',undefined,{cookie})).status,403);
-    const profile=await h.req('/api/auth/profile',{firstName:'Example',lastName:'Admin',dateOfBirth:'1990-01-01'},{cookie});
+    const profile=await h.req('/api/auth/profile',{firstName:'Example',lastName:'Admin'},{cookie});
     assert.equal(profile.status,200);
     assert.equal((await h.req('/api/admin/dashboard',undefined,{cookie})).status,403);
     const agreement=await h.req('/api/auth/agreements',{accepted:true,termsVersion:JSON.parse(readFileSync('src/generated/policy-versions.json','utf8')).terms.version,privacyVersion:JSON.parse(readFileSync('src/generated/policy-versions.json','utf8')).privacy.version},{cookie});
@@ -202,9 +205,9 @@ test('agreement is rejected without profile and rejects mismatched or unchecked 
     const cookie=login.headers.get('set-cookie');
     const accept=(body)=>h.req('/api/auth/agreements',body,{cookie});
     assert.equal((await accept({accepted:true,termsVersion:JSON.parse(readFileSync('src/generated/policy-versions.json','utf8')).terms.version,privacyVersion:JSON.parse(readFileSync('src/generated/policy-versions.json','utf8')).privacy.version})).status,403);
-    assert.equal((await h.req('/api/auth/profile',{firstName:' ',lastName:'Valid',dateOfBirth:'2026-02-30'},{cookie})).status,422);
-    assert.equal((await h.req('/api/auth/profile',{firstName:'Alice',lastName:'Example',dateOfBirth:'1990-05-02'},{cookie})).status,200);
-    assert.equal((await h.req('/api/auth/profile',{firstName:'New',lastName:'Value',dateOfBirth:'1980-03-02'},{cookie})).status,409);
+    assert.equal((await h.req('/api/auth/profile',{firstName:' ',lastName:'Valid'},{cookie})).status,422);
+    assert.equal((await h.req('/api/auth/profile',{firstName:'Alice',lastName:'Example'},{cookie})).status,200);
+    assert.equal((await h.req('/api/auth/profile',{firstName:'New',lastName:'Value'},{cookie})).status,409);
     assert.equal((await accept({accepted:false,termsVersion:JSON.parse(readFileSync('src/generated/policy-versions.json','utf8')).terms.version,privacyVersion:JSON.parse(readFileSync('src/generated/policy-versions.json','utf8')).privacy.version})).status,409);
     assert.equal((await accept({accepted:true,termsVersion:'old',privacyVersion:JSON.parse(readFileSync('src/generated/policy-versions.json','utf8')).privacy.version})).status,409);
     assert.equal((await accept({accepted:true,termsVersion:JSON.parse(readFileSync('src/generated/policy-versions.json','utf8')).terms.version,privacyVersion:JSON.parse(readFileSync('src/generated/policy-versions.json','utf8')).privacy.version})).status,200);
@@ -219,7 +222,7 @@ async function complete(h,email,name){
   const login=await h.req('/api/auth/verify',{email,code:credentials(mail).code});
   assert.equal(login.status,200);
   const cookie=login.headers.get('set-cookie');
-  assert.equal((await h.req('/api/auth/profile',{firstName:name,lastName:'Example',dateOfBirth:'1990-01-01'},{cookie})).status,200);
+  assert.equal((await h.req('/api/auth/profile',{firstName:name,lastName:'Example'},{cookie})).status,200);
   assert.equal((await h.req('/api/auth/agreements',{accepted:true,termsVersion:JSON.parse(readFileSync('src/generated/policy-versions.json','utf8')).terms.version,privacyVersion:JSON.parse(readFileSync('src/generated/policy-versions.json','utf8')).privacy.version},{cookie})).status,200);
   const me=await (await h.req('/api/auth/me',undefined,{cookie})).json();
   return {cookie,id:me.userId};
@@ -237,57 +240,28 @@ test('directory is admin-only and excludes DOB from every result',async()=>{
     assert.equal((await h.req('/api/admin/users?sort=unknown&letter=ab',undefined,{cookie:admin.cookie})).status,400);
   }finally{h.close()}
 });
-test('canonical user reads are owner/admin only, owner cannot correct DOB or edit email',async()=>{
-  const h=harness();try{
-    const admin=await complete(h,'lionaugust@icloud.com','Admin');
-    const guest=await complete(h,'guest@example.org','Guest');
-    const outsider=await complete(h,'lsvalera58@gmail.com','Other');
-    assert.equal((await h.req('/api/users/'+admin.id,undefined,{cookie:guest.cookie})).status,404);
-    assert.equal((await h.req('/api/users/'+guest.id,undefined,{cookie:admin.cookie})).status,200);
-    assert.equal((await h.req('/api/users/'+guest.id,undefined,{cookie:guest.cookie})).status,200);
-    assert.equal((await h.req('/api/users/'+guest.id,{firstName:'Updated',lastName:'Example',dateOfBirth:'1980-01-01'},{cookie:guest.cookie,method:'PUT'})).status,403);
-    assert.equal((await h.req('/api/users/'+guest.id,{firstName:'Updated',lastName:'Example',email:'stolen@example.org'},{cookie:guest.cookie,method:'PUT'})).status,200);
-    assert.equal(h.sqlite.prepare('SELECT email FROM users WHERE id=?').get(guest.id).email,'guest@example.org');
-    assert.equal((await h.req('/api/users/'+guest.id,{firstName:'Updated',lastName:'Example',dateOfBirth:'1980-01-01'},{cookie:admin.cookie,method:'PUT'})).status,200);
-    const audit=h.sqlite.prepare('SELECT actor_user_id,subject_user_id,changed_at FROM user_dob_audit').all();
-    assert.equal(audit.length,1);
-    assert.equal(audit[0].actor_user_id,admin.id);
-    assert.equal(audit[0].subject_user_id,guest.id);
-    assert.equal((await h.req('/api/users/'+guest.id,{firstName:'Updated',lastName:'Example',dateOfBirth:'1980-01-01'},{cookie:admin.cookie,method:'PUT'})).status,200);
-    assert.equal(h.sqlite.prepare('SELECT count(*) n FROM user_dob_audit').get().n,1);
-    assert.equal((await h.req('/api/users/'+guest.id,undefined,{cookie:outsider.cookie})).status,200);
-  }finally{h.close()}
+test('canonical user reads are owner/admin only and DOB is rejected',async()=>{
+ const h=harness();try{
+  const admin=await complete(h,'lionaugust@icloud.com','Admin');
+  const guest=await complete(h,'guest@example.org','Guest');
+  assert.equal((await h.req('/api/users/'+admin.id,undefined,{cookie:guest.cookie})).status,404);
+  assert.equal((await h.req('/api/users/'+guest.id,undefined,{cookie:admin.cookie})).status,200);
+  assert.equal((await h.req('/api/users/'+guest.id,undefined,{cookie:guest.cookie})).status,200);
+  assert.equal((await h.req('/api/users/'+guest.id,{firstName:'Updated',lastName:'Example',dateOfBirth:'1980-01-01'},{cookie:admin.cookie,method:'PUT'})).status,422);
+  assert.equal((await h.req('/api/users/'+guest.id,{firstName:'Updated',lastName:'Example'},{cookie:guest.cookie,method:'PUT'})).status,200);
+  assert.equal(h.sqlite.prepare('SELECT first_name FROM users WHERE id=?').get(guest.id).first_name,'Updated');
+ }finally{h.close()}
 });
-
-test('minimum age rejects under-13 profile completion without storing supplied DOB', async () => {
-  const h=harness();
-  try {
-    await h.req('/api/auth/request',{email:'lionaugust@icloud.com'});
-    const {code}=credentials(h.sent.at(-1));
-    const login=await h.req('/api/auth/verify',{email:'lionaugust@icloud.com',code});
-    const cookie=login.headers.get('set-cookie');
-    const today=new Date().toISOString().slice(0,10);
-    const birth=(age)=>{const d=new Date(today+'T12:00:00Z');d.setUTCFullYear(d.getUTCFullYear()-age);return d.toISOString().slice(0,10)};
-    const child=birth(12);
-    assert.equal((await h.req('/api/auth/profile',{firstName:'Minor',lastName:'Test',dateOfBirth:child},{cookie})).status,422);
-    assert.equal(h.sqlite.prepare('SELECT date_of_birth FROM users').get().date_of_birth,null);
-    assert.equal((await h.req('/api/auth/profile',{firstName:'Allowed',lastName:'Test',dateOfBirth:birth(13)},{cookie})).status,200);
-  } finally { h.close(); }
-});
-
-test('previously stored underage profile cannot regain privileged access', async () => {
-  const h=harness();
-  try {
-    await h.req('/api/auth/request',{email:'lionaugust@icloud.com'});
-    const {code}=credentials(h.sent.at(-1));
-    const login=await h.req('/api/auth/verify',{email:'lionaugust@icloud.com',code});
-    const cookie=login.headers.get('set-cookie');
-    h.sqlite.prepare("UPDATE users SET first_name='Young',last_name='Member',date_of_birth='2020-01-01'").run();
-    const me=await (await h.req('/api/auth/me',undefined,{cookie})).json();
-    assert.equal(me.profileComplete,false);
-    assert.equal(me.privileged,false);
-    assert.equal((await h.req('/api/admin/dashboard',undefined,{cookie})).status,403);
-  } finally { h.close(); }
+test('profile completion no longer collects date of birth',async()=>{
+ const h=harness();try{
+  await h.req('/api/auth/request',{email:'lionaugust@icloud.com'});
+  const {code}=credentials(h.sent.at(-1));
+  const login=await h.req('/api/auth/verify',{email:'lionaugust@icloud.com',code});
+  const cookie=login.headers.get('set-cookie');
+  assert.equal((await h.req('/api/auth/profile',{firstName:'Minor',lastName:'Test',dateOfBirth:'2014-01-01'},{cookie})).status,422);
+  assert.equal((await h.req('/api/auth/profile',{firstName:'Allowed',lastName:'Test'},{cookie})).status,200);
+  assert.equal(h.sqlite.prepare('PRAGMA table_info(users)').all().some(c=>c.name==='date_of_birth'),false);
+ }finally{h.close()}
 });
 
 test('Turnstile blocks email issuance unless Siteverify confirms hostname and action',async()=>{
@@ -346,7 +320,7 @@ test('email-verified stub claim reuses ID and requires full profile and personal
   assert.equal(incomplete.profileComplete,false);
   assert.equal(incomplete.agreementCurrent,false);
   assert.equal((await h.req('/api/auth/agreements',{accepted:true,termsVersion:'wrong',privacyVersion:'wrong'},{cookie:session})).status,403);
-  assert.equal((await h.req('/api/auth/profile',{firstName:'Actual',lastName:'Owner',dateOfBirth:'1991-05-22'},{cookie:session})).status,200);
+  assert.equal((await h.req('/api/auth/profile',{firstName:'Actual',lastName:'Owner'},{cookie:session})).status,200);
   const versions=JSON.parse(readFileSync('src/generated/policy-versions.json','utf8'));
   const accepted=await h.req('/api/auth/agreements',{
    accepted:true,termsVersion:versions.terms.version,privacyVersion:versions.privacy.version

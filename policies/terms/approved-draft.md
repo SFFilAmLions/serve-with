@@ -13,7 +13,7 @@ By registering and accepting these Terms, you agree to use Serve With in accorda
 
 You must be at least **13 years old** to register.
 
-You agree to provide accurate information, including your name, email address, and date of birth, and to keep supported account information reasonably up to date.
+You agree to provide accurate information, including your name and email address, and to keep supported account information reasonably up to date.
 
 Serve With uses email-based authentication. You are responsible for maintaining the security of your email account and must not access another person's account without authorization.
 
@@ -21,7 +21,7 @@ Serve With uses email-based authentication. You are responsible for maintaining 
 
 Some events and volunteer activities may have higher minimum age requirements or additional participation conditions.
 
-Serve With may use your date of birth to help determine age eligibility.
+By accepting these Terms, you confirm that you are at least 13 years old. Parental or guardian permission is required only for activities that specifically require it; such permission does not override an event's minimum age or safety requirements.
 
 Having an account does not guarantee acceptance into or eligibility for any particular activity. Event organizers may impose additional requirements, including appropriate supervision or guardian permission for minors where applicable.
 

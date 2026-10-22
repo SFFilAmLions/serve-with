@@ -37,10 +37,11 @@ function harness() {
   sqlite.exec(readFileSync('migrations/0004_users_and_agreements.sql','utf8'));
   sqlite.exec(readFileSync('migrations/0005_event_signups.sql','utf8'));
   sqlite.exec('BEGIN;'+readFileSync('migrations/0006_unclaimed_users.sql','utf8')+'COMMIT;');
+  sqlite.exec(readFileSync('migrations/0007_remove_date_of_birth.sql','utf8'));
   const versionTerms=JSON.parse(readFileSync('src/generated/policy-versions.json','utf8')).terms.version, versionPrivacy=JSON.parse(readFileSync('src/generated/policy-versions.json','utf8')).privacy.version;
   // Event regressions retain an already-completed authorized administrator session.
-  sqlite.prepare('INSERT INTO users(id,email,first_name,last_name,date_of_birth,email_verified_at,created_at,updated_at,terms_accepted_at,accepted_terms_version,accepted_privacy_version) VALUES(?,?,?,?,?,?,?,?,?,?,?)')
-    .run('11111111-1111-4111-8111-111111111111','lionaugust@icloud.com','Admin','Example','1990-01-01',1,1,1,1,versionTerms,versionPrivacy);
+  sqlite.prepare('INSERT INTO users(id,email,first_name,last_name,email_verified_at,created_at,updated_at,terms_accepted_at,accepted_terms_version,accepted_privacy_version) VALUES(?,?,?,?,?,?,?,?,?,?)')
+    .run('11111111-1111-4111-8111-111111111111','lionaugust@icloud.com','Admin','Example',1,1,1,1,versionTerms,versionPrivacy);
   const adapter = { prepare(sql) { const statement = sqlite.prepare(sql); return {
     bind(...args) { return {
       all: async () => ({ results: statement.all(...args) }),
@@ -531,6 +532,19 @@ test('admin creates email-optional unverified user without consent or login',asy
   assert.equal(created.email,null);assert.equal(created.isStub,true);
   const saved=h.sqlite.prepare('SELECT email,claimed_at FROM user_stubs WHERE id=?').get(created.id);
   assert.equal(saved.email,null);assert.equal(saved.claimed_at,null);
+  const detailPath='/api/users/'+created.id;
+  const detailResponse=await h.req(detailPath,'GET',undefined,cookie);
+  assert.equal(detailResponse.status,200,'admin can open email-less attendee profile');
+  const detail=await detailResponse.json();
+  assert.equal(detail.user.email,null);
+  assert.equal(detail.user.id,created.id);
+  assert.equal(detail.isStub,true);
+  assert.equal(detail.canCorrectDob,false);
+  assert.equal((await h.req(detailPath,'GET')).status,401,'anonymous profile access denied');
+  assert.equal((await h.req(detailPath,'PUT',{firstName:'Alexis',lastName:'Volunteer'},cookie)).status,200);
+  assert.equal(h.sqlite.prepare('SELECT first_name FROM user_stubs WHERE id=?').get(created.id).first_name,'Alexis');
+  assert.equal((await h.req(detailPath,'PUT',{firstName:'Alexis',lastName:'Volunteer',dateOfBirth:'1990-01-01'},cookie)).status,422,'DOB is no longer accepted');
+
   assert.equal(h.sqlite.prepare('SELECT COUNT(*) n FROM users WHERE id=?').get(created.id).n,0);
   assert.equal(h.sqlite.prepare('SELECT COUNT(*) n FROM agreement_acceptances WHERE user_id=?').get(created.id).n,0);
   assert.equal(h.sqlite.prepare('SELECT COUNT(*) n FROM sessions WHERE user_id=?').get(created.id).n,0);
@@ -696,8 +710,8 @@ test('a signed-in nonparticipant cannot read another event roster or administrat
   h.insert(eventB,now+600000,now+900000);
   const attendeeId='77777777-7777-4777-8777-777777777777',email='ordinary@example.org',token='7'.repeat(64);
   const versions=JSON.parse(readFileSync('src/generated/policy-versions.json','utf8'));
-  h.sqlite.prepare('INSERT INTO users(id,email,first_name,last_name,date_of_birth,email_verified_at,created_at,updated_at,terms_accepted_at,accepted_terms_version,accepted_privacy_version) VALUES(?,?,?,?,?,?,?,?,?,?,?)')
-   .run(attendeeId,email,'Ordinary','Member','1990-01-01',now,now,now,now,versions.terms.version,versions.privacy.version);
+  h.sqlite.prepare('INSERT INTO users(id,email,first_name,last_name,email_verified_at,created_at,updated_at,terms_accepted_at,accepted_terms_version,accepted_privacy_version) VALUES(?,?,?,?,?,?,?,?,?,?)')
+   .run(attendeeId,email,'Ordinary','Member',now,now,now,now,versions.terms.version,versions.privacy.version);
   const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode('test:'+token))),b=>b.toString(16).padStart(2,'0')).join('');
   h.sqlite.prepare('INSERT INTO sessions(token_hash,email,expires_at,created_at) VALUES(?,?,?,?)').run(hash,email,now+600000,now);
   const cookie='__Host-sw_session='+token;
@@ -746,7 +760,7 @@ test('verified magic-link claim reuses stub enrollment identity without granting
   assert.equal((await h.req('/api/events/'+eventId+'/signups','POST',{},session)).status,403,'uncompleted profile and policies still gate signup');
   const versions=JSON.parse(readFileSync('src/generated/policy-versions.json','utf8'));
   assert.equal((await h.req('/api/auth/agreements','POST',{accepted:true,termsVersion:versions.terms.version,privacyVersion:versions.privacy.version},session)).status,403,'claimant cannot consent before profile completion');
-  assert.equal((await h.req('/api/auth/profile','POST',{firstName:'Magic',lastName:'Claim',dateOfBirth:'1990-01-01'},session)).status,200,'claimant completes the ordinary profile workflow');
+  assert.equal((await h.req('/api/auth/profile','POST',{firstName:'Magic',lastName:'Claim'},session)).status,200,'claimant completes the ordinary profile workflow');
   assert.equal(h.sqlite.prepare('SELECT claimed_at FROM user_stubs WHERE id=?').get(stubId).claimed_at,null,'profile completion alone does not finalize claiming');
   assert.equal((await h.req('/api/events/'+eventId+'/signups','POST',{},session)).status,403,'profile completion does not bypass consent');
   assert.equal((await h.req('/api/auth/agreements','POST',{accepted:true,termsVersion:versions.terms.version,privacyVersion:versions.privacy.version},session)).status,200,'claimant accepts policies via normal registration');

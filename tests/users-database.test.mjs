@@ -39,7 +39,7 @@ test('acceptance history is immutable and references existing users',()=>{
   d.prepare("UPDATE users SET terms_accepted_at=3,accepted_terms_version='t1',accepted_privacy_version='p1' WHERE id=?").run(uuid1);
   d.close();
 });
-test('DOB audit contains no DOB values or columns',()=>{
+test('legacy DOB audit was originally reference-only',()=>{
   const d=db();user(d,uuid1,'admin@example.org');user(d,uuid2,'actor@example.org');
   d.prepare('INSERT INTO user_dob_audit(id,subject_user_id,actor_user_id,changed_at) VALUES(?,?,?,?)').run('audit',uuid1,uuid2,42);
   assert.deepEqual(d.prepare('PRAGMA table_info(user_dob_audit)').all().map(x=>x.name),['id','subject_user_id','actor_user_id','changed_at']);

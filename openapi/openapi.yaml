@@ -450,13 +450,11 @@ paths:
             schema:
               type: object
               additionalProperties: true
-              required: [firstName, lastName, dateOfBirth]
+              required: [firstName, lastName]
               properties:
                 firstName:
                   type: string
                 lastName:
-                  type: string
-                dateOfBirth:
                   type: string
       responses:
         '200':
@@ -816,7 +814,6 @@ paths:
                 firstName: {type: string, minLength: 1, maxLength: 100}
                 lastName: {type: string, minLength: 1, maxLength: 100}
                 email: {type: [string, 'null']}
-                dateOfBirth: {type: [string, 'null']}
       responses:
         '201':
           description: Unclaimed identity created, without verified email or agreements
@@ -1081,8 +1078,6 @@ paths:
                 firstName:
                   type: string
                 lastName:
-                  type: string
-                dateOfBirth:
                   type: string
       responses:
         '200':
@@ -1463,7 +1458,7 @@ paths:
           schema: {type: string, format: uuid}
       responses:
         '200':
-          description: Active participant names only; no email, DOB or history
+          description: Active participant names only; no email or history
           content:
             application/json:
               schema:

@@ -109,6 +109,8 @@ Enable authenticated attendees to sign up for events, withdraw, and review their
 ## Visual system refinement — approved addition to SDDW-006 scope
 This is a cross-cutting UI refinement implemented in the same batch as event signups. **Preserve existing routes, permissions, application behavior, centered page structure, rounded fields/cards, and established form layouts.** These changes are visual/interaction-pattern consistency only; signup behavior remains governed by the requirements above.
 
+The repository [design system](../../docs/design-system.md) is the normative visual and component reference for this refinement. Its component vocabulary is intentional: shared primitives should enforce standards in code where practical, rather than relying only on page-by-page styling discipline.
+
 ### Material iconography
 - Replace mixed Unicode glyphs, ad hoc icons and inconsistent icon styles with **Material Symbols Rounded** throughout attendee and administrator interfaces.
 - Apply a consistent icon size system: **18px** for inline/contextual icons, **20px** within labeled action buttons and **24px** for header utilities.
@@ -129,9 +131,15 @@ This is a cross-cutting UI refinement implemented in the same batch as event sig
 
 ### Consistency and accessibility
 - Apply the same Material icon, button, pill, spacing, surface and emphasis conventions across attendee pages, admin event management, users directory/profile management, event detail and event Create/Edit pages.
+- Establish five consistent page families: browse (Events/My signups), record (event/profile/admin event), directory (users/roster/history), task (sign-in/onboarding/editors) and dashboard/document (usage/policies). Each uses the common shell and PageHeader order: contextual back link where needed, title/action row, optional helper text, then named content sections.
+- Use one event-card anatomy across event listings and signup history: title, icon-supported facts, capacity/status, then bottom-aligned actions. Use responsive tables—not card grids—for dense, comparable directory data such as users, rosters and history.
+- Constrain task/form pages to a readable form column and prevent desktop inputs from stretching needlessly. Keep document pages at a readable measure. Retain the wide workspace only for grids, tables and usage dashboards.
+- Use a single explicit primary action per page. Gold filled buttons represent normal primary actions; secondary actions are Material text/outlined buttons; destructive actions are explicitly labeled red. Orange continues to signify administrator context/caution, not primary action.
+- Standardize loading, empty, recoverable-error and disabled states through shared content-state patterns. Skeletons must reflect the geometry of the content they replace.
+- Treat the staging notice as an environment-only red notice. It must remain prominent without obscuring the page title or selected navigation on narrow screens. Treat GitHub/build links as quiet footer status metadata, not product navigation.
 - Preserve the current centered content width, card/form shape, underlying workflows and screen behavior; no changes to routes, permissions, APIs or signup semantics solely for visual restyling.
-- Validate **light and dark themes**, including admin orange and gold-button contrast, disabled/hover/focus/selected states, responsive layouts, keyboard focus visibility and screen reader labels.
-- Add regression/browser checks for icon replacement, 18/20/24px sizes, segmented admin navigation, header text and removal of Administrator Chip, theme consistency and functional equivalence.
+- Validate **light and dark themes**, including admin orange and gold-button contrast, disabled/hover/focus/selected states, responsive layouts, keyboard focus visibility and screen reader labels. Do not rely on color alone for selected, warning, error, capacity or signup state.
+- Add regression/browser checks for icon replacement, 18/20/24px sizes, segmented admin navigation, header text and removal of Administrator Chip, PageHeader/card/table/form parity, theme consistency and functional equivalence.
 
 ## Explicitly deferred
 - Waitlists or automatic promotion.
