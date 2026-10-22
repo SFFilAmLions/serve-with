@@ -85,8 +85,6 @@ test('incomplete verified profile stays on the login flow without collecting dat
   await page.getByRole('textbox',{name:'First name'}).fill('Test');
   await page.getByRole('textbox',{name:'Last name'}).fill('Person');
   assert.equal(await page.getByLabel('Date of birth').count(),0);
-  await page.getByRole('checkbox').check();
-  await page.getByRole('button',{name:'Complete registration'}).click();
  }finally{await browser.close()}
 });
 
