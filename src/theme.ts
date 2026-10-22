@@ -18,12 +18,15 @@ export function createClubTheme(mode:Appearance){
    fontFamily:'Alata, system-ui, sans-serif',
    h1:{fontFamily:'Ubuntu, system-ui, sans-serif',fontWeight:700},
    h3:{fontFamily:'Ubuntu, system-ui, sans-serif',fontWeight:700},
+   h4:{fontFamily:'Ubuntu, system-ui, sans-serif',fontWeight:700},
+   h5:{fontFamily:'Ubuntu, system-ui, sans-serif',fontWeight:700},
    h6:{fontFamily:'Ubuntu, system-ui, sans-serif',fontWeight:700},
    subtitle1:{fontFamily:'"Ubuntu Condensed", Ubuntu, system-ui, sans-serif'}
   },
   components:{
    MuiCssBaseline:{styleOverrides:{'html':{colorScheme:mode},'body':{backgroundColor:dark?'#141613':'#FCFBF6'}}},
    MuiCard:{styleOverrides:{root:{borderRadius:20}}},
+   MuiAlert:{styleOverrides:{root:{borderRadius:16}}},
    MuiButton:{styleOverrides:{root:{borderRadius:20,textTransform:'none',fontWeight:700}}},
    MuiToggleButton:{styleOverrides:{root:{borderRadius:24,textTransform:'none',fontWeight:700,
     '&.Mui-selected,&.Mui-selected:hover':{backgroundColor:clubGold,color:'#25200B',borderColor:clubGold}}}},

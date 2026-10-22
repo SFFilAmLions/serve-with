@@ -69,9 +69,41 @@ function BuildFooter() {
  const released = buildEnvironment === 'production' && /^v\d+\.\d+\.\d+$/.test(releaseTag);
  const label = staged ? 'Commit ' + buildSha.slice(0,12) : released ? 'Version ' + releaseTag : 'Development build';
  const href = staged ? repositoryUrl + '/commit/' + buildSha : released ? repositoryUrl + '/releases/tag/' + releaseTag : undefined;
- return <Box component="footer" sx={{my:5,color:'text.secondary',fontSize:12,display:'flex',flexWrap:'wrap',gap:1,alignItems:'center'}}>
+ return <Box component="footer" sx={{mt:6,mb:3,color:'text.secondary',fontSize:12,display:'flex',flexWrap:'wrap',gap:1,alignItems:'center',opacity:0.8}}>
   <Chip component="a" clickable icon={<Glyph type="github"/>} label="GitHub" href={repositoryUrl} target="_blank" rel="noopener noreferrer" aria-label="Serve With GitHub repository" size="small" variant="outlined"/>{href?<Chip component="a" clickable label={label} href={href} target="_blank" rel="noopener noreferrer" size="small" variant="outlined"/>:<Chip label={label} size="small" variant="outlined"/>}
  </Box>;
+}
+type PageHeaderProps={title:string;description?:React.ReactNode;back?:{label:string;onClick:()=>void};action?:React.ReactNode;children?:React.ReactNode};
+function PageHeader({title,description,back,action,children}:PageHeaderProps){
+ return <Stack component="header" spacing={1.5} sx={{mt:4,mb:3}}>
+  {back&&<Button size="small" startIcon={<Glyph type="back" size={24}/>} sx={{alignSelf:'flex-start'}} onClick={back.onClick}>{back.label}</Button>}
+  <Stack direction={{xs:'column',sm:'row'}} spacing={2} alignItems={{sm:'flex-start'}} justifyContent="space-between">
+   <Box sx={{minWidth:0}}><Typography variant="h4" component="h1">{title}</Typography>{description&&<Typography color="text.secondary" sx={{mt:0.5}}>{description}</Typography>}</Box>
+   {action&&<Box sx={{flexShrink:0,alignSelf:{xs:'flex-start',sm:'center'}}>{action}</Box>}
+  </Stack>
+  {children}
+ </Stack>;
+}
+function SegmentedNavigation<T extends string>({value,onChange,label,items}:{value:T;onChange:(value:T)=>void;label:string;items:{value:T;label:string;icon?:React.ReactNode}[]}){
+ return <ToggleButtonGroup exclusive color="primary" size="small" value={value} onChange={(_,next:T|null)=>{if(next)onChange(next)}} aria-label={label}
+  sx={{gap:1,maxWidth:'100%',overflowX:'auto','& .MuiToggleButton-root':{borderRadius:'24px !important',px:2,gap:0.75,flexShrink:0,border:'1px solid',borderColor:'divider'}}}>
+  {items.map(item=><ToggleButton key={item.value} value={item.value}>{item.icon}{item.label}</ToggleButton>)}
+ </ToggleButtonGroup>;
+}
+function ContentState({loading,error,empty,children}:{loading?:boolean;error?:string;empty?:React.ReactNode;children:React.ReactNode}){
+ if(loading)return <Box sx={{py:3}} role="status"><Skeleton variant="rounded" height={160} aria-label="Loading content"/></Box>;
+ if(error)return <Alert severity="error" role="alert">{error}</Alert>;
+ if(empty)return <Box sx={{py:3}}>{empty}</Box>;
+ return <>{children}</>;
+}
+function FormPage({children}:{children:React.ReactNode}){
+ return <Stack spacing={2} sx={{mt:4,maxWidth:560,width:'100%'}}>{children}</Stack>;
+}
+function EventCard({event,onDetails,onCopy,actions,summary}:{event:EventRecord;onDetails:()=>void;onCopy:()=>void;actions?:React.ReactNode;summary?:React.ReactNode}){
+ return <Card variant="outlined" sx={{display:'flex',flexDirection:'column',minWidth:0}}><CardContent sx={{flexGrow:1}}>
+  <Typography variant="h6" component="h2"><Button sx={{p:0,textAlign:'left',fontSize:'inherit',lineHeight:'inherit'}} onClick={onDetails}>{event.title}</Button></Typography>
+  <Box sx={{mt:1.5}}><EventWhen event={event}/>{summary&&<Box sx={{mt:1}}>{summary}</Box>}</Box>
+ </CardContent><CardActions sx={{justifyContent:'flex-end',px:2,pb:2}}>{actions??<Button size="small" onClick={onDetails}>Details</Button>}<Tooltip title="Copy public event link"><IconButton size="small" aria-label={'Copy link to '+event.title} onClick={onCopy}><Glyph type="link"/></IconButton></Tooltip></CardActions></Card>;
 }
 function StagingNotice(){
  if(buildEnvironment!=='staging')return null;
@@ -146,11 +178,11 @@ function EventList({admin}:{admin:boolean}){
   }catch{setDeleteError('Could not reach the server')}finally{setDeleting(false)}
  };
  useEffect(()=>{let active=true;setLoading(true);setError('');generatedApi.listEvents({view}).then(result=>{if(result.status!==200)throw Error('Unable to load events');return result.data as {events:EventRecord[]}}).then(d=>{if(active)setEvents(d.events)}).catch(e=>{if(active)setError(String(e.message))}).finally(()=>{if(active)setLoading(false)});return()=>{active=false}},[view,revision]);
- return <Box component="section" aria-label="Events" sx={{my:5}}>
-  {admin&&<Box sx={{display:'flex',justifyContent:'flex-end',mb:2}}><Button variant="contained" onClick={e=>{editorTrigger.current=e.currentTarget;go('/admin/events/new')}}>Add Event</Button></Box>}
-  <ToggleButtonGroup exclusive color="primary" size="small" value={view} onChange={(_,v:View|null)=>{if(v)setView(v)}} aria-label="Event timeline" sx={{gap:1,'& .MuiToggleButton-root':{borderRadius:'24px !important',px:2,gap:0.75,border:'1px solid',borderColor:'divider'}}}><ToggleButton value="upcoming">Upcoming</ToggleButton><ToggleButton value="past">Past</ToggleButton></ToggleButtonGroup>
-  {loading?<Box sx={{p:4}} role="status"><CircularProgress aria-label="Loading events"/></Box>:error?<Stack sx={{p:3}} spacing={2}><Typography role="alert">{error}</Typography><Button onClick={()=>reload(n=>n+1)}>Retry</Button></Stack>:events.length===0?<Box sx={{p:4}}><Typography variant="h6">{view==='upcoming'?'No upcoming events':'No past events yet.'}</Typography>{view==='upcoming'&&<Typography>Check back soon for new opportunities to serve.</Typography>}</Box>:
-  <Box sx={{display:'grid',gridTemplateColumns:{xs:'1fr',md:'repeat(2,minmax(0,1fr))'},gap:2,pt:3}}>{events.map(e=><Card variant="outlined" key={e.id} sx={{display:'flex',flexDirection:'column'}}><CardContent sx={{flexGrow:1}}><Typography variant="h6" component="h3"><Button sx={{p:0,textAlign:'left',fontSize:'inherit'}} onClick={()=>go(admin?'/admin/events/'+e.id:'/events/'+e.id)}>{e.title}</Button></Typography><EventWhen event={e}/></CardContent><CardActions sx={{justifyContent:'flex-end',px:2,pb:2}}>{admin?<><Button size="small" startIcon={<Glyph type="edit"/>} onClick={()=>go('/admin/events/'+e.id+'/edit')}>Edit</Button><Button size="small" onClick={()=>go('/admin/events/'+e.id)}>Signups</Button><IconButton size="small" aria-label={'Duplicate '+e.title} onClick={()=>go('/admin/events/new',{duplicate:e})}><Glyph type="copy"/></IconButton><IconButton size="small" color="error" aria-label={'Delete '+e.title} onClick={event=>{deleteTrigger.current=event.currentTarget;setToDelete(e);setDeleteError('')}}><Glyph type="trash"/></IconButton></>:<Button size="small" onClick={()=>go('/events/'+e.id)}>Details</Button>}<Tooltip title="Copy public event link"><IconButton size="small" aria-label={'Copy link to '+e.title} onClick={()=>void copyEventLink(e)}><Glyph type="link"/></IconButton></Tooltip></CardActions></Card>)}</Box>}
+ return <Box component="section" aria-label="Events" sx={{mb:5}}>
+  <SegmentedNavigation value={view} onChange={setView} label="Event timeline" items={[{value:'upcoming',label:'Upcoming'},{value:'past',label:'Past'}]}/>
+  <ContentState loading={loading} error={error} empty={events.length===0?<><Typography variant="h6">{view==='upcoming'?'No upcoming events':'No past events yet.'}</Typography>{view==='upcoming'&&<Typography color="text.secondary">Check back soon for new opportunities to serve.</Typography>}</>}>
+   <Box sx={{display:'grid',gridTemplateColumns:{xs:'1fr',md:'repeat(2,minmax(0,1fr))'},gap:2,pt:3}}>{events.map(e=><EventCard key={e.id} event={e} onDetails={()=>go(admin?'/admin/events/'+e.id:'/events/'+e.id)} onCopy={()=>void copyEventLink(e)} actions={admin?<><Button size="small" startIcon={<Glyph type="edit"/>} onClick={()=>go('/admin/events/'+e.id+'/edit')}>Edit</Button><Button size="small" onClick={()=>go('/admin/events/'+e.id)}>Signups</Button><IconButton size="small" aria-label={'Duplicate '+e.title} onClick={()=>go('/admin/events/new',{duplicate:e})}><Glyph type="copy"/></IconButton><IconButton size="small" color="error" aria-label={'Delete '+e.title} onClick={event=>{deleteTrigger.current=event.currentTarget;setToDelete(e);setDeleteError('')}}><Glyph type="trash"/></IconButton></>:undefined}/>)}</Box>
+  </ContentState>
  {editor.open&&<Editor key={editor.event?.id||'new'} event={editor.event} onClose={closeEditor} onSaved={()=>{setNotice(editor.event?'Event updated':'Event created');closeEditor();reload(n=>n+1)}} onReload={()=>{closeEditor();reload(n=>n+1)}}/>}
  <Snackbar open={!!notice} autoHideDuration={4500} onClose={()=>setNotice('')} anchorOrigin={{vertical:'bottom',horizontal:'center'}}><Alert severity="success" onClose={()=>setNotice('')}>{notice}</Alert></Snackbar>
  <Dialog open={!!toDelete} onClose={()=>{if(!deleting)closeDelete()}} aria-labelledby="delete-event-title" aria-describedby="delete-event-description"><DialogTitle id="delete-event-title">Delete {toDelete?.title}?</DialogTitle><DialogContent id="delete-event-description">{deleteError&&<Alert severity="error">{deleteError}</Alert>}This removes the event from public listings.</DialogContent><DialogActions><Button disabled={deleting} onClick={closeDelete}>Cancel</Button><Button color="error" loading={deleting} onClick={()=>void remove()}>Delete event</Button></DialogActions></Dialog>
@@ -227,15 +259,15 @@ function AuthScreen({me,refresh}:{me:Me;refresh:()=>Promise<void>}){
  const exchanging=useRef(false);
  const work=async(fn:()=>Promise<void>)=>{setBusy(true);setMessage('');try{await fn()}catch(err){setMessage(err instanceof Error?err.message:'Unable to complete request')}finally{setBusy(false)}};
  useEffect(()=>{if(!token||exchanging.current)return;exchanging.current=true;history.replaceState(null,'','/login');void work(async()=>{await submitJson('/api/auth/magic',{token});await refresh()})},[token]);
- return <Stack spacing={2} sx={{mt:4,maxWidth:560}}>
- <Typography variant="h4">Sign in</Typography>
+ return <FormPage>
+ <PageHeader title="Sign in" description="Use your email to access event signups and your account."/>
  {!me.authenticated&&turnstileKey&&<LoginChallenge key={captchaRound} siteKey={turnstileKey} onToken={setCaptchaToken}/>}
  {!me.authenticated&&(stage==='email'?<Box component="form" onSubmit={e=>{e.preventDefault();void work(async()=>{const r=await requestCode();setMessage(r.message);setStage('code')})}}><Stack spacing={2}><TextField required type="email" label="Email" value={email} onChange={e=>setEmail(e.target.value)} autoComplete="email"/><Button variant="contained" type="submit" disabled={busy||!captchaReady||Boolean(turnstileKey&&!captchaToken)}>Continue</Button></Stack></Box>:
  <Stack spacing={2}><Typography>Check your email at {email}</Typography><Box component="form" onSubmit={e=>{e.preventDefault();void work(async()=>{await submitJson('/api/auth/verify',{email,code});await refresh()})}}><Stack spacing={2}><TextField required label="Eight-digit code" value={code} inputProps={{inputMode:'numeric',maxLength:8,pattern:'[0-9]{8}'}} onChange={e=>setCode(e.target.value)}/><Button type="submit" disabled={busy}>Continue</Button></Stack></Box><Button disabled={busy||!captchaReady||Boolean(turnstileKey&&!captchaToken)} onClick={()=>void work(async()=>{await requestCode();setMessage('If eligible, a new code will arrive shortly.')})}>Resend code</Button><Button onClick={()=>{setStage('email');setCode('');setMessage('')}}>Use a different email</Button></Stack>)}
  {me.authenticated&&(!me.profileComplete||!me.agreementCurrent)&&<OnboardingForm me={me} refresh={refresh}/>}
  {me.authenticated&&me.profileComplete&&me.agreementCurrent&&<Button onClick={()=>go('/')}>Continue to events</Button>}
  {message&&<Alert role="status" severity="info">{message}</Alert>}
- </Stack>;
+ </FormPage>;
 }
 function OnboardingForm({me,refresh}:{me:Me;refresh:()=>Promise<void>}){
  const [first,setFirst]=useState(''),[last,setLast]=useState(''),[checked,setChecked]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState('');
@@ -252,7 +284,7 @@ function OnboardingForm({me,refresh}:{me:Me;refresh:()=>Promise<void>}){
   }catch(e){setError(e instanceof Error?e.message:'Unable to complete registration')}
   finally{setBusy(false)}
  };
- return <Stack spacing={2} component="form" onSubmit={e=>void submit(e)} sx={{maxWidth:650}}>
+ return <Stack spacing={2} component="form" onSubmit={e=>void submit(e)} sx={{maxWidth:560,width:'100%'}}>
   <Typography variant="h6">{needsProfile?'Complete registration':'Review updated policies'}</Typography>
   {needsProfile&&<><TextField required label="First name" value={first} onChange={e=>setFirst(e.target.value)}/><TextField required label="Last name" value={last} onChange={e=>setLast(e.target.value)}/></>}
   <Typography>Read the <a href="/terms" target="_blank" rel="noopener noreferrer">Terms of Use</a> and <a href="/privacy" target="_blank" rel="noopener noreferrer">Privacy Policy</a> before continuing.</Typography>
@@ -294,12 +326,12 @@ function UsersDirectory(){
  useEffect(()=>{sessionStorage.setItem('sw-users-q',query);sessionStorage.setItem('sw-users-sort',sort);sessionStorage.setItem('sw-users-direction',direction);void load(0)},[query,sort,direction]);
  const sortBy=(v:'first'|'last')=>{if(sort===v)setDirection(d=>d==='asc'?'desc':'asc');else{setSort(v);setDirection('asc')}};
  const gridColumns={xs:'minmax(0,1fr)',sm:'minmax(0,1fr) minmax(0,1fr)',lg:'minmax(0,1fr) minmax(0,1fr) minmax(0,2fr)'};
- return <Stack sx={{my:4}} spacing={2}><Typography variant="h4">Users</Typography><TextField label="Search name or email" value={query} onChange={e=>setQuery(e.target.value)}/><Box sx={{display:{xs:'none',sm:'grid'},gridTemplateColumns:gridColumns,gap:1}}>
+ return <Stack spacing={2}><PageHeader title="Users"/><TextField label="Search name or email" value={query} onChange={e=>setQuery(e.target.value)}/><Box sx={{display:{xs:'none',sm:'grid'},gridTemplateColumns:gridColumns,gap:1}}>
  <Button sx={{justifyContent:'flex-start'}} onClick={()=>sortBy('first')}>First name {sort==='first'?(direction==='asc'?'↑':'↓'):''}</Button>
  <Button sx={{justifyContent:'flex-start'}} onClick={()=>sortBy('last')}>Last name {sort==='last'?(direction==='asc'?'↑':'↓'):''}</Button>
  <Typography sx={{display:{xs:'none',lg:'block'},px:1,alignSelf:'center',color:'text.secondary'}}>Email</Typography>
  </Box>
- <Box sx={{display:'flex',gap:1}}><Box sx={{flex:1,minWidth:0}}>{people.map(p=><React.Fragment key={p.id}><ListItemButton onClick={()=>go('/users/'+p.id)} sx={{display:'grid',gridTemplateColumns:gridColumns,gap:1,minHeight:52}}>
+ <Box sx={{display:'flex',gap:1}}><Box sx={{flex:1,minWidth:0,border:1,borderColor:'divider',borderRadius:2,overflow:'hidden'}}>{people.map(p=><React.Fragment key={p.id}><ListItemButton onClick={()=>go('/users/'+p.id)} sx={{display:'grid',gridTemplateColumns:gridColumns,gap:1,minHeight:52}}>
  <Typography sx={{display:{xs:'none',sm:'block'},overflow:'hidden',textOverflow:'ellipsis'}}>{p.first_name||'—'}</Typography>
  <Typography sx={{display:{xs:'none',sm:'block'},overflow:'hidden',textOverflow:'ellipsis'}}>{p.last_name||'—'}</Typography>
  <Typography sx={{display:{xs:'block',sm:'none'}}}>{[p.first_name,p.last_name].filter(Boolean).join(' ')||p.email}</Typography>
@@ -377,9 +409,8 @@ function EventDetail({id,admin,me}:{id:string;admin:boolean;me:Me}){
  if(!event)return <Skeleton height={200}/>;
  const closed=Date.now()>=event.start_at;
  const full=event.spots_available===0;
- return <Stack spacing={2} sx={{my:4}}>
-  <Button size="small" startIcon={<Glyph type="back" size={24}/>} sx={{alignSelf:"flex-start"}} onClick={()=>go(admin?"/admin/events":"/")}>Back to events</Button>
-  <Typography variant="h4">{event.title}</Typography>
+ return <Stack spacing={2}>
+  <PageHeader title={event.title} back={{label:'Back to events',onClick:()=>go(admin?'/admin/events':'/')}}/>
   <Box sx={{display:'grid',gridTemplateColumns:{xs:'minmax(0,1fr)',md:'minmax(0,2fr) minmax(240px,1fr)'},gap:3,alignItems:'start'}}>
    <Stack spacing={2} sx={{minWidth:0}}>
     <EventWhen event={event} clockNow={clockNow}/>
@@ -622,7 +653,7 @@ function MySignups({me}:{me:Me}){
   return()=>{active=false};
  },[me.authenticated,me.profileComplete,me.agreementCurrent]);
  if(!me.authenticated||!me.profileComplete||!me.agreementCurrent)
-  return <Stack sx={{my:4}} spacing={2}><Typography variant="h4">My signups</Typography><Alert severity="info">Sign in and complete your account to see your event signups.</Alert><Button onClick={()=>go('/login')}>Complete account</Button></Stack>;
+  return <Stack spacing={2}><PageHeader title="My signups"/><Alert severity="info">Sign in and complete your account to see your event signups.</Alert><Button sx={{alignSelf:'flex-start'}} onClick={()=>go('/login')}>Complete account</Button></Stack>;
  const copyEventLink=async(id:string)=>{
   try{await navigator.clipboard.writeText(new URL('/events/'+id,location.origin).toString());setNotice('Event link copied');}
   catch{setError('Unable to copy the event link. Please copy it from your browser address bar.');}
@@ -638,28 +669,17 @@ function MySignups({me}:{me:Me}){
   view==='cancelled'?!activeEventIds.has(item.event_id)&&item.deleted_at!==null:
   activeEventIds.has(item.event_id)&&item.deleted_at===null&&(view==='upcoming'?item.end_at>now:item.end_at<=now)
  ).sort((a,b)=>view==='upcoming'?a.start_at-b.start_at:b.start_at-a.start_at);
- return <Box component="section" aria-label="My signups" sx={{my:5}}>
-  <Typography variant="h4" sx={{mb:2}}>My signups</Typography>
-  <ToggleButtonGroup exclusive color="primary" size="small" value={view} onChange={(_,v:'upcoming'|'past'|'cancelled'|null)=>{if(v)setView(v)}} aria-label="Signup timeline"
-   sx={{gap:1,maxWidth:'100%',overflowX:'auto','& .MuiToggleButton-root':{borderRadius:'24px !important',px:2,flexShrink:0}}}>
-   <ToggleButton value="upcoming">Upcoming</ToggleButton><ToggleButton value="past">Past</ToggleButton><ToggleButton value="cancelled">Cancelled</ToggleButton>
-  </ToggleButtonGroup>
-  {loading?<Box sx={{p:4}} role="status"><CircularProgress aria-label="Loading signups"/></Box>:
-   error?<Alert severity="error" role="alert">{error}</Alert>:
-   filtered.length===0?<Box sx={{p:4}}><Typography variant="h6">{view==='cancelled'?'No cancelled signups.':view==='past'?'No past signups.':'No upcoming signups.'}</Typography></Box>:
+ return <Box component="section" aria-label="My signups" sx={{mb:5}}>
+  <PageHeader title="My signups"/>
+  <SegmentedNavigation value={view} onChange={setView} label="Signup timeline" items={[{value:'upcoming',label:'Upcoming'},{value:'past',label:'Past'},{value:'cancelled',label:'Cancelled'}]}/>
+  <ContentState loading={loading} error={error} empty={filtered.length===0?<Typography variant="h6">{view==='cancelled'?'No cancelled signups.':view==='past'?'No past signups.':'No upcoming signups.'}</Typography>}>
    <Box sx={{display:'grid',gridTemplateColumns:{xs:'1fr',md:'repeat(2,minmax(0,1fr))'},gap:2,pt:3}}>
     {filtered.map(item=>{
      const event:EventRecord={id:item.event_id,title:item.title,location:item.location,timezone:item.timezone,start_at:item.start_at,end_at:item.end_at,version:1,capacity:item.capacity,signups_count:item.signups_count,spots_available:item.capacity===null?null:Math.max(0,item.capacity-item.signups_count)};
-     return <Card variant="outlined" key={item.event_id} sx={{display:'flex',flexDirection:'column'}}>
-      <CardContent sx={{flexGrow:1}}>
-       <Typography variant="h6" component="h3"><Button sx={{p:0,textAlign:'left',fontSize:'inherit'}} onClick={()=>go('/events/'+item.event_id)}>{item.title}</Button></Typography>
-       <EventWhen event={event}/>
-       <Typography variant="body2" color="text.secondary" sx={{mt:1}}>{item.deleted_at!==null?'Cancelled '+new Date(item.deleted_at).toLocaleString():'Signed up '+new Date(item.created_at).toLocaleString()}</Typography>
-      </CardContent>
-      <CardActions sx={{justifyContent:'flex-end',px:2,pb:2}}><Button size="small" onClick={()=>go('/events/'+item.event_id)}>Details</Button><Tooltip title="Copy public event link"><IconButton size="small" aria-label={'Copy link to '+item.title} onClick={()=>void copyEventLink(item.event_id)}><Glyph type="link"/></IconButton></Tooltip></CardActions>
-     </Card>;
+     return <EventCard key={item.event_id} event={event} onDetails={()=>go('/events/'+item.event_id)} onCopy={()=>void copyEventLink(item.event_id)} summary={<Typography variant="body2" color="text.secondary">{item.deleted_at!==null?'Cancelled '+new Date(item.deleted_at).toLocaleString():'Signed up '+new Date(item.created_at).toLocaleString()}</Typography>}/>;
     })}
-   </Box>}
+   </Box>
+  </ContentState>
   <Snackbar open={!!notice} autoHideDuration={4500} onClose={()=>setNotice('')} anchorOrigin={{vertical:'bottom',horizontal:'center'}}><Alert severity="success" onClose={()=>setNotice('')}>{notice}</Alert></Snackbar>
  </Box>;
 }
@@ -681,12 +701,11 @@ function UsageDashboard(){
   }catch(e){setError(e instanceof Error?e.message:'Unable to load provider usage');}finally{setLoading(false);}
  };
  useEffect(()=>{void refresh()},[]);
- return <Stack spacing={2} sx={{my:4}}>
-  <Typography variant="h4">Usage &amp; Quotas</Typography>
+ return <Stack spacing={2}>
+  <PageHeader title="Usage & Quotas" description="Provider readings may be shared across an account or specific to this application." action={<Button disabled={loading} onClick={()=>void refresh()}>Refresh status</Button>}/>
   <Alert severity="warning" role="status">Experimental: provider usage integrations are not yet complete. These values may be unavailable or inaccurate until verified against each provider. Unknown is not zero.</Alert>
   <Box component="details" sx={{p:1,border:1,borderColor:'divider',borderRadius:1}}><Box component="summary" sx={{cursor:'pointer'}}>Integration diagnostics (no credentials or account identifiers)</Box><Box component="pre" sx={{whiteSpace:'pre-wrap',overflowWrap:'anywhere',fontSize:12}}>{diagnostic}</Box></Box>
-  <Typography variant="body2" color="text.secondary">Usage may be shared across an account or specific to an application. Limits are shown only when confirmed by a provider.</Typography>
-  <Button sx={{alignSelf:'flex-start'}} disabled={loading} onClick={()=>void refresh()}>Refresh status</Button>
+  <Typography variant="body2" color="text.secondary">Limits are shown only when confirmed by a provider.</Typography>
   {loading&&<CircularProgress aria-label="Loading provider usage status"/>}
   {error&&<Alert severity="error" role="alert">{error}</Alert>}
   {data&&<><Typography color="text.secondary">Environment: {data.environment} · Collected {new Date(data.collectedAt).toLocaleString()}</Typography>
@@ -754,7 +773,7 @@ function RoutedApp(){
   aria-label="Administrator sections" sx={{my:1,gap:1,maxWidth:'100%',overflowX:'auto','& .MuiToggleButton-root':{borderRadius:'24px !important',px:2,gap:0.75,flexShrink:0}}}>
    <ToggleButton value="events"><Glyph type="events"/>Events</ToggleButton><ToggleButton value="users"><Glyph type="users"/>Users</ToggleButton><ToggleButton value="usage"><Glyph type="usage"/>Usage</ToggleButton>
   </ToggleButtonGroup>}</Container></AppBar><StagingNotice/>
- <Container maxWidth="lg" component="main" sx={{flex:1,width:'100%'}}>{path==='/terms'?<PolicyPage kind="terms"/>:path==='/privacy'?<PolicyPage kind="privacy"/>:path==='/login'?<AuthScreen me={me} refresh={refresh}/>:path==='/admin/events/new'&&canAdmin?<EventPageEditor/>:editRoute&&canAdmin?<EventPageEditor id={editRoute[1]}/>:adminEventRoute&&canAdmin?<AdminEventSignups id={adminEventRoute[1]}/>:userRoute?<UserView key={path} id={userRoute[1]} edit={!!userRoute[2]} backPath={userRoute[1]===me.userId?'/':'/admin/users'} canEditAvatar={userRoute[1]===me.userId}/>:eventRoute?<EventDetail id={eventRoute[1]} admin={false} me={me}/>:path==='/admin/users'&&canAdmin?<UsersDirectory/>:path==='/admin/users/new'&&canAdmin?<AdminCreateUser/>:path==='/admin/usage'&&canAdmin?<UsageDashboard/>:path==='/my-signups'?<MySignups me={me}/>:path.startsWith('/admin')&&!canAdmin?<Alert severity="warning" sx={{mt:3}}>Complete your profile and current agreement to access administrator tools. <Button onClick={()=>go('/login')}>Account setup</Button></Alert>:<><Typography variant="h4" sx={{mt:4}}>{admin?'Manage events':'Serve With SF Fil-Am Lions'}</Typography><EventList admin={canAdmin&&admin}/></>}<BuildFooter/></Container></ThemeProvider>;
+ <Container maxWidth="lg" component="main" sx={{flex:1,width:'100%'}}>{path==='/terms'?<PolicyPage kind="terms"/>:path==='/privacy'?<PolicyPage kind="privacy"/>:path==='/login'?<AuthScreen me={me} refresh={refresh}/>:path==='/admin/events/new'&&canAdmin?<EventPageEditor/>:editRoute&&canAdmin?<EventPageEditor id={editRoute[1]}/>:adminEventRoute&&canAdmin?<AdminEventSignups id={adminEventRoute[1]}/>:userRoute?<UserView key={path} id={userRoute[1]} edit={!!userRoute[2]} backPath={userRoute[1]===me.userId?'/':'/admin/users'} canEditAvatar={userRoute[1]===me.userId}/>:eventRoute?<EventDetail id={eventRoute[1]} admin={false} me={me}/>:path==='/admin/users'&&canAdmin?<UsersDirectory/>:path==='/admin/users/new'&&canAdmin?<AdminCreateUser/>:path==='/admin/usage'&&canAdmin?<UsageDashboard/>:path==='/my-signups'?<MySignups me={me}/>:path.startsWith('/admin')&&!canAdmin?<Alert severity="warning" sx={{mt:3}}>Complete your profile and current agreement to access administrator tools. <Button onClick={()=>go('/login')}>Account setup</Button></Alert>:<><PageHeader title={admin?'Manage events':'Serve With SF Fil-Am Lions'} description={admin?undefined:'Making it easier to serve together.'} action={admin?<Button variant="contained" onClick={()=>go('/admin/events/new')}>Add Event</Button>:undefined}/><EventList admin={canAdmin&&admin}/></>}<BuildFooter/></Container></ThemeProvider>;
 }
 
 createRoot(document.getElementById('app')!).render(<RoutedApp/>);
